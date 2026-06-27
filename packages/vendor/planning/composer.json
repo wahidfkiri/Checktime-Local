@@ -1,0 +1,22 @@
+{
+    "name": "vendor/planning",
+    "description": "A Laravel package for testing purposes",
+    "type": "library",
+    "autoload": {
+      "psr-4": {
+        "Vendor\\Planning\\": "src/"
+      }
+    },
+    "require": {
+      "php": "^8.0",
+      "illuminate/support": "^10.0"
+    },
+    "extra": {
+      "laravel": {
+        "providers": [
+          "Vendor\\Planning\\PlanningServiceProvider"
+        ]
+      }
+    }
+  }
+  

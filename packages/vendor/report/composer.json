@@ -1,0 +1,22 @@
+{
+    "name": "vendor/report",
+    "description": "A Laravel package for report tracking",
+    "type": "library",
+    "autoload": {
+      "psr-4": {
+        "Vendor\\Report\\": "src/"
+      }
+    },
+    "require": {
+      "php": "^8.0",
+      "illuminate/support": "^10.0"
+    },
+    "extra": {
+      "laravel": {
+        "providers": [
+          "Vendor\\Report\\ReportServiceProvider"
+        ]
+      }
+    }
+  }
+  
