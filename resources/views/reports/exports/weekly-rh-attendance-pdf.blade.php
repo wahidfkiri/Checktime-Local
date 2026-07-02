@@ -256,7 +256,7 @@
     <!-- En-tête -->
     <div class="header">
         @if(isset($client->logo) && $client->logo)
-            <img src="{{ public_path('storage/' . $client->logo) }}" alt="{{ $client->raison_sociale }}" class="client-logo">
+            <img src="{{ public_path($client->logo) }}" alt="{{ $client->raison_sociale }}" class="client-logo">
         @endif
         <div class="header-content">
             <div class="title">RAPPORT DE PRÉSENCE DU PERSONNEL</div>

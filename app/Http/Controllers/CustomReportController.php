@@ -700,7 +700,7 @@ class CustomReportController extends Controller
                 'report_data'     => $reportData,
                 'totals'          => $totals,
                 'total_employees' => count($reportData),
-                'period_days'     => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1
+                'period_days'     => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1,
             ];
 
             $pdf = Pdf::loadView('reports.exports.custom-report-pdf', $data);

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\CheckTimeService;
 use App\Models\Employee;
-use App\Models\Client;
 use App\Models\Zone;
 use App\Models\Department;
 use Yajra\DataTables\Facades\DataTables;
@@ -26,26 +25,14 @@ class EmployeeController extends Controller
 
     public function index(Request $request)
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        // Si l'utilisateur n'a pas de client associé
-        if (!$client) {
-            if ($request->ajax()) {
-                return response()->json(['data' => []]);
-            }
-            return view('employee::employees.index')->with('error', 'Aucun client associé à votre compte.');
-        }
-        
         // Si c'est une requête AJAX pour DataTables
         if ($request->ajax()) {
             return $this->getLocalEmployees($request);
         }
         
         // Pour l'affichage normal de la page
-        $clientId = $client->id;
-        $zones = Zone::where('client_id', $clientId)->get();
-        $departments = Department::where('client_id', $clientId)->get();
+        $zones = Zone::all();
+        $departments = Department::all();
         
         return view('employee::employees.index', compact('zones', 'departments'));
     }
@@ -65,16 +52,8 @@ class EmployeeController extends Controller
             'address' => 'nullable|string|max:500',
         ]);
 
-        // Ajouter le client_id
-        $validated['client_id'] = auth()->user()->client_id;
+        $token = $this->api->getGeneralToken();
 
-        
-         // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -82,12 +61,10 @@ class EmployeeController extends Controller
             ], 401);
         }
 
-        
         $this->sync($request);
 
         // get max code 
-    $code = Employee::where('client_id', $client->id)
-    ->whereRaw('emp_code REGEXP "^[0-9]+$"')
+    $code = Employee::whereRaw('emp_code REGEXP "^[0-9]+$"')
     ->selectRaw('MAX(CAST(emp_code AS UNSIGNED)) as max_code')
     ->value('max_code');
     $nextCode = $code !== null ? ((int) $code + 1) : 1;
@@ -113,8 +90,7 @@ class EmployeeController extends Controller
             "Accept" => "application/json",
             "Content-Type" => "application/json"
         ])
-        // ->timeout(30)
-        ->post('http://54.37.15.111/personnel/api/employees/', $apiData);
+        ->post(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/employees/', $apiData);
 
         if ($response->successful()) {
             $responseData = $response->json();
@@ -177,12 +153,8 @@ public function update(Request $request, $id)
         ]);
 
         
-         // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -190,8 +162,7 @@ public function update(Request $request, $id)
             ], 401);
         }
 
-         $apiData = [
-         //   'emp_code' => $validated['emp_code'],
+        $apiData = [
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'contact_tel' => $validated['phone'] ?? null,
@@ -209,7 +180,7 @@ public function update(Request $request, $id)
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->patch('http://54.37.15.111/personnel/api/employees/' . $id . '/', $apiData);
+        ->patch(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/employees/' . $id . '/', $apiData);
 
         if ($response->successful()) {
             $responseData = $response->json();
@@ -254,12 +225,8 @@ public function update(Request $request, $id)
 public function destroy($id)
 {
     try {
-       // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+            $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -273,11 +240,11 @@ public function destroy($id)
             "Accept" => "application/json",
         ])
         ->timeout(30)
-        ->delete('http://54.37.15.111/personnel/api/employees/' . $id . '/');
+        ->delete(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/employees/' . $id . '/');
 
         if ($response->successful()) {
             $this->sync(new Request()); // Synchroniser après suppression
-            Employee::where('employee_id', $id)->where('client_id', $client->id)->delete();
+            Employee::where('employee_id', $id)->delete();
             return response()->json([
                 'success' => true,
                 'message' => 'Employé supprimé avec succès'
@@ -316,35 +283,22 @@ public function destroy($id)
         try {
             Log::info('====== DÉBUT SYNCHRONISATION EMPLOYÉS ======');
             
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
+            $token = $this->api->getGeneralToken();
+
+            if (!$token) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
+                    'message' => 'Token API non configuré'
                 ]);
             }
-            
-            $clientId = $client->id;
-            
-            // Récupérer la configuration du client
-            $accessConfig = DB::table('access_configs')->where('client_id', $clientId)->first();
-            
-            if (!$accessConfig) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucune configuration trouvée pour ce client'
-                ]);
-            }
-            
-            // Synchroniser les employés pour ce client
-            $synced = $this->syncEmployeesForClient($accessConfig);
+
+            // Synchroniser les employés
+            $synced = $this->syncEmployees($token);
             
             // Mettre à jour le cache
-            Cache::put('employees_last_sync_' . $clientId, time(), now()->addHours(2));
+            Cache::put('employees_last_sync_1', time(), now()->addHours(2));
             
-            $totalEmployees = Employee::where('client_id', $clientId)->count();
+            $totalEmployees = Employee::count();
             
             Log::info("====== SYNCHRONISATION TERMINÉE: {$synced} employés synchronisés ======");
             
@@ -367,12 +321,11 @@ public function destroy($id)
     /**
      * Synchronise les employés pour un client
      */
-    private function syncEmployeesForClient($config): int
+    private function syncEmployees($token): int
     {
-        $clientId = $config->client_id;
-        $token = $config->general_token;
+        $clientId = 1;
         
-        Log::info("Client {$clientId}: Début synchronisation");
+        Log::info("Synchronisation employés");
         
         try {
             // Récupérer TOUS les employés avec pagination
@@ -416,14 +369,13 @@ public function destroy($id)
                 $batchData[] = [
                     'employee_id' => $employeeId,
                     'emp_code' => (string) $employeeCode,
-                    'client_id' => $clientId,
                     'first_name' => $firstName,
-                    'last_name' => $lastName,
+                    'last_name' => $lastName ?? $firstName,
                     'email' => $employeeData['email'] ?? null,
                     'phone' => $employeeData['mobile'] ?? $employeeData['contact_tel'] ?? null,
                     'area_name' => $areaName,
                     'dept_name' => $deptName,
-                    'zone_id' => $zoneData['id'] ?? null, // Now correctly gets ID from area[0]
+                    'area_id' => $zoneData['id'] ?? null,
                     'department_id' => $departmentData ?? null,
                     'status' => $this->determineStatus($employeeData),
                     'metadata' => json_encode($employeeData),
@@ -553,8 +505,7 @@ public function destroy($id)
                     Employee::updateOrCreate(
                         [
                             'employee_id' => $data['employee_id'],
-                            'emp_code' => $data['emp_code'],
-                            'client_id' => $data['client_id']
+                            'emp_code' => $data['emp_code']
                         ],
                         [
                             'first_name' => $data['first_name'],
@@ -563,7 +514,7 @@ public function destroy($id)
                             'dept_name' => $data['dept_name'],
                             'email' => $data['email'],
                             'phone' => $data['phone'],
-                            'zone_id' => $data['zone_id'],
+                            'area_id' => $data['area_id'],
                             'department_id' => $data['department_id'],
                             'status' => $data['status'],
                             'metadata' => $data['metadata'],
@@ -592,12 +543,10 @@ public function destroy($id)
                 return 0;
             }
             
-            $deleted = Employee::where('client_id', $clientId)
-                             ->whereNotIn('emp_code', $apiEmployeeCodes)
-                             ->delete();
+            $deleted = Employee::whereNotIn('emp_code', $apiEmployeeCodes)->delete();
             
             if ($deleted > 0) {
-                Log::info("Supprimé {$deleted} employés obsolètes pour client {$clientId}");
+                Log::info("Supprimé {$deleted} employés obsolètes");
             }
             
             return $deleted;
@@ -614,14 +563,7 @@ public function destroy($id)
     public function getLocalEmployees(Request $request)
 {
     if ($request->ajax()) {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        if (!$client) {
-            return DataTables::of([])->make(true);
-        }
-        
-        $query = Employee::where('client_id', $client->id);
+        $query = Employee::query();
         
         // Appliquer les filtres
         $this->applyFilters($query, $request);
@@ -721,7 +663,7 @@ public function destroy($id)
         // Note: Le filtre client_id est automatiquement appliqué
         
         if ($request->has('zone_id') && !empty($request->zone_id)) {
-            $query->where('zone_id', $request->zone_id);
+            $query->where('area_id', $request->zone_id);
         }
         
         if ($request->has('dept_name') && !empty($request->dept_name)) {
@@ -764,44 +706,34 @@ public function destroy($id)
     public function resetAndSync(Request $request)
     {
         try {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
-                ], 404);
-            }
-            
-            $clientId = $client->id;
+            $clientId = 1;
             
             // Compter avant suppression
-            $beforeCount = Employee::where('client_id', $clientId)->count();
+            $beforeCount = Employee::count();
             
-            // Vider les employés du client
-            Employee::where('client_id', $clientId)->delete();
-            Log::info("Employés du client {$clientId} supprimés (avant: {$beforeCount})");
+            // Vider les employés
+            Employee::truncate();
+            Log::info("Employés supprimés (avant: {$beforeCount})");
             
             // Vider le cache
             Cache::forget('employees_last_sync_' . $clientId);
             
             // Resynchroniser
-            $accessConfig = DB::table('access_configs')->where('client_id', $clientId)->first();
-            
-            if (!$accessConfig) {
+            $token = $this->api->getGeneralToken();
+
+            if (!$token) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Aucune configuration trouvée pour ce client'
+                    'message' => 'Token API non configuré'
                 ]);
             }
-            
-            $synced = $this->syncEmployeesForClient($accessConfig);
+
+            $synced = $this->syncEmployees($token);
             
             // Mettre à jour le cache
             Cache::put('employees_last_sync_' . $clientId, time(), now()->addHours(2));
             
-            $afterCount = Employee::where('client_id', $clientId)->count();
+            $afterCount = Employee::count();
             
             return response()->json([
                 'success' => true,
@@ -821,30 +753,142 @@ public function destroy($id)
     }
 
     /**
+     * Synchroniser les employés avec des credentials explicites (pour installation)
+     */
+    public function syncWithCredentials(Request $request)
+    {
+        $apiUrl = $request->input('api_url');
+        $apiToken = $request->input('api_token');
+
+        if (!$apiUrl || !$apiToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'URL et token API requis'
+            ], 400);
+        }
+
+        try {
+            Log::info('====== SYNCHRONISATION EMPLOYÉS (DEPUIS INSTALLATION) ======');
+
+            $allEmployees = [];
+            $page = 1;
+
+            while (true) {
+                $response = Http::withHeaders([
+                    "Authorization" => "Token " . $apiToken,
+                    "Accept" => "application/json"
+                ])
+                ->timeout(60)
+                ->get(rtrim($apiUrl, '/') . '/personnel/api/employees/', [
+                    'page' => $page,
+                    'limit' => 300
+                ]);
+
+                if ($response->failed()) {
+                    Log::warning("Page {$page} échouée: " . $response->status());
+                    break;
+                }
+
+                $data = $response->json();
+                $employees = $data['data'] ?? [];
+
+                if (empty($employees)) break;
+
+                $allEmployees = array_merge($allEmployees, $employees);
+
+                if (empty($data['next'])) break;
+                $page++;
+                usleep(100000);
+            }
+
+            if (empty($allEmployees)) {
+                Log::info('Aucun employé trouvé via API');
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Connexion réussie mais aucun employé trouvé.',
+                    'total_synced' => 0,
+                    'total_in_db' => Employee::count()
+                ]);
+            }
+
+            Log::info(count($allEmployees) . ' employés récupérés depuis l\'API');
+
+            $batchData = [];
+            $employeeCodes = [];
+            $now = now();
+
+            foreach ($allEmployees as $employeeData) {
+                $employeeCode = $employeeData['emp_code'] ?? null;
+                $firstName = $employeeData['first_name'] ?? null;
+
+                if (!$employeeCode || !$firstName) continue;
+
+                $employeeCodes[] = (string) $employeeCode;
+
+                $batchData[] = [
+                    'employee_id' => $employeeData['id'] ?? null,
+                    'emp_code' => (string) $employeeCode,
+                    'first_name' => $firstName,
+                    'last_name' => $employeeData['last_name'] ?? $firstName,
+                    'email' => $employeeData['email'] ?? null,
+                    'phone' => $employeeData['mobile'] ?? $employeeData['contact_tel'] ?? null,
+                    'area_name' => $employeeData['area'][0]['area_name'] ?? null,
+                    'dept_name' => $employeeData['department']['dept_name'] ?? null,
+                    'area_id' => $employeeData['area'][0]['id'] ?? null,
+                    'department_id' => $employeeData['department']['id'] ?? null,
+                    'status' => (isset($employeeData['enable_att']) && $employeeData['enable_att'] === false) ? 'inactive' : 'active',
+                    'metadata' => json_encode($employeeData),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+
+                if (count($batchData) >= 150) {
+                    $this->bulkUpsertEmployees($batchData);
+                    $batchData = [];
+                }
+            }
+
+            if (!empty($batchData)) {
+                $this->bulkUpsertEmployees($batchData);
+            }
+
+            $this->cleanupMissingEmployees($employeeCodes, 1);
+
+            Cache::put('employees_last_sync_1', time(), now()->addHours(2));
+
+            $totalEmployees = Employee::count();
+
+            Log::info("====== SYNCHRONISATION INSTALLATION TERMINÉE: {$totalEmployees} employés ======");
+
+            return response()->json([
+                'success' => true,
+                'message' => "Synchronisation terminée: {$totalEmployees} employés en base",
+                'total_synced' => count($employeeCodes),
+                'total_in_db' => $totalEmployees
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur syncWithCredentials: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur synchro employés: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Statut de synchronisation
      */
     public function syncStatus()
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        if (!$client) {
-            return response()->json([
-                'total_employees' => 0,
-                'last_sync' => 'Jamais',
-                'client_name' => 'Non associé'
-            ]);
-        }
-        
-        $clientId = $client->id;
+        $clientId = 1;
         
         $status = [
-            'total_employees' => Employee::where('client_id', $clientId)->count(),
+            'total_employees' => Employee::count(),
             'last_sync' => Cache::get('employees_last_sync_' . $clientId) ? 
                 date('d/m/Y H:i:s', Cache::get('employees_last_sync_' . $clientId)) : 'Jamais',
-            'client_name' => $client->raison_sociale ?? 'Client #' . $clientId,
-            'employees_by_status' => Employee::where('client_id', $clientId)
-                ->select('status', DB::raw('count(*) as count'))
+            'client_name' => config('app.name'),
+            'employees_by_status' => Employee::select('status', DB::raw('count(*) as count'))
                 ->groupBy('status')
                 ->get()
                 ->map(function($item) {

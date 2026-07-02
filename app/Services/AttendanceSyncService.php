@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\AttendanceTransaction;
 use App\Models\DailyAttendance;
-use App\Models\AccessConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +14,7 @@ use Illuminate\Http\Client\RequestException;
 
 class AttendanceSyncService
 {
-    private $apiBaseUrl = 'http://54.37.15.111/iclock/api/transactions/';
+    private $apiBaseUrl;
     
     // Configuration des timeouts et retry
     private $connectionTimeout = 10;
@@ -23,26 +22,32 @@ class AttendanceSyncService
     private $maxRetries = 3;
     private $retryDelay = 1000;
     private $retryMultiplier = 2;
+
+    public function __construct()
+    {
+        $baseUrl = CheckTimeService::getConfigBaseUrl();
+        $this->apiBaseUrl = rtrim($baseUrl, '/') . '/iclock/api/transactions/';
+    }
     
     /**
      * Synchroniser les pointages pour tous les employés
      */
     public function syncAll($daysBack = 1)
     {
-        $accessConfig = AccessConfig::first();
+        $token = CheckTimeService::getConfigToken();
         
-        if (!$accessConfig || !$accessConfig->general_token) {
-            Log::warning("Pas de token configuré dans access_configs");
+        if (!$token) {
+            Log::warning("Pas de token configuré");
             return false;
         }
         
-        $employees = Employee::whereNotNull('emp_code')->where('is_active', true)->get();
+        $employees = Employee::whereNotNull('emp_code')->where('status', 'active')->get();
         $successCount = 0;
         $errorCount = 0;
         
         foreach ($employees as $employee) {
             try {
-                $result = $this->syncEmployeeAttendances($employee, $accessConfig->general_token, $daysBack);
+                $result = $this->syncEmployeeAttendances($employee, $token, $daysBack);
                 if ($result) {
                     $successCount++;
                 } else {
@@ -342,7 +347,7 @@ class AttendanceSyncService
      */
     public function updateDailySummaryForDate(Carbon $date)
     {
-        $employees = Employee::whereNotNull('emp_code')->where('is_active', true)->get();
+        $employees = Employee::whereNotNull('emp_code')->where('status', 'active')->get();
         $updatedCount = 0;
         
         foreach ($employees as $employee) {
@@ -670,9 +675,9 @@ class AttendanceSyncService
      */
     public function syncForDate(Carbon $date)
     {
-        $accessConfig = AccessConfig::first();
+        $token = CheckTimeService::getConfigToken();
         
-        if (!$accessConfig || !$accessConfig->general_token) {
+        if (!$token) {
             Log::warning("Pas de token configuré pour la synchronisation");
             return false;
         }
@@ -680,12 +685,12 @@ class AttendanceSyncService
         $startDate = $date->copy()->startOfDay();
         $endDate = $date->copy()->endOfDay();
         
-        $employees = Employee::whereNotNull('emp_code')->where('is_active', true)->get();
+        $employees = Employee::whereNotNull('emp_code')->where('status', 'active')->get();
         $successCount = 0;
         
         foreach ($employees as $employee) {
             try {
-                $result = $this->syncEmployeeForDate($employee, $accessConfig->general_token, $startDate, $endDate);
+                $result = $this->syncEmployeeForDate($employee, $token, $startDate, $endDate);
                 if ($result) {
                     $successCount++;
                 }

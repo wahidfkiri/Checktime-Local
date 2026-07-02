@@ -19,13 +19,10 @@ class ClientController extends Controller
      */
     public function index()
     {
-        $companySettings = Setting::getGroup('company');
+        $companySettings = Setting::company();
         return view('clients.index', compact('companySettings'));
     }
 
-    /**
-     * Met à jour le profil de l'entreprise
-     */
     public function update(Request $request)
     {
         try {
@@ -69,7 +66,7 @@ class ClientController extends Controller
      */
     public function edit()
     {
-        $companySettings = Setting::getGroup('company');
-        return view('clients.modals.edit', ['client' => $companySettings]);
+        $client = Setting::company();
+        return view('clients.modals.edit', compact('client'));
     }
 }

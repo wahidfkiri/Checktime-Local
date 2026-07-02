@@ -7,7 +7,6 @@ use App\Models\Device;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -66,10 +65,8 @@ class DailyAttendanceController extends Controller
             
             Log::info("Récupération données pour aujourd'hui: " . $today->format('d-m-Y'));
             
-            // Récupérer le token d'authentification
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
+            // Récupérer le token d'authentification depuis CheckTimeService
+            if (!$this->api->hasToken()) {
                 Log::warning("Token d'accès non configuré");
                 return [
                     'success' => false,
@@ -77,9 +74,9 @@ class DailyAttendanceController extends Controller
                     'data' => []
                 ];
             }
-            
-            $token = $accessConfig->general_token;
-            
+
+            $token = $this->api->getGeneralToken();
+
             // Récupérer tous les devices
             $devices = Device::all();
             
@@ -213,15 +210,13 @@ class DailyAttendanceController extends Controller
             $startTime = Carbon::parse($startDate)->startOfDay()->format('Y-m-d H:i:s');
             $endTime = Carbon::parse($endDate)->endOfDay()->format('Y-m-d H:i:s');
             
-            // Récupérer le token d'authentification
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
+            // Récupérer le token d'authentification depuis CheckTimeService
+            if (!$this->api->hasToken()) {
                 return response()->json(['error' => 'Token d\'accès non configuré'], 400);
             }
-            
-            $token = $accessConfig->general_token;
-            
+
+            $token = $this->api->getGeneralToken();
+
             // Récupérer les devices selon le filtre
             $devicesQuery = Device::query();
             
@@ -369,7 +364,7 @@ class DailyAttendanceController extends Controller
             ])->withOptions([
                 'verify' => false,
                 'timeout' => 30,
-            ])->get('http://54.37.15.111/iclock/api/transactions/', $apiParams);
+            ])->get(rtrim($this->api->getBaseUrl(), '/') . '/iclock/api/transactions/', $apiParams);
 
             
             
@@ -826,18 +821,16 @@ private function getAllTransactionsWithRetry($devices, $startTime, $endTime, $to
             $startTime = Carbon::parse($startDate)->startOfDay()->format('Y-m-d H:i:s');
             $endTime = Carbon::parse($endDate)->endOfDay()->format('Y-m-d H:i:s');
             
-            // Récupérer le token d'authentification
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
+            // Récupérer le token d'authentification depuis CheckTimeService
+            if (!$this->api->hasToken()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Token d\'accès non configuré.'
                 ], 400);
             }
-            
-            $token = $accessConfig->general_token;
-            
+
+            $token = $this->api->getGeneralToken();
+
             // Récupérer les devices selon le filtre
             $devicesQuery = Device::query();
             

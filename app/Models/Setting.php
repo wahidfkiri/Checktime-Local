@@ -28,6 +28,44 @@ class Setting extends Model
         'sms_credit' => 'integer',
     ];
 
+    public static function set(string $key, $value, string $group = null): void
+    {
+        self::updateOrCreate(
+            ['key' => $key],
+            ['value' => $value, 'group' => $group]
+        );
+    }
+
+    public static function getGroup(string $group): array
+    {
+        return self::where('group', $group)->pluck('value', 'key')->toArray();
+    }
+
+    public static function company(): \stdClass
+    {
+        $settings = self::where('group', 'company')->pluck('value', 'key')->toArray();
+
+        $user = new \stdClass();
+        $user->name = $settings['app_name'] ?? 'CheckTime';
+        $user->email = $settings['mail_from_address'] ?? '';
+
+        $company = new \stdClass();
+        $company->id = 1;
+        $company->name = $settings['app_name'] ?? 'CheckTime';
+        $company->raison_sociale = $settings['app_name'] ?? '';
+        $company->company_name = $settings['app_name'] ?? '';
+        $company->logo = $settings['app_logo'] ?? '';
+        $company->address = $settings['app_address'] ?? '';
+        $company->adresse = $settings['app_address'] ?? '';
+        $company->phone = $settings['app_phone'] ?? '';
+        $company->telephone = $settings['app_phone'] ?? '';
+        $company->email = $settings['mail_from_address'] ?? '';
+        $company->user = $user;
+        $company->all = $settings;
+
+        return $company;
+    }
+
     public function decrement($column, $amount = 1, array $extra = [])
     {
         if ($column === 'sms_credit') {

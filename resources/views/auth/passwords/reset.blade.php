@@ -380,7 +380,7 @@
                 <!-- Reset Form -->
                 <div class="reset-header">
                     <div class="reset-logo">
-                        <img src="{{ asset('logo.jpg') }}" alt="Logo">
+                        <img src="{{ $appLogo }}" alt="Logo">
                     </div>
                     <h1 class="reset-title">Nouveau mot de passe</h1>
                     <p class="reset-subtitle">Choisissez un mot de passe sécurisé</p>

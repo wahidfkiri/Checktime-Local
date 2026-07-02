@@ -5,7 +5,6 @@ namespace Vendor\Planning\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\EmployeeSchedule;
 use App\Models\Employee;
-use App\Models\Client;
 use App\Models\WorkHourType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,19 +20,11 @@ class EmployeeScheduleController extends Controller
    public function index(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Client non trouvé.'
-                ], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             if ($request->ajax()) {
                 // Construire la requête
-                $query = EmployeeSchedule::with(['employee', 'workHourType'])
-                    ->where('client_id', $client->id);
+                $query = EmployeeSchedule::with(['employee', 'workHourType']);
                 
                 // Filtres
                 if ($request->filled('employee_id')) {
@@ -232,12 +223,10 @@ class EmployeeScheduleController extends Controller
             }
             
             // Pour les requêtes non-AJAX (affichage initial)
-            $employees = Employee::where('client_id', $client->id)
-                ->orderBy('first_name')
+            $employees = Employee::orderBy('first_name')
                 ->get();
                 
-            $workHourTypes = WorkHourType::where('client_id', $client->id)
-                ->where('is_active', true)
+            $workHourTypes = WorkHourType::where('is_active', true)
                 ->orderBy('name')
                 ->get();
             
@@ -265,7 +254,7 @@ class EmployeeScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validator = Validator::make($request->all(), [
                 'employee_ids' => 'required',
@@ -300,11 +289,10 @@ class EmployeeScheduleController extends Controller
             
             // Récupérer les employés
             $employeeIds = $validated['employee_ids'] === 'all' 
-                ? Employee::where('client_id', $client->id)->pluck('id')->toArray()
+                ? Employee::pluck('id')->toArray()
                 : (array)$validated['employee_ids'];
             
             $employees = Employee::whereIn('id', $employeeIds)
-                ->where('client_id', $client->id)
                 ->get();
             
             if ($employees->isEmpty()) {
@@ -317,7 +305,7 @@ class EmployeeScheduleController extends Controller
             // Récupérer les infos de l'horaire si fourni (pour planifié)
             if ($validated['schedule_type'] === 'planifie' && isset($validated['work_hour_type_id'])) {
                 $workHourType = WorkHourType::find($validated['work_hour_type_id']);
-                if (!$workHourType || $workHourType->client_id != $client->id) {
+                if (!$workHourType) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Type d\'horaire non autorisé'
@@ -386,7 +374,6 @@ class EmployeeScheduleController extends Controller
                     
                     // Préparer les données pour le planning
                     $scheduleData = $this->prepareScheduleData(
-                        $client->id,
                         $employee->id,
                         $currentDate,
                         $validated,
@@ -518,13 +505,12 @@ class EmployeeScheduleController extends Controller
     /**
      * Prépare les données du planning selon le type
      */
-    private function prepareScheduleData(int $clientId, int $employeeId, Carbon $date, array $data, ?WorkHourType $workHourType = null): array
+    private function prepareScheduleData(int $employeeId, Carbon $date, array $data, ?WorkHourType $workHourType = null): array
     {
         $dayOfWeek = $date->dayOfWeekIso;
         $scheduleType = $data['schedule_type'];
         
         $baseData = [
-            'client_id' => $clientId,
             'employee_id' => $employeeId,
             'schedule_type' => $scheduleType,
             'schedule_date' => $date->toDateString(),
@@ -647,7 +633,7 @@ class EmployeeScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validator = Validator::make($request->all(), [
                 'employee_id' => 'required|exists:employees,id',
@@ -680,24 +666,12 @@ class EmployeeScheduleController extends Controller
             
             // Vérifier l'employé
             $employee = Employee::find($request->employee_id);
-            if ($employee->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
             
             $validated = $validator->validated();
             
             // Si work_hour_type_id fourni, vérifier et récupérer les infos
             if (!empty($validated['work_hour_type_id'])) {
                 $workHourType = WorkHourType::find($validated['work_hour_type_id']);
-                if ($workHourType->client_id != $client->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Type d\'horaire non autorisé.'
-                    ], 403);
-                }
                 
                 // Remplir les infos depuis le type
                 $validated['start_time'] = $workHourType->start_time;
@@ -737,7 +711,6 @@ class EmployeeScheduleController extends Controller
             
             // Préparer les données
             $scheduleData = [
-                'client_id' => $client->id,
                 'employee_id' => $validated['employee_id'],
                 'work_hour_type_id' => $validated['work_hour_type_id'] ?? null,
                 'schedule_type' => $validated['schedule_type'],
@@ -794,14 +767,7 @@ class EmployeeScheduleController extends Controller
     public function edit(EmployeeSchedule $employeeSchedule)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if ($employeeSchedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+            $client = \App\Models\Setting::company();
             
             return response()->json([
                 'success' => true,
@@ -822,14 +788,7 @@ class EmployeeScheduleController extends Controller
     public function update(Request $request, EmployeeSchedule $employeeSchedule)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if ($employeeSchedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'work_hour_type_id' => 'nullable|exists:work_hour_types,id',
@@ -848,12 +807,6 @@ class EmployeeScheduleController extends Controller
             // Si work_hour_type_id fourni
             if ($request->filled('work_hour_type_id')) {
                 $workHourType = WorkHourType::find($validated['work_hour_type_id']);
-                if ($workHourType->client_id != $client->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Type d\'horaire non autorisé.'
-                    ], 403);
-                }
                 
                 $validated['start_time'] = $workHourType->start_time;
                 $validated['end_time'] = $workHourType->end_time;
@@ -890,14 +843,7 @@ class EmployeeScheduleController extends Controller
     public function destroy(EmployeeSchedule $employeeSchedule)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if ($employeeSchedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+            $client = \App\Models\Setting::company();
             
             $employeeSchedule->delete();
             
@@ -920,7 +866,7 @@ class EmployeeScheduleController extends Controller
     public function duplicate(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'schedule_id' => 'required|exists:employee_schedules,id',
@@ -932,13 +878,6 @@ class EmployeeScheduleController extends Controller
             ]);
             
             $originalSchedule = EmployeeSchedule::find($validated['schedule_id']);
-            
-            if ($originalSchedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
             
             $startDate = Carbon::parse($validated['start_date']);
             $endDate = Carbon::parse($validated['end_date']);
@@ -973,7 +912,6 @@ class EmployeeScheduleController extends Controller
                 
                 // Créer la copie
                 EmployeeSchedule::create([
-                    'client_id' => $client->id,
                     'employee_id' => $originalSchedule->employee_id,
                     'work_hour_type_id' => $originalSchedule->work_hour_type_id,
                     'schedule_type' => $originalSchedule->schedule_type,
@@ -1010,14 +948,7 @@ class EmployeeScheduleController extends Controller
     public function toggleStatus(EmployeeSchedule $employeeSchedule)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if ($employeeSchedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+            $client = \App\Models\Setting::company();
             
             $employeeSchedule->update([
                 'is_active' => !$employeeSchedule->is_active
@@ -1044,7 +975,7 @@ class EmployeeScheduleController extends Controller
     public function import(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $request->validate([
                 'import_file' => 'required|file|mimes:csv,xlsx,xls'
@@ -1069,8 +1000,7 @@ class EmployeeScheduleController extends Controller
                     // Valider et créer le planning
                     try {
                         // Trouver l'employé par matricule
-                        $employee = Employee::where('client_id', $client->id)
-                            ->where('emp_code', $data['matricule'])
+                        $employee = Employee::where('emp_code', $data['matricule'])
                             ->first();
                         
                         if (!$employee) {
@@ -1079,8 +1009,7 @@ class EmployeeScheduleController extends Controller
                         }
                         
                         // Trouver le type d'horaire
-                        $workHourType = WorkHourType::where('client_id', $client->id)
-                            ->where('name', $data['horaire'])
+                        $workHourType = WorkHourType::where('name', $data['horaire'])
                             ->first();
                         
                         EmployeeSchedule::updateOrCreate(
@@ -1089,7 +1018,6 @@ class EmployeeScheduleController extends Controller
                                 'schedule_date' => $data['date']
                             ],
                             [
-                                'client_id' => $client->id,
                                 'work_hour_type_id' => $workHourType->id ?? null,
                                 'schedule_type' => 'planifie',
                                 'day_of_week' => Carbon::parse($data['date'])->dayOfWeekIso,
@@ -1128,14 +1056,7 @@ class EmployeeScheduleController extends Controller
     public function export(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Client non trouvé.'
-                ], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             $validator = Validator::make($request->all(), [
                 'format' => 'required|in:pdf,excel,csv',
@@ -1158,7 +1079,6 @@ class EmployeeScheduleController extends Controller
             
             // Récupérer les plannings
             $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType'])
-                ->where('client_id', $client->id)
                 ->whereBetween('schedule_date', [
                     $validated['start_date'],
                     $validated['end_date']
@@ -1309,7 +1229,7 @@ class EmployeeScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
-            $client = Auth::user()->client;
+            $client = \App\Models\Setting::company();
             
             $validator = Validator::make($request->all(), [
                 'ids' => 'required|array',
@@ -1325,18 +1245,6 @@ class EmployeeScheduleController extends Controller
             }
             
             $validated = $validator->validated();
-            
-            // Vérifier que tous les plannings appartiennent au client
-            $schedules = EmployeeSchedule::whereIn('id', $validated['ids'])->get();
-            
-            foreach ($schedules as $schedule) {
-                if ($schedule->client_id != $client->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Non autorisé pour certains plannings.'
-                    ], 403);
-                }
-            }
             
             $count = EmployeeSchedule::whereIn('id', $validated['ids'])->delete();
             
@@ -1363,7 +1271,7 @@ class EmployeeScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
-            $client = Auth::user()->client;
+            $client = \App\Models\Setting::company();
             
             $validator = Validator::make($request->all(), [
                 'ids' => 'required|array',
@@ -1381,18 +1289,6 @@ class EmployeeScheduleController extends Controller
             }
             
             $validated = $validator->validated();
-            
-            // Vérifier que tous les plannings appartiennent au client
-            $schedules = EmployeeSchedule::whereIn('id', $validated['ids'])->get();
-            
-            foreach ($schedules as $schedule) {
-                if ($schedule->client_id != $client->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Non autorisé pour certains plannings.'
-                    ], 403);
-                }
-            }
             
             $count = EmployeeSchedule::whereIn('id', $validated['ids'])
                 ->update([$validated['field'] => $validated['value']]);

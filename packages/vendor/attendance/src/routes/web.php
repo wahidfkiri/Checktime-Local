@@ -5,7 +5,7 @@ use Vendor\Attendance\Controllers\DailyAttendanceController;
 
 
 Auth::routes();
-Route::middleware(['web','auth', 'role:client','client.active'])->group(function () {
+Route::middleware(['web','auth', 'role:admin','client.active'])->group(function () {
 // Gestion des présences
 Route::prefix('admin/daily-attendance')->group(function () {
     Route::get('/', [DailyAttendanceController::class, 'index'])->name('admin.daily-attendance.index');

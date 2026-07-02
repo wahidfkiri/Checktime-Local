@@ -531,7 +531,7 @@ $(document).ready(function() {
         });
     });
     
-    // ========== EXPORT PDF AVEC PROGRESSION ==========
+    // ========== EXPORT PDF ==========
     
     $('#exportPdfBtn').click(function() {
         var startDate = $('#filter_start_date').val();
@@ -550,20 +550,14 @@ $(document).ready(function() {
             return;
         }
         
-        // Vérifier si une génération est déjà en cours
-        if (isGeneratingPDF) {
-            showSweetAlert('info', 'Opération en cours', 'Un export PDF est déjà en cours. Veuillez patienter.');
-            return;
-        }
-        
         // Afficher la barre de progression PDF
         showPdfProgress();
-        var progressInterval = simulatePdfProgress();
+        var pdfInterval = simulatePdfProgress();
         
         // Envoyer la requête AJAX
         $.ajax({
             url: "{{ route('admin.daily-attendance.retard.export-pdf') }}",
-            type: 'POST',
+            method: 'POST',
             data: {
                 _token: "{{ csrf_token() }}",
                 start_date: startDate,
@@ -572,44 +566,48 @@ $(document).ready(function() {
                 department: department === 'all' ? '' : department
             },
             success: function(response) {
-                clearInterval(progressInterval);
-                
                 if (response.success) {
-                    updatePdfProgressBar(100, 'PDF généré avec succès !');
+                    clearInterval(pdfInterval);
+                    updatePdfProgressBar(100, 'PDF prêt au téléchargement !');
+                    
+                    if (response.statistics) {
+                        var statsHtml = '<strong>Rapport généré :</strong><br>';
+                        if (response.statistics.period) {
+                            statsHtml += 'Période : ' + response.statistics.period + '<br>';
+                        }
+                        if (response.statistics.total_attendances) {
+                            statsHtml += 'Total retards : ' + response.statistics.total_attendances + '<br>';
+                        }
+                        if (response.statistics.total_employees) {
+                            statsHtml += 'Employés : ' + response.statistics.total_employees;
+                        }
+                        $('#pdf-progress-details').html('<i class="bi bi-check-circle me-1"></i> ' + statsHtml);
+                    }
                     
                     setTimeout(function() {
-                        hidePdfProgress();
-                        
                         var link = document.createElement('a');
                         link.href = response.pdf_url;
-                        link.download = response.filename || 'retards_report.pdf';
+                        link.download = response.filename || 'export.pdf';
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
-                        
-                        showSweetAlert('success', 'Succès', 
-                            'Le PDF a été généré et téléchargé avec succès!', 
-                            3000);
-                    }, 500);
+                        hidePdfProgress();
+                        showSweetAlert('success', 'Succès', 'PDF exporté avec succès !');
+                    }, 1000);
                 } else {
-                    clearInterval(progressInterval);
+                    clearInterval(pdfInterval);
                     hidePdfProgress();
-                    showSweetAlert('error', 'Erreur', response.message || 'Erreur lors de la génération du PDF.');
+                    showSweetAlert('error', 'Erreur', response.message || 'Erreur lors de l\'export.');
                 }
             },
-            error: function(xhr, status, error) {
-                clearInterval(progressInterval);
+            error: function(xhr) {
+                clearInterval(pdfInterval);
                 hidePdfProgress();
-                
-                var errorMessage = 'Une erreur est survenue lors de la génération du PDF.';
+                var msg = 'Erreur lors de l\'export.';
                 if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMessage = xhr.responseJSON.message;
-                } else if (xhr.statusText) {
-                    errorMessage = 'Erreur ' + xhr.status + ': ' + xhr.statusText;
+                    msg = xhr.responseJSON.message;
                 }
-                
-                showSweetAlert('error', 'Erreur', errorMessage);
-                console.error('Erreur export PDF:', xhr);
+                showSweetAlert('error', 'Erreur', msg);
             }
         });
     });

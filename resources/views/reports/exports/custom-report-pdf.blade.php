@@ -158,10 +158,12 @@
 <body>
     <!-- En-tête -->
     <div class="header">
-        <!-- Logo du client -->
-         @if(isset($client->logo) && $client->logo)
-        <img src="<?php echo $_SERVER["DOCUMENT_ROOT"]; ?>/storage/app/public/<?php echo $client->logo; ?>" alt="{{$client->raison_sociale}}" class="client-logo">
-    @endif
+        @php
+            $appLogo = \App\Models\Setting::where('key', 'app_logo')->value('value');
+        @endphp
+        @if($appLogo)
+            <img src="{{ public_path($appLogo) }}" alt="Logo" class="client-logo">
+        @endif
         <div class="header-content">
         <div class="title">RAPPORT DE PRÉSENCE & PONCTUALITÉ</div>
         <div class="period-info">
@@ -169,7 +171,6 @@
             ({{ $period_days }} jours)
         </div>
         <div class="client-info">
-            Client : {{ $client->name }} | 
             Employés : {{ $total_employees }} | 
             Exporté le : {{ $export_date->format('d/m/Y à H:i') }}
         </div>

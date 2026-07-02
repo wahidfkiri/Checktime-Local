@@ -4,7 +4,7 @@
       <div class="d-flex justify-content-center align-items-center">
         <div class="logo">
           <a href="{{route('dashboard')}}">
-            <img src="{{asset('logo.jpg')}}" alt="Logo" srcset="" style="width: 150px; height: 100px;">
+            <img src="{{ $appLogo }}" alt="Logo" style="width: 150px; height: 100px;">
           </a>
         </div>
         <div class="sidebar-toggler x">
@@ -32,19 +32,19 @@
           </a>
           <ul class="submenu @if(request()->routeIs('employees.*') || request()->routeIs('departments.*') || request()->routeIs('areas.*')) active @endif">
             <li class="submenu-item @if(request()->routeIs('employees.*')) active @endif">
-              <a href="{{route('employees.index')}}">
+              <a href="{{route('employees.index')}}" class="submenu-link">
                 <i class="bi bi-list-ul"></i>
                 <span>Liste des employés</span>
               </a>
             </li>
             <li class="submenu-item @if(request()->routeIs('departments.*')) active @endif">
-              <a href="{{route('departments.index')}}">
+              <a href="{{route('departments.index')}}" class="submenu-link">
                 <i class="bi bi-building"></i>
                 <span>Départements</span>
               </a>
             </li>
             <li class="submenu-item @if(request()->routeIs('areas.*')) active @endif">
-              <a href="{{route('areas.index')}}">
+              <a href="{{route('areas.index')}}" class="submenu-link">
                 <i class="bi bi-geo-alt"></i>
                 <span>Zones</span>
               </a>
@@ -61,7 +61,7 @@
     <ul class="submenu @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('schedules.*') || request()->routeIs('rotations.*')) active @endif">
         <!-- Types d'horaires -->
         <li class="submenu-item @if(request()->routeIs('work-hours.*')) active @endif">
-            <a href="{{ route('work-hours.index') }}">
+            <a href="{{ route('work-hours.index') }}" class="submenu-link">
                 <i class="bi bi-clock-history"></i>
                 <span>Types d'horaires</span>
             </a>
@@ -69,7 +69,7 @@
         
         <!-- Horaires rotatifs -->
         <li class="d-none submenu-item @if(request()->routeIs('rotations.*')) active @endif">
-            <a href="{{ route('rotations.index') }}">
+            <a href="{{ route('rotations.index') }}" class="submenu-link">
                 <i class="bi bi-arrow-repeat"></i>
                 <span>Horaires rotatifs</span>
             </a>
@@ -84,7 +84,7 @@
 </li>
         <!-- Calendrier d'assignation -->
         <li class="submenu-item @if(request()->routeIs('schedules.calendar')) active @endif">
-            <a href="{{ route('schedules.calendar') }}">
+            <a href="{{ route('schedules.calendar') }}" class="submenu-link">
                 <i class="bi bi-calendar3"></i>
                 <span>Calendrier</span>
             </a>
@@ -107,13 +107,13 @@
               </a>
             </li> -->
             <li class="submenu-item @if(request()->routeIs('permissions.*')) active @endif">
-              <a href="{{route('authorizations.employee-permissions.index')}}">
+              <a href="{{route('authorizations.employee-permissions.index')}}" class="submenu-link">
                 <i class="bi bi-check-circle-fill"></i>
                 <span>Permissions</span>
               </a>
             </li>
             <li class="submenu-item {{ request()->routeIs('missions.*') ? 'active' : '' }}">
-    <a href="{{ route('missions.index') }}">
+    <a href="{{ route('missions.index') }}" class="submenu-link">
         <i class="bi bi-briefcase me-2"></i>
         <span>Missions</span>
     </a>
@@ -129,7 +129,7 @@
             
             <!-- Congés -->
             <li class="submenu-item @if(request()->routeIs('leaves.*')) active @endif">
-              <a href="{{route('leaves.index')}}">
+              <a href="{{route('leaves.index')}}" class="submenu-link">
                 <i class="bi bi-calendar-check"></i>
                 <span>Congés</span>
               </a>
@@ -153,7 +153,7 @@
     <ul class="submenu @if(request()->routeIs('admin.daily-attendance.*')) active @endif">
         <!-- Historique complet -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.index')) active @endif">
-            <a href="{{ route('admin.daily-attendance.index') }}">
+            <a href="{{ route('admin.daily-attendance.index') }}" class="submenu-link">
                 <i class="bi bi-table"></i>
                 <span>Historique complet</span>
             </a>
@@ -161,7 +161,7 @@
         
         <!-- Liste des présences -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.presence')) active @endif">
-            <a href="{{ route('admin.daily-attendance.presence') }}">
+            <a href="{{ route('admin.daily-attendance.presence') }}" class="submenu-link">
                 <i class="bi bi-person-check-fill text-success"></i>
                 <span>Liste des présences</span>
             </a>
@@ -169,7 +169,7 @@
         
         <!-- Liste des absences -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.absence')) active @endif">
-            <a href="{{ route('admin.daily-attendance.absence') }}">
+            <a href="{{ route('admin.daily-attendance.absence') }}" class="submenu-link">
                 <i class="bi bi-person-x-fill text-danger"></i>
                 <span>Liste des absences</span>
             </a>
@@ -177,7 +177,7 @@
         
         <!-- Liste des retards -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.retards')) active @endif">
-            <a href="{{ route('admin.daily-attendance.retards') }}">
+            <a href="{{ route('admin.daily-attendance.retards') }}" class="submenu-link">
                 <i class="bi bi-person-x-fill text-warning"></i>
                 <span>Liste des retards</span>
             </a>
@@ -193,13 +193,13 @@
     </a>
     <ul class="submenu @if(request()->routeIs('reports.*')) active @endif">
         <li class="submenu-item @if(request()->routeIs('reports.absences-delays')) active @endif">
-            <a href="{{ route('reports.absences-delays') }}">
+            <a href="{{ route('reports.absences-delays') }}" class="submenu-link">
                 <i class="bi bi-exclamation-triangle"></i>
                 <span>État de pointage <br>(arrivées – départs)</span>
             </a>
         </li>
         <li class="submenu-item @if(request()->routeIs('reports.custom.presence')) active @endif">
-            <a href="{{ route('reports.custom.presence') }}">
+            <a href="{{ route('reports.custom.presence') }}" class="submenu-link">
                 <i class="bi bi-funnel"></i>
                 <span>Rapport d'assiduité et de ponctualité</span>
             </a>

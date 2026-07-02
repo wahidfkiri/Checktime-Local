@@ -81,6 +81,7 @@ class SettingsController extends Controller
             
             $testData = [
                 'settings' => $settings,
+                'client' => \App\Models\Setting::company(),
                 'test_time' => now(),
                 'type' => 'rh'
             ];
@@ -134,6 +135,7 @@ class SettingsController extends Controller
             $testData = [
                 'employee' => $employee,
                 'settings' => $settings,
+                'client' => \App\Models\Setting::company(),
                 'test_time' => now(),
                 'type' => 'employee'
             ];

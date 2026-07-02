@@ -4,7 +4,6 @@ namespace Vendor\Planning\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkHourType;
-use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +17,9 @@ class WorkHourController extends Controller
     {
         // Vérifier si c'est une requête AJAX pour DataTable
         if ($request->ajax()) {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            $query = WorkHourType::where('client_id', $client->id)
-                ->select(['id', 'name', 'code', 'start_time', 'end_time', 'break_minutes', 'is_overnight', 'is_active', 'created_at']);
+            $query = WorkHourType::select(['id', 'name', 'code', 'start_time', 'end_time', 'break_minutes', 'is_overnight', 'is_active', 'created_at']);
             
             // Filtres
             if ($request->filled('code_filter')) {
@@ -108,7 +106,7 @@ class WorkHourController extends Controller
     public function store(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'code' => 'required|string|max:50',
@@ -120,7 +118,6 @@ class WorkHourController extends Controller
                 'is_active' => 'boolean'
             ]);
             
-            $validated['client_id'] = $client->id;
             $validated['is_overnight'] = $request->has('is_overnight');
             $validated['is_active'] = $request->has('is_active', true);
             
@@ -157,15 +154,6 @@ class WorkHourController extends Controller
      */
     public function show(WorkHourType $workHourType)
     {
-        // Vérifier que le type d'horaire appartient au client
-            $client = Client::where('user_id', auth()->user()->id)->first();
-        if ($workHourType->client_id != $client->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Non autorisé.'
-            ], 403);
-        }
-        
         return response()->json([
             'success' => true,
             'data' => $workHourType
@@ -178,15 +166,9 @@ class WorkHourController extends Controller
     public function update(Request $request, WorkHourType $workHourType)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            // Vérifier que le type d'horaire appartient au client
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+
             
             $validated = $request->validate([
                 'code' => 'required|string|max:50',
@@ -242,15 +224,9 @@ class WorkHourController extends Controller
     public function destroy(WorkHourType $workHourType)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            // Vérifier que le type d'horaire appartient au client
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+
             
             // Vérifier s'il est utilisé dans des plannings
             $usedInSchedules = $workHourType->employeeSchedules()->exists();
@@ -283,15 +259,9 @@ class WorkHourController extends Controller
     public function duplicate(WorkHourType $workHourType)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            // Vérifier que le type d'horaire appartient au client
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+
             
             // Créer une copie avec un nouveau code
             $newWorkHourType = $workHourType->replicate();
@@ -318,15 +288,9 @@ class WorkHourController extends Controller
     public function toggleStatus(WorkHourType $workHourType)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            // Vérifier que le type d'horaire appartient au client
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
+
             
             $workHourType->update([
                 'is_active' => !$workHourType->is_active
@@ -353,9 +317,9 @@ class WorkHourController extends Controller
     public function export(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
-            $query = WorkHourType::where('client_id', $client->id);
+            $query = WorkHourType::query();
             
             // Appliquer les filtres
             if ($request->filled('code')) {

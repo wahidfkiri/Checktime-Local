@@ -4,39 +4,53 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use App\Models\Setting;
 
 class CheckTimeService
 {
-    private string $baseUrl = "http://54.37.15.111";
+    private ?string $baseUrl = null;
     private ?string $generalToken = null;
 
     /**
-     * Constructor - Charge le token depuis la base de données
+     * Constructor - Charge config depuis la table settings (fallback access_configs)
      */
     public function __construct()
     {
-        $this->loadToken();
+        $this->loadConfig();
     }
 
     /**
-     * Charge le token depuis la base de données
+     * Charge base_url et token depuis la table settings (group=company)
+     * Fallback: access_configs table, puis hardcoded default
      */
-    private function loadToken(): void
+    private function loadConfig(): void
     {
         try {
-            $access_credentials = DB::table('access_configs')->first();
-            
-            if ($access_credentials && !empty($access_credentials->general_token)) {
-                $this->generalToken = $access_credentials->general_token;
-            } else {
-                // Pas d'erreur immédiate, on permet à l'utilisateur de configurer le token plus tard
-                $this->generalToken = null;
-                \Log::warning('Aucun token trouvé dans la base de données. Le service nécessite une configuration.');
+            $settings = Setting::getGroup('company');
+
+            $this->baseUrl = $settings['api_url']
+                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+
+            $this->generalToken = $settings['api_token'] ?? null;
+
+            if (!$this->generalToken) {
+                $access_credentials = DB::table('access_configs')->first();
+                if ($access_credentials && !empty($access_credentials->general_token)) {
+                    $this->generalToken = $access_credentials->general_token;
+                }
+            }
+
+            if (!$this->generalToken) {
+                $this->generalToken = env('CHECKTIME_TOKEN');
+            }
+
+            if (!$this->generalToken) {
+                \Log::warning('Aucun token trouvé dans settings ni access_configs.');
             }
         } catch (\Exception $e) {
-            // En cas d'erreur de base de données, on log l'erreur mais on ne bloque pas l'instanciation
-            $this->generalToken = null;
-            \Log::error('Erreur lors du chargement du token: ' . $e->getMessage());
+            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+            $this->generalToken = env('CHECKTIME_TOKEN');
+            \Log::error('Erreur chargement config CheckTimeService: ' . $e->getMessage());
         }
     }
 
@@ -89,6 +103,17 @@ class CheckTimeService
     }
 
     /**
+     * Get base URL
+     */
+    public function getBaseUrl(): string
+    {
+        if (!$this->baseUrl) {
+            $this->loadConfig();
+        }
+        return $this->baseUrl;
+    }
+
+    /**
      * Get GENERAL TOKEN
      */
     public function getGeneralToken(): string
@@ -109,18 +134,23 @@ class CheckTimeService
     }
 
     /**
-     * Update token
+     * Update token (dans settings + access_configs)
      */
     public function updateToken(string $token): void
     {
         try {
             $this->generalToken = $token;
-            
-            // Sauvegarder dans la base de données
+
+            // Écrire dans settings
+            Setting::updateOrCreate(
+                ['key' => 'api_token'],
+                ['value' => $token, 'group' => 'company']
+            );
+
+            // Écrire aussi dans access_configs (backward compat)
             $existingRecord = DB::table('access_configs')->first();
-            
+
             if ($existingRecord) {
-                // Mettre à jour l'enregistrement existant
                 DB::table('access_configs')
                     ->where('id', $existingRecord->id)
                     ->update([
@@ -128,16 +158,15 @@ class CheckTimeService
                         'updated_at' => now()
                     ]);
             } else {
-                // Créer un nouvel enregistrement
                 DB::table('access_configs')->insert([
                     'general_token' => $token,
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
             }
-            
+
             \Log::info('Token mis à jour avec succès');
-            
+
         } catch (\Exception $e) {
             \Log::error('Erreur lors de la mise à jour du token: ' . $e->getMessage());
             throw new \Exception('Erreur lors de la mise à jour du token: ' . $e->getMessage());
@@ -157,7 +186,10 @@ class CheckTimeService
         $response = Http::withHeaders([
             "Authorization" => "Token " . $token,
             "Accept" => "application/json"
-        ])->get($this->baseUrl . $endpoint, $params);
+        ])
+        ->timeout(60)
+        ->retry(3, 1000)
+        ->get($this->baseUrl . $endpoint, $params);
 
         if ($response->failed()) {
             throw new \Exception("GET request failed to {$endpoint}: " . $response->body());
@@ -273,35 +305,81 @@ class CheckTimeService
     }
 
     /**
-     * Refresh token from database
+     * Refresh config from database
      */
-    public function refreshToken(): void
+    public function refreshConfig(): void
     {
-        $this->loadToken();
+        $this->loadConfig();
     }
 
     /**
-     * Initialiser la table si elle est vide
+     * Refresh token alias
+     */
+    public function refreshToken(): void
+    {
+        $this->loadConfig();
+    }
+
+    // ─── Static helpers ─────────────────────────────────────────────
+
+    /**
+     * Lire l'URL de base depuis la table settings (fallback access_configs)
+     */
+    public static function getConfigBaseUrl(): string
+    {
+        try {
+            $settings = Setting::getGroup('company');
+            return $settings['api_url']
+                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+        } catch (\Exception $e) {
+            return env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+        }
+    }
+
+    /**
+     * Lire le token depuis la table settings (fallback access_configs)
+     */
+    public static function getConfigToken(): ?string
+    {
+        try {
+            $settings = Setting::getGroup('company');
+            $token = $settings['api_token'] ?? null;
+
+            if (!$token) {
+                $config = DB::table('access_configs')->first();
+                $token = $config->general_token ?? null;
+            }
+
+            if (!$token) {
+                $token = env('CHECKTIME_TOKEN');
+            }
+
+            return $token;
+        } catch (\Exception $e) {
+            return env('CHECKTIME_TOKEN');
+        }
+    }
+
+    /**
+     * Initialiser la table access_configs si elle est vide
      */
     public function initializeTable(): bool
     {
         try {
-            // Vérifier si la table existe et est vide
             $count = DB::table('access_configs')->count();
-            
+
             if ($count === 0) {
-                // Créer un enregistrement vide
                 DB::table('access_configs')->insert([
-                    'general_token' => null,
+                    'general_token' => $this->generalToken,
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
                 return true;
             }
-            
+
             return false;
         } catch (\Exception $e) {
-            \Log::error('Erreur lors de l\'initialisation de la table: ' . $e->getMessage());
+            \Log::error('Erreur initialisation access_configs: ' . $e->getMessage());
             return false;
         }
     }
@@ -311,16 +389,23 @@ class CheckTimeService
      */
     public function getConfigStatus(): array
     {
+        try {
+            $settings = Setting::getGroup('company');
+        } catch (\Exception $e) {
+            $settings = [];
+        }
+
         return [
             'has_token' => $this->hasToken(),
-            'table_exists' => $this->checkTableExists(),
-            'table_has_records' => DB::table('access_configs')->exists(),
-            'base_url' => $this->baseUrl
+            'settings_has_api_url' => !empty($settings['api_url']),
+            'settings_has_api_token' => !empty($settings['api_token']),
+            'access_configs_exists' => $this->checkTableExists(),
+            'base_url' => $this->baseUrl ?? self::getConfigBaseUrl()
         ];
     }
 
     /**
-     * Vérifie si la table existe
+     * Vérifie si la table access_configs existe
      */
     private function checkTableExists(): bool
     {

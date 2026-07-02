@@ -153,7 +153,7 @@
 {{-- ── HEADER ── --}}
 <div class="header">
     @if(!empty($client->logo))
-        <img class="client-logo" src="{{ public_path('storage/' . $client->logo) }}" alt="Logo">
+        <img class="client-logo" src="{{ public_path($client->logo) }}" alt="Logo">
     @endif
     <div class="header-content">
         <div class="title">Rapport de Présence Hebdomadaire</div>

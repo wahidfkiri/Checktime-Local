@@ -19,17 +19,17 @@ class SyncZonesBackground extends Command
         Log::info('Démarrage sync zones background');
         
         try {
-            $config = DB::table('access_configs')->first();
-            
-            if (!$config || !$config->general_token) {
+            $token = \App\Services\CheckTimeService::getConfigToken();
+
+            if (!$token) {
                 $this->error('Pas de token configuré');
                 return;
             }
-            
+
             $this->info("Synchronisation des zones...");
-            
+
             $response = Http::withHeaders([
-                "Authorization" => "Token " . $config->general_token,
+                "Authorization" => "Token " . $token,
                 "Accept" => "application/json"
             ])
             ->timeout(45)

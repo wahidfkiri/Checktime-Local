@@ -355,8 +355,10 @@ class SendMonthlyRHReport extends Command
             $settings = Setting::first();
             $appName  = $settings->app_name ?? config('app.name', 'CheckTime');
 
+            $client = \App\Models\Setting::company();
             $pdfData = [
                 'app_name'          => $appName,
+                'client'            => $client,
                 'rh_email'          => $rhEmail,
                 'start_date'        => $startDate->format('Y-m-d'),
                 'end_date'          => $endDate->format('Y-m-d'),
@@ -413,8 +415,10 @@ class SendMonthlyRHReport extends Command
         $settings = Setting::first();
         $appName  = $settings->app_name ?? config('app.name', 'CheckTime');
 
+        $clientData = \App\Models\Setting::company();
         $emailData = [
             'app_name'          => $appName,
+            'client'            => $clientData,
             'rh_email'          => $rhEmail,
             'start_date'        => $startDate->format('d/m/Y'),
             'end_date'          => $endDate->format('d/m/Y'),

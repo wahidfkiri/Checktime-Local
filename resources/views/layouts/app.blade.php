@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CheckTime</title>
 <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="shortcut icon" href="{{asset('logo.jpg')}}" type="image/png">
+    <link rel="shortcut icon" href="{{ $appLogo }}" type="image/png">
     <link rel="stylesheet" href="{{asset('assets/compiled/css/app.css')}}">
     <link rel="stylesheet" href="{{asset('assets/compiled/css/app-dark.css')}}">
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">

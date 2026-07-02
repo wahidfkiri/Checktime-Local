@@ -1,0 +1,22 @@
+{
+    "name": "vendor/attendance",
+    "description": "A Laravel package for attendance tracking",
+    "type": "library",
+    "autoload": {
+      "psr-4": {
+        "Vendor\\Attendance\\": "src/"
+      }
+    },
+    "require": {
+      "php": "^8.0",
+      "illuminate/support": "^10.0"
+    },
+    "extra": {
+      "laravel": {
+        "providers": [
+          "Vendor\\Attendance\\AttendanceServiceProvider"
+        ]
+      }
+    }
+  }
+  

@@ -314,34 +314,18 @@
             <tr>
                 <td>{{ $attendance['date'] }}</td>
                 <td>
-                    {{ $attendance['full_name'] }}
-                    @if($attendance['employee_found'] === 'Non')
-                    <span class="employee-not-found">*</span>
+                    {{ $attendance['employee_name'] ?? $attendance['full_name'] ?? 'N/A' }}
+                    @if(!empty($attendance['dept_name']) && $attendance['dept_name'] !== 'Non défini')
+                    <br><small>{{ $attendance['dept_name'] }}</small>
                     @endif
                 </td>
                 <td>{{ $attendance['emp_code'] }}</td>
-                <td class="punches-cell">
-                    <div style="margin-bottom: 3px;">
-                        @foreach($attendance['punch_list'] as $punch)
-                            <span class="punch-time">{{ $punch }}</span>
-                        @endforeach
-                    </div>
-                    <div style="font-size: 9px; color: #666;">
-                        @if($attendance['first_punch'])
-                        Début: <strong>{{ $attendance['first_punch'] }}</strong>
-                        @endif
-                        @if($attendance['last_punch'])
-                        | Fin: <strong>{{ $attendance['last_punch'] }}</strong>
-                        @endif
-                        | Total: <strong>{{ $attendance['total_punches'] }}</strong>
-                    </div>
+                <td>
+                    <div>Entrée: <strong>{{ $attendance['check_in'] ?? '--:--' }}</strong></div>
+                    <div>Sortie: <strong>{{ $attendance['check_out'] ?? '--:--' }}</strong></div>
                 </td>
                 <td class="text-center">
-                    @if($attendance['total_work_hours'])
-                    <strong>{{ $attendance['total_work_hours'] }}h</strong>
-                    @else
-                    <span class="text-muted">-</span>
-                    @endif
+                    <strong>{{ $attendance['work_hours'] ?? '-' }}</strong>
                 </td>
                 <td class="text-center">
                     <span class="status-badge status-{{ strtolower($attendance['status']) }}">
@@ -349,7 +333,7 @@
                     </span>
                 </td>
                 <td class="text-center">
-                    {{ $attendance['employee_found'] }}
+                    {{ $attendance['is_late'] ?? 'Non' }}
                 </td>
             </tr>
             @endforeach
@@ -389,8 +373,8 @@
     <div class="footer">
         <p>Document généré automatiquement par le système de pointage</p>
         <p>Total: {{ count($attendances) }} présence(s) | 
-           Présents: {{ $statistics['present'] }} | 
-           Absents: {{ $statistics['absent'] }}</p>
+           Présents: {{ $statistics['present_days'] ?? 0 }} | 
+           Absents: {{ $statistics['absent_days'] ?? 0 }}</p>
     </div>
     @else
     <div class="no-data">

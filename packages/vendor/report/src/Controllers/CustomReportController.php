@@ -4,7 +4,6 @@ namespace Vendor\Report\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\Client;
 use App\Models\Department;
 use App\Models\EmployeeSchedule;
 use App\Models\Leave;
@@ -24,15 +23,10 @@ class CustomReportController extends Controller
      */
     public function presencePonctualite(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
-        
-        if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
-        }
+        $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::where('client_id', $client->id)
-            ->whereNotNull('emp_code')
+        $employees = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -44,8 +38,7 @@ class CustomReportController extends Controller
             });
         
         // Récupérer les départements
-        $departments = Department::where('client_id', $client->id)
-            ->orderBy('name')
+        $departments = Department::orderBy('name')
             ->get();
         
         return view('report::ponctualites.index', compact('employees', 'departments', 'client'));
@@ -57,11 +50,7 @@ class CustomReportController extends Controller
     public function generateCustomReport(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -105,8 +94,7 @@ class CustomReportController extends Controller
     private function getPresencePonctualiteData($client, $startDate, $endDate, $empCode = 'all', $departmentId = 'all')
     {
         // Récupérer les employés selon les filtres
-        $employeesQuery = Employee::where('client_id', $client->id)
-            ->whereNotNull('emp_code')
+        $employeesQuery = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -124,15 +112,13 @@ class CustomReportController extends Controller
         }
         
         // Récupérer les permissions approuvées pour la période
-        $permissions = EmployeePermission::where('client_id', $client->id)
-            ->where('status', 'approved')
+        $permissions = EmployeePermission::where('status', 'approved')
             ->whereBetween('date', [$startDate, $endDate])
             ->get()
             ->groupBy('employee_id');
         
         // Récupérer les congés pour la période
-        $leaves = Leave::where('client_id', $client->id)
-            ->where('start_date', '<=', $endDate)
+        $leaves = Leave::where('start_date', '<=', $endDate)
             ->where('end_date', '>=', $startDate)
             ->get();
         
@@ -230,8 +216,7 @@ class CustomReportController extends Controller
             
             if ($isWorkingDay) {
                 // Récupérer les données d'attendance pour ce jour
-                $attendance = DailyAttendance::where('client_id', $employee->client_id)
-                    ->where('employee_id', $employee->id)
+                $attendance = DailyAttendance::where('employee_id', $employee->id)
                     ->where('attendance_date', $dateStr)
                     ->first();
                 
@@ -316,8 +301,7 @@ class CustomReportController extends Controller
         $dayOfWeek = $date->dayOfWeekIso;
         
         // 1. Planning spécifique à la date
-        $specificSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $specificSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_date', $dateStr)
             ->first();
         
@@ -326,8 +310,7 @@ class CustomReportController extends Controller
         }
         
         // 2. Planning dans la plage de dates
-        $rangeSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $rangeSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where(function($query) use ($dateStr) {
                 $query->where('start_date', '<=', $dateStr)
                       ->where('end_date', '>=', $dateStr);
@@ -339,8 +322,7 @@ class CustomReportController extends Controller
         }
         
         // 3. Planning fixe par jour de semaine
-        $fixedSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $fixedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_type', 'fixe')
             ->where('day_of_week', $dayOfWeek)
             ->first();
@@ -350,8 +332,7 @@ class CustomReportController extends Controller
         }
         
         // 4. Planning planifié par défaut
-        $plannedSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $plannedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_type', 'planifie')
             ->first();
         
@@ -402,11 +383,7 @@ class CustomReportController extends Controller
     public function exportCustomPdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return redirect()->back()->with('error', 'Client non trouvé.');
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -468,11 +445,7 @@ class CustomReportController extends Controller
     public function exportDepartmentPdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return redirect()->back()->with('error', 'Client non trouvé.');
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -534,7 +507,7 @@ class CustomReportController extends Controller
     private function getDepartmentData($client, $startDate, $endDate, $departmentId)
     {
         // Récupérer les départements
-        $departmentsQuery = Department::where('client_id', $client->id);
+        $departmentsQuery = Department::query();
         
         if ($departmentId !== 'all') {
             $departmentsQuery->where('id', $departmentId);
@@ -675,22 +648,17 @@ class CustomReportController extends Controller
     public function debugData(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             $startDate = $request->input('start_date', Carbon::now()->subDays(7)->format('Y-m-d'));
             $endDate = $request->input('end_date', Carbon::now()->format('Y-m-d'));
             
             $workingDays = $this->countWorkingDays($startDate, $endDate);
             
-            $dailyAttendances = DailyAttendance::where('client_id', $client->id)
-                ->whereBetween('attendance_date', [$startDate, $endDate])
+            $dailyAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
                 ->count();
             
-            $employees = Employee::where('client_id', $client->id)->count();
+            $employees = Employee::count();
             
             return response()->json([
                 'success' => true,

@@ -186,8 +186,12 @@
     <!-- En-tête -->
     <div class="header">
         <!-- Logo du client -->
-         @if(isset($client->logo) && $client->logo)
-        <img src="<?php echo $_SERVER["DOCUMENT_ROOT"]; ?>/storage/app/public/<?php echo $client->logo; ?>" alt="{{$client->raison_sociale}}" class="client-logo">
+        @php
+            $logoPath = \App\Models\Setting::where('key', 'app_logo')->value('value');
+            $companyName = \App\Models\Setting::where('key', 'company_name')->value('value') ?? 'CheckTime';
+        @endphp
+        @if($logoPath)
+        <img src="{{ public_path($logoPath) }}" alt="{{ $companyName }}" class="client-logo">
     @endif
         <div class="header-content">
         <div class="title">RAPPORT DES ABSENCES & RETARDS</div>
@@ -197,7 +201,7 @@
     
     <!-- Informations générales -->
     <div class="info-section">
-        <div><span class="info-label">Client :</span> {{ $client->name }}</div>
+        <div><span class="info-label">Client :</span> {{ $companyName }}</div>
         <div><span class="info-label">Nombre d'employés :</span> {{ $total_employees }}</div>
         <div><span class="info-label">Période analysée :</span> {{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}</div>
         <div><span class="info-label">Filtre employé :</span> {{ $filters['emp_code'] }}</div>
@@ -434,7 +438,7 @@
     <div class="footer">
         Page <span class="page-number"></span> sur <span class="page-count"></span> |
         Généré le {{ $export_date->format('d/m/Y à H:i') }} |
-        © {{ date('Y') }} {{ $client->name ?? 'Système de Gestion' }}
+        © {{ date('Y') }} {{ $companyName }}
     </div>
 </body>
 </html>

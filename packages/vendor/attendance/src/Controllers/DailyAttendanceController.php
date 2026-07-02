@@ -4,7 +4,6 @@ namespace Vendor\Attendance\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\Client;
 use App\Models\Device; 
 use App\Models\Department;
 use App\Models\DailyAttendance;
@@ -32,27 +31,27 @@ class DailyAttendanceController extends Controller
      */
     public function index(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
+            return redirect()->route('home')->with('error', 'Informations société non trouvées.');
         }
         
         // Synchroniser les données d'aujourd'hui avant d'afficher
         try {
-            $this->attendanceService->updateDailySummariesForPeriod($client);
-            Log::info("Données synchronisées pour aujourd'hui - Client: {$client->id}");
+            $this->attendanceService->updateDailySummariesForPeriod(1);
+            Log::info("Données synchronisées pour aujourd'hui ");
         } catch (\Exception $e) {
             Log::error("Erreur synchronisation: " . $e->getMessage());
         }
         
         // Récupérer les devices pour les filtres
-        $devices = Device::where('client_id', $client->id)
+        $devices = Device::whereRaw('1 = 1')
             ->orderBy('terminal_name')
             ->get();
         
         // Récupérer les employés avec leurs codes pour le filtre
-        $employees = Employee::where('client_id', $client->id)
+        $employees = Employee::whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -71,7 +70,7 @@ class DailyAttendanceController extends Controller
             });
 
         // Récupérer les départements UNIQUES depuis la table employees
-        $departments = Department::where('client_id', $client->id)
+        $departments = Department::whereRaw('1 = 1')
             ->orderBy('name')
             ->get();
         
@@ -86,27 +85,27 @@ class DailyAttendanceController extends Controller
      */
     public function retardList(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
+            return redirect()->route('home')->with('error', 'Informations société non trouvées.');
         }
         
         // Synchroniser les données si nécessaire
         try {
-            $this->attendanceService->updateDailySummariesForPeriod($client);
-            Log::info("Données synchronisées pour les retards - Client: {$client->id}");
+            $this->attendanceService->updateDailySummariesForPeriod(1);
+            Log::info("Données synchronisées pour les retards ");
         } catch (\Exception $e) {
             Log::error("Erreur synchronisation: " . $e->getMessage());
         }
         
         // Récupérer les devices pour les filtres
-        $devices = Device::where('client_id', $client->id)
+        $devices = Device::whereRaw('1 = 1')
             ->orderBy('terminal_name')
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::where('client_id', $client->id)
+        $employees = Employee::whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -125,7 +124,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::where('client_id', $client->id)
+        $allEmployees = Employee::whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -138,15 +137,15 @@ class DailyAttendanceController extends Controller
         // Récupérer les statistiques des retards
         $today = Carbon::today()->format('Y-m-d');
         $retardStats = [
-            'today' => DailyAttendance::where('client_id', $client->id)
+            'today' => DailyAttendance::whereRaw('1 = 1')
                 ->where('attendance_date', $today)
                 ->where('is_late', true)
                 ->count(),
-            'week' => DailyAttendance::where('client_id', $client->id)
+            'week' => DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
                 ->where('is_late', true)
                 ->count(),
-            'month' => DailyAttendance::where('client_id', $client->id)
+            'month' => DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
                 ->where('is_late', true)
                 ->count()
@@ -160,26 +159,26 @@ class DailyAttendanceController extends Controller
      */
     public function presenceList(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
+            return redirect()->route('home')->with('error', 'Informations société non trouvées.');
         }
         
         // Synchroniser les données si nécessaire
         try {
-            $this->attendanceService->updateDailySummariesForPeriod($client);
+            $this->attendanceService->updateDailySummariesForPeriod(1);
         } catch (\Exception $e) {
             Log::error("Erreur synchronisation: " . $e->getMessage());
         }
         
         // Récupérer les devices pour les filtres
-        $devices = Device::where('client_id', $client->id)
+        $devices = Device::whereRaw('1 = 1')
             ->orderBy('terminal_name')
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::where('client_id', $client->id)
+        $employees = Employee::whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -198,7 +197,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::where('client_id', $client->id)
+        $allEmployees = Employee::whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -219,26 +218,26 @@ class DailyAttendanceController extends Controller
      */
     public function absenceList(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
+            return redirect()->route('home')->with('error', 'Informations société non trouvées.');
         }
         
         // Synchroniser les données si nécessaire
         try {
-            $this->attendanceService->updateDailySummariesForPeriod($client);
+            $this->attendanceService->updateDailySummariesForPeriod(1);
         } catch (\Exception $e) {
             Log::error("Erreur synchronisation: " . $e->getMessage());
         }
         
         // Récupérer les devices pour les filtres
-        $devices = Device::where('client_id', $client->id)
+        $devices = Device::whereRaw('1 = 1')
             ->orderBy('terminal_name')
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::where('client_id', $client->id)
+        $employees = Employee::whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -257,7 +256,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::where('client_id', $client->id)
+        $allEmployees = Employee::whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -279,10 +278,10 @@ class DailyAttendanceController extends Controller
     public function getRetardData(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
+                return response()->json(['error' => 'Société non trouvée'], 404);
             }
             
             // Valider les paramètres
@@ -304,7 +303,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee');
@@ -316,7 +315,7 @@ class DailyAttendanceController extends Controller
             
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -672,10 +671,10 @@ class DailyAttendanceController extends Controller
     private function getFilteredAttendanceData(Request $request, array $statuses)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
+                return response()->json(['error' => 'Société non trouvée'], 404);
             }
             
             // Valider les paramètres
@@ -699,7 +698,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données " . implode(',', $statuses) . " pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', $statuses)
                 ->with('employee');
@@ -711,7 +710,7 @@ class DailyAttendanceController extends Controller
             
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -796,7 +795,7 @@ class DailyAttendanceController extends Controller
         $workingDays = $this->countWorkingDays($startDate, $endDate);
         
         // Nombre total d'employés
-        $totalEmployees = Employee::where('client_id', $client->id)->count();
+        $totalEmployees = Employee::whereRaw('1 = 1')->count();
         
         // Calculer le taux d'absence
         $totalPossiblePresences = $totalEmployees * $workingDays;
@@ -837,21 +836,21 @@ class DailyAttendanceController extends Controller
     {
         $today = Carbon::today()->format('Y-m-d');
         
-        $total = DailyAttendance::where('client_id', $client->id)
+        $total = DailyAttendance::whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->count();
         
-        $present = DailyAttendance::where('client_id', $client->id)
+        $present = DailyAttendance::whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
             ->count();
         
-        $absent = DailyAttendance::where('client_id', $client->id)
+        $absent = DailyAttendance::whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->where('status', 'ABSENT')
             ->count();
         
-        $totalEmployees = Employee::where('client_id', $client->id)->count();
+        $totalEmployees = Employee::whereRaw('1 = 1')->count();
         
         return [
             'total' => $total,
@@ -875,7 +874,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données pour aujourd'hui depuis DB: " . $today);
             
             // Récupérer toutes les présences d'aujourd'hui
-            $attendances = DailyAttendance::where('client_id', $client->id)
+            $attendances = DailyAttendance::whereRaw('1 = 1')
                 ->where('attendance_date', $today)
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -926,10 +925,10 @@ class DailyAttendanceController extends Controller
     public function getData(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
+                return response()->json(['error' => 'Société non trouvée'], 404);
             }
             
             // Valider les paramètres
@@ -966,7 +965,7 @@ class DailyAttendanceController extends Controller
                      ", department: " . ($department ?: 'all'));
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee');
             
@@ -976,7 +975,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -1432,7 +1431,7 @@ class DailyAttendanceController extends Controller
     public function syncStatus(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
@@ -1443,7 +1442,7 @@ class DailyAttendanceController extends Controller
             }
             
             // Dernière synchronisation depuis les données
-            $lastSync = DailyAttendance::where('client_id', $client->id)
+            $lastSync = DailyAttendance::whereRaw('1 = 1')
                 ->whereNotNull('last_sync_at')
                 ->orderBy('last_sync_at', 'desc')
                 ->first();
@@ -1452,7 +1451,7 @@ class DailyAttendanceController extends Controller
             $todayData = $this->getTodayDataFromDatabase($client);
             
             return response()->json([
-                'client_name' => $client->nraison_sociale,
+                'client_name' => $client->company_name,
                 'last_sync' => $lastSync ? Carbon::parse($lastSync->last_sync_at)->format('d/m/Y H:i:s') : 'Jamais',
                 'current_date' => date('d/m/Y'),
                 'today_count' => $todayData['success'] ? $todayData['total_attendances'] : 0,
@@ -1474,12 +1473,12 @@ class DailyAttendanceController extends Controller
     public function resyncAttendance(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Client non trouvé.'
+                    'message' => 'Informations société non trouvées.'
                 ], 404);
             }
             
@@ -1492,7 +1491,7 @@ class DailyAttendanceController extends Controller
                 $carbonDate = Carbon::parse($date);
                 
                 // Synchroniser les transactions depuis l'API
-                $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
+                $accessConfig = DB::table('access_configs')->whereRaw('1 = 1')->first();
                 
                 if (!$accessConfig || !$accessConfig->general_token) {
                     return response()->json([
@@ -1507,7 +1506,7 @@ class DailyAttendanceController extends Controller
                 Log::info("Resynchronisation manuelle pour {$empCode} le {$date}");
                 
                 // Récupérer la présence mise à jour
-                $attendance = DailyAttendance::where('client_id', $client->id)
+                $attendance = DailyAttendance::whereRaw('1 = 1')
                     ->where('emp_code', $empCode)
                     ->where('attendance_date', $date)
                     ->first();
@@ -1671,10 +1670,10 @@ class DailyAttendanceController extends Controller
     public function exportPDF(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
-                return redirect()->back()->with('error', 'Client non trouvé.');
+                return redirect()->back()->with('error', 'Informations société non trouvées.');
             }
             
             // Récupérer les paramètres de filtre
@@ -1697,14 +1696,14 @@ class DailyAttendanceController extends Controller
                      ", department: " . ($department ?: 'all'));
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::where('client_id', $client->id)
+            $employees = Employee::whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête pour les présences journalières
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -1716,7 +1715,7 @@ class DailyAttendanceController extends Controller
             
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -1769,17 +1768,34 @@ class DailyAttendanceController extends Controller
             ]);
             
             // Nom du fichier avec timestamp
-            $filename = 'rapport_presences_' . $client->nraison_sociale . '_' . 
+            $filename = 'rapport_presences_' . $client->company_name . '_' . 
                        Carbon::parse($startDate)->format('Ymd') . '_' . 
                        Carbon::parse($endDate)->format('Ymd') . '_' . 
                        Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
             
-            // Téléchargement direct du PDF
-            return $pdf->download($filename);
+            // Sauvegarder le PDF dans le répertoire public
+            $pdfPath = public_path('storage/pdfs/' . $filename);
+            if (!file_exists(dirname($pdfPath))) {
+                mkdir(dirname($pdfPath), 0755, true);
+            }
+            $pdf->save($pdfPath);
+            
+            $pdfUrl = asset('storage/pdfs/' . $filename);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'PDF généré avec succès',
+                'pdf_url' => $pdfUrl,
+                'filename' => $filename,
+                'statistics' => $statistics
+            ]);
             
         } catch (\Exception $e) {
             Log::error('Erreur export PDF: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Erreur lors de l\'export: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'export: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -1789,12 +1805,12 @@ class DailyAttendanceController extends Controller
     public function exportPresencePdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Client non trouvé.'
+                    'message' => 'Informations société non trouvées.'
                 ], 404);
             }
             
@@ -1816,14 +1832,14 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Présences pour: " . $startDate . " à " . $endDate);
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::where('client_id', $client->id)
+            $employees = Employee::whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
                 ->with('employee')
@@ -1836,7 +1852,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -1879,18 +1895,10 @@ class DailyAttendanceController extends Controller
             $filters = $this->prepareFiltersForDisplay($request, $client);
             
             // Générer un nom de fichier unique
-            $filename = 'rapport_presences_' . $client->nraison_sociale . '_' . 
+            $filename = 'rapport_presences_' . $client->company_name . '_' . 
                        Carbon::parse($startDate)->format('Ymd') . '_' . 
                        Carbon::parse($endDate)->format('Ymd') . '_' . 
                        Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
-            
-            // Chemin temporaire pour stocker le PDF
-            $tempPath = storage_path('app/temp/' . $filename);
-            
-            // Créer le dossier temp s'il n'existe pas
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0755, true);
-            }
             
             // Préparer les données pour la vue PDF
             $pdfData = [
@@ -1912,16 +1920,21 @@ class DailyAttendanceController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
             ]);
-            $pdf->save($tempPath);
             
-            // Générer une URL temporaire pour télécharger le fichier
-            $pdfUrl = route('admin.daily-attendance.download-temp', ['filename' => basename($tempPath)]);
+            $pdfPath = public_path('storage/pdfs/' . $filename);
+            if (!file_exists(dirname($pdfPath))) {
+                mkdir(dirname($pdfPath), 0755, true);
+            }
+            $pdf->save($pdfPath);
+            
+            $pdfUrl = asset('storage/pdfs/' . $filename);
             
             return response()->json([
                 'success' => true,
                 'message' => 'PDF généré avec succès',
                 'pdf_url' => $pdfUrl,
-                'filename' => $filename
+                'filename' => $filename,
+                'statistics' => $statistics
             ]);
             
         } catch (\Exception $e) {
@@ -1939,12 +1952,12 @@ class DailyAttendanceController extends Controller
     public function exportRetardPdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Client non trouvé.'
+                    'message' => 'Informations société non trouvées.'
                 ], 404);
             }
             
@@ -1966,7 +1979,7 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee')
@@ -1980,7 +1993,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2015,18 +2028,10 @@ class DailyAttendanceController extends Controller
             $filters = $this->prepareFiltersForDisplay($request, $client);
             
             // Générer un nom de fichier unique
-            $filename = 'rapport_retards_' . $client->nraison_sociale . '_' . 
+            $filename = 'rapport_retards_' . $client->company_name . '_' . 
                        Carbon::parse($startDate)->format('Ymd') . '_' . 
                        Carbon::parse($endDate)->format('Ymd') . '_' . 
                        Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
-            
-            // Chemin temporaire pour stocker le PDF
-            $tempPath = storage_path('app/temp/' . $filename);
-            
-            // Créer le dossier temp s'il n'existe pas
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0755, true);
-            }
             
             // Préparer les données pour la vue PDF
             $pdfData = [
@@ -2048,16 +2053,21 @@ class DailyAttendanceController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
             ]);
-            $pdf->save($tempPath);
             
-            // Générer une URL temporaire pour télécharger le fichier
-            $pdfUrl = route('admin.daily-attendance.download-temp', ['filename' => basename($tempPath)]);
+            $pdfPath = public_path('storage/pdfs/' . $filename);
+            if (!file_exists(dirname($pdfPath))) {
+                mkdir(dirname($pdfPath), 0755, true);
+            }
+            $pdf->save($pdfPath);
+            
+            $pdfUrl = asset('storage/pdfs/' . $filename);
             
             return response()->json([
                 'success' => true,
                 'message' => 'PDF généré avec succès',
                 'pdf_url' => $pdfUrl,
-                'filename' => $filename
+                'filename' => $filename,
+                'statistics' => $summary
             ]);
             
         } catch (\Exception $e) {
@@ -2075,12 +2085,12 @@ class DailyAttendanceController extends Controller
     public function exportAbsencePdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Client non trouvé.'
+                    'message' => 'Informations société non trouvées.'
                 ], 404);
             }
             
@@ -2101,14 +2111,14 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Absences pour: " . $startDate . " à " . $endDate);
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::where('client_id', $client->id)
+            $employees = Employee::whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::where('client_id', $client->id)
+            $query = DailyAttendance::whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('status', 'ABSENT')
                 ->with('employee')
@@ -2121,7 +2131,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::where('client_id', $client->id)->get();
+                $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2149,7 +2159,7 @@ class DailyAttendanceController extends Controller
             $totalAbsences = $attendances->count();
             $uniqueEmployees = $attendances->pluck('employee_id')->filter()->unique()->count();
             $workingDays = $this->countWorkingDays($startDate, $endDate);
-            $totalEmployees = Employee::where('client_id', $client->id)->count();
+            $totalEmployees = Employee::whereRaw('1 = 1')->count();
             $absenceRate = $totalEmployees > 0 ? round(($totalAbsences / ($totalEmployees * $workingDays)) * 100, 1) : 0;
             
             $statistics = [
@@ -2164,18 +2174,10 @@ class DailyAttendanceController extends Controller
             $filters = $this->prepareFiltersForDisplay($request, $client);
             
             // Générer un nom de fichier unique
-            $filename = 'rapport_absences_' . $client->nraison_sociale . '_' . 
+            $filename = 'rapport_absences_' . $client->company_name . '_' . 
                        Carbon::parse($startDate)->format('Ymd') . '_' . 
                        Carbon::parse($endDate)->format('Ymd') . '_' . 
                        Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
-            
-            // Chemin temporaire pour stocker le PDF
-            $tempPath = storage_path('app/temp/' . $filename);
-            
-            // Créer le dossier temp s'il n'existe pas
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0755, true);
-            }
             
             // Préparer les données pour la vue PDF
             $pdfData = [
@@ -2197,16 +2199,21 @@ class DailyAttendanceController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
             ]);
-            $pdf->save($tempPath);
             
-            // Générer une URL temporaire pour télécharger le fichier
-            $pdfUrl = route('admin.daily-attendance.download-temp', ['filename' => basename($tempPath)]);
+            $pdfPath = public_path('storage/pdfs/' . $filename);
+            if (!file_exists(dirname($pdfPath))) {
+                mkdir(dirname($pdfPath), 0755, true);
+            }
+            $pdf->save($pdfPath);
+            
+            $pdfUrl = asset('storage/pdfs/' . $filename);
             
             return response()->json([
                 'success' => true,
                 'message' => 'PDF généré avec succès',
                 'pdf_url' => $pdfUrl,
-                'filename' => $filename
+                'filename' => $filename,
+                'statistics' => $statistics
             ]);
             
         } catch (\Exception $e) {
@@ -2320,7 +2327,7 @@ class DailyAttendanceController extends Controller
         }
         
         if ($request->has('emp_code') && $request->emp_code && $request->emp_code !== 'all') {
-            $employee = Employee::where('client_id', $client->id)
+            $employee = Employee::whereRaw('1 = 1')
                 ->where('emp_code', $request->emp_code)
                 ->first();
                 
@@ -2366,13 +2373,13 @@ class DailyAttendanceController extends Controller
      */
     public function getEmployeeByCode(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         if (!$client || !$request->has('emp_code')) {
             return response()->json(null);
         }
         
-        $employee = Employee::where('client_id', $client->id)
+        $employee = Employee::whereRaw('1 = 1')
             ->where('emp_code', $request->emp_code)
             ->first();
             
@@ -2406,12 +2413,12 @@ class DailyAttendanceController extends Controller
     public function syncAttendance(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             if (!$client) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Client non trouvé.'
+                    'message' => 'Informations société non trouvées.'
                 ], 404);
             }
             
@@ -2433,7 +2440,7 @@ class DailyAttendanceController extends Controller
             ]);
             
             // Vérifier la configuration d'accès
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
+            $accessConfig = DB::table('access_configs')->whereRaw('1 = 1')->first();
             
             if (!$accessConfig || !$accessConfig->general_token) {
                 return response()->json([

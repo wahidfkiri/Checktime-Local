@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\CheckTimeService;
 use App\Models\Department;
-use App\Models\Client;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,26 +23,13 @@ class DepartmentController extends Controller
 
     public function index(Request $request)
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        // Si l'utilisateur n'a pas de client associé
-        if (!$client) {
-            if ($request->ajax()) {
-                return response()->json(['data' => []]);
-            }
-            return view('employee::departments.index')->with('error', 'Aucun client associé à votre compte.');
-        }
-        
         // Si c'est une requête AJAX pour DataTables
         if ($request->ajax()) {
-            // VÉRIFIER ET SYNCHRONISER avant de retourner les données
-            $this->checkAndSyncIfNeeded($client->id);
+            $this->checkAndSyncIfNeeded(1);
             return $this->getLocalDepartments($request);
         }
         
-        // Synchroniser automatiquement au premier chargement si nécessaire
-        $this->checkAndSyncIfNeeded($client->id);
+        $this->checkAndSyncIfNeeded(1);
         
         return view('employee::departments.index');
     }
@@ -58,12 +44,8 @@ class DepartmentController extends Controller
         ]);
 
 
-        // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -75,7 +57,7 @@ class DepartmentController extends Controller
         $this->sync($request);
 
         // get max code 
-        $code = Department::where('client_id', $client->id)->max('code');
+        $code = Department::max('code');
         $nextCode = $code ? $code + 1 : 1;
 
 
@@ -86,7 +68,7 @@ class DepartmentController extends Controller
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->post('http://54.37.15.111/personnel/api/departments/', [
+        ->post(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/departments/', [
             'dept_code' => $nextCode,
             'dept_name' => $validated['name'],
         ]);
@@ -147,12 +129,8 @@ public function update(Request $request, $id)
             'name' => 'required|string|max:255',
         ]);
 
-        // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -167,7 +145,7 @@ public function update(Request $request, $id)
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->patch('http://54.37.15.111/personnel/api/departments/' . $id . '/', [
+        ->patch(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/departments/' . $id . '/', [
             'dept_name' => $validated['name'],
         ]);
 
@@ -215,13 +193,8 @@ public function destroy($id)
 {
     try {
 
-        // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -235,11 +208,11 @@ public function destroy($id)
             "Accept" => "application/json",
         ])
         ->timeout(30)
-        ->delete('http://54.37.15.111/personnel/api/departments/' . $id . '/');
+        ->delete(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/departments/' . $id . '/');
 
         if ($response->successful()) {
             //$this->sync($request); // Synchroniser après suppression
-            Department::where('department_id', $id)->where('client_id', $client->id)->delete();
+            Department::where('department_id', $id)->delete();
             return response()->json([
                 'success' => true,
                 'message' => 'Département supprimé avec succès'
@@ -302,17 +275,14 @@ public function destroy($id)
     {
         try {
             Log::info("Début de la synchronisation des départements pour le client {$clientId}");
-            
-            // Récupérer la configuration d'accès du client
-            $accessConfig = DB::table('access_configs')->where('client_id', $clientId)->first();
-            
-            if (!$accessConfig) {
-                Log::warning("Aucune configuration d'accès trouvée pour le client {$clientId}");
+
+            $token = $this->api->getGeneralToken();
+
+            if (!$token) {
+                Log::warning("Aucun token configuré pour le client {$clientId}");
                 Cache::forget('departments_syncing_' . $clientId);
                 return 0;
             }
-            
-            $token = $accessConfig->general_token;
             
             // Récupérer toutes les départements de l'API
             $allDepartments = $this->fetchAllDepartmentsFromAPI($token);
@@ -363,10 +333,11 @@ public function destroy($id)
                     "Authorization" => "Token " . $token,
                     "Accept" => "application/json"
                 ])
-                ->timeout(30)
-                ->get('http://54.37.15.111/personnel/api/departments/', [
+                ->timeout(60)
+                ->retry(3, 1000)
+                ->get(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/departments/', [
                     'page' => $page,
-                    'limit' => 100
+                    'limit' => 300
                 ]);
                 
                 if (!$response->successful()) {
@@ -417,7 +388,6 @@ public function destroy($id)
             
             // Vérifier si la département existe déjà
             $existingDepartment = Department::where('code', $departmentCode)
-                               ->where('client_id', $clientId)
                                ->where('department_id', $departmentData['id'] ?? 0)
                                ->first();
             
@@ -439,7 +409,6 @@ public function destroy($id)
             } else {
                 // Créer un nouveau département
                 $departmentAttributes['code'] = $departmentCode;
-                $departmentAttributes['client_id'] = $clientId;
                 $departmentAttributes['created_at'] = now();
                 
                 Department::create($departmentAttributes);
@@ -473,9 +442,7 @@ public function destroy($id)
             }
             
             // Trouver les departments locaux qui ne sont plus dans l'API
-            $departmentsToDelete = Department::where('client_id', $clientId)
-                                ->whereNotIn('code', $apiDepartmentCodes)
-                                ->get();
+            $departmentsToDelete = Department::whereNotIn('code', $apiDepartmentCodes)->get();
             
             // Supprimer les departments obsolètes
             $deletedCount = 0;
@@ -500,14 +467,7 @@ public function destroy($id)
     public function getLocalDepartments(Request $request)
     {
         if ($request->ajax()) {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
-                return DataTables::of([])->make(true);
-            }
-            
-            $query = Department::where('client_id', $client->id);
+            $query = Department::query();
             
             // Appliquer les filtres
             $this->applyFilters($query, $request);
@@ -569,26 +529,14 @@ public function destroy($id)
     public function sync(Request $request)
     {
         try {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
-                ], 404);
-            }
-            
-            $clientId = $client->id;
+            $clientId = 1;
             $force = $request->get('force', false);
             
-            // Forcer la synchronisation en ignorant le cache
             if ($force) {
                 Cache::forget('departments_last_sync_' . $clientId);
                 Cache::forget('departments_syncing_' . $clientId);
             }
             
-            // Lancer la synchronisation
             $syncedCount = $this->syncDepartmentsForClientNow($clientId);
             
             return response()->json([
@@ -611,26 +559,14 @@ public function destroy($id)
      */
     public function syncStatus()
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        if (!$client) {
-            return response()->json([
-                'total_departments' => 0,
-                'last_sync' => 'Jamais',
-                'is_syncing' => false,
-                'client_name' => 'Non associé'
-            ]);
-        }
-        
-        $clientId = $client->id;
+        $clientId = 1;
         
         $status = [
-            'total_departments' => Department::where('client_id', $clientId)->count(),
+            'total_departments' => Department::count(),
             'last_sync' => Cache::get('departments_last_sync_' . $clientId) ? 
                 date('d/m/Y H:i:s', Cache::get('departments_last_sync_' . $clientId)) : 'Jamais',
             'is_syncing' => Cache::get('departments_syncing_' . $clientId, false),
-            'client_name' => $client->raison_sociale ?? 'Client #' . $clientId
+            'client_name' => config('app.name')
         ];
         
         return response()->json($status);
@@ -642,27 +578,14 @@ public function destroy($id)
     public function resetAndSync(Request $request)
     {
         try {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
+            $clientId = 1;
             
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
-                ], 404);
-            }
+            Department::truncate();
+            Log::info("Tous les départements ont été supprimés");
             
-            $clientId = $client->id;
-            
-            // Vider toutes les départements du client
-            Department::where('client_id', $clientId)->delete();
-            Log::info("Toutes les départements du client {$clientId} ont été supprimées");
-            
-            // Vider le cache spécifique au client
             Cache::forget('departments_last_sync_' . $clientId);
             Cache::forget('departments_syncing_' . $clientId);
             
-            // Resynchroniser
             $syncedCount = $this->syncDepartmentsForClientNow($clientId);
             
             return response()->json([

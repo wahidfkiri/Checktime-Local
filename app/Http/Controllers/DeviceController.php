@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use App\Services\CheckTimeService;
 use App\Models\Device;
 use Yajra\DataTables\Facades\DataTables;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -60,16 +59,14 @@ class DeviceController extends Controller
     {
         try {
             Log::info("Début de la synchronisation des devices");
-            
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
-                Log::warning("Aucune configuration d'accès trouvée");
+
+            if (!$this->api->hasToken()) {
+                Log::warning("Aucun token configuré dans CheckTimeService");
                 Cache::forget('devices_syncing');
                 return 0;
             }
-            
-            $token = $accessConfig->general_token;
+
+            $token = $this->api->getGeneralToken();
             $allDevices = $this->fetchAllDevicesFromAPI($token);
             
             if (empty($allDevices)) {
@@ -116,7 +113,7 @@ class DeviceController extends Controller
                     "Accept" => "application/json"
                 ])
                 ->timeout(30)
-                ->get('http://54.37.15.111/iclock/api/terminals/', [
+                ->get(rtrim($this->api->getBaseUrl(), '/') . '/iclock/api/terminals/', [
                     'page' => $page,
                     'limit' => 100
                 ]);

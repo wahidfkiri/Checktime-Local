@@ -265,7 +265,7 @@ $(document).ready(function() {
                     d.employee_filter = $('#employee_filter').val();
                     d.type_filter = $('#type_filter').val();
                     d.status_filter = $('#status_filter').val();
-                    d.client_id = "{{ auth()->user()->client_id }}";
+                    d.client_id = "1";
                 }
             },
             columns: [

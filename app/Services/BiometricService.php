@@ -3,16 +3,29 @@
 namespace App\Services;
 
 use App\Models\Employee;
-use App\Models\AccessConfig;
+use App\Models\Setting;
+use App\Services\CheckTimeService;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
 class BiometricService
 {
+    private ?string $baseUrl = null;
+
+    public function __construct()
+    {
+        try {
+            $settings = Setting::getGroup('company');
+            $this->baseUrl = $settings['api_url']
+                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+        } catch (\Exception $e) {
+            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+        }
+    }
+
     /**
      * Générer une réponse biométrique
      */
@@ -171,11 +184,12 @@ class BiometricService
             }
             
             // Essayer d'abord le endpoint des devices/terminaux
+            $base = rtrim($this->baseUrl, '/');
             $endpoints = [
-                'http://54.37.15.111/iclock/api/devices/',
-                'http://54.37.15.111/iclock/api/terminals/',
-                'http://54.37.15.111/iclock/api/device/list/',
-                'http://54.37.15.111/iclock/api/terminal/list/'
+                $base . '/iclock/api/devices/',
+                $base . '/iclock/api/terminals/',
+                $base . '/iclock/api/device/list/',
+                $base . '/iclock/api/terminal/list/'
             ];
             
             foreach ($endpoints as $endpoint) {
@@ -242,7 +256,7 @@ class BiometricService
                 'Accept' => 'application/json',
             ])->timeout(10)
               ->connectTimeout(5)
-              ->get('http://54.37.15.111/iclock/api/transactions/', $params);
+              ->get(rtrim($this->baseUrl, '/') . '/iclock/api/transactions/', $params);
             
             if ($response->successful()) {
                 $data = $response->json();
@@ -268,32 +282,23 @@ class BiometricService
     }
     
     /**
-     * Récupérer le token général
+     * Récupérer le token général depuis settings (fallback access_configs)
      */
     private function getGeneralToken()
     {
         try {
-            $user = Auth::user();
-            
-            if (!$user) {
-                // Essayer de récupérer depuis la session ou autre méthode
-                if (session()->has('general_token')) {
-                    return session('general_token');
-                }
-                return null;
+            // Session cache
+            if (session()->has('general_token')) {
+                return session('general_token');
             }
-            
-            // Récupérer le token depuis la configuration d'accès
-            $accessConfig = AccessConfig::whereHas('client', function($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })->first();
-            
-            if ($accessConfig && $accessConfig->general_token) {
-                // Stocker en session pour utilisation future
-                session(['general_token' => $accessConfig->general_token]);
-                return $accessConfig->general_token;
+
+            $token = CheckTimeService::getConfigToken();
+
+            if ($token) {
+                session(['general_token' => $token]);
+                return $token;
             }
-            
+
             return null;
         } catch (Exception $e) {
             Log::error('Error getting general token: ' . $e->getMessage());
@@ -351,7 +356,7 @@ class BiometricService
             ])->timeout(15)
               ->connectTimeout(10)
               ->retry(2, 1000)
-              ->get('http://54.37.15.111/iclock/api/transactions/', $defaultParams);
+              ->get(rtrim($this->baseUrl, '/') . '/iclock/api/transactions/', $defaultParams);
             
             if ($response->successful()) {
                 $data = $response->json();

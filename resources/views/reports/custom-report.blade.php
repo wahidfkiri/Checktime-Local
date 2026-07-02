@@ -23,15 +23,7 @@
                                 <div class="card bg-light">
                                     <div class="card-body">
                                         <h6 class="card-title">Filtres du rapport</h6>
-                                        <!-- Formulaire pour PDF standard -->
-                                        <form id="exportPdfForm" action="{{ route('reports.custom.export.pdf') }}" method="POST" style="display: none;">
-                                            @csrf
-                                            <input type="hidden" name="start_date" id="pdf_start_date">
-                                            <input type="hidden" name="end_date" id="pdf_end_date">
-                                            <input type="hidden" name="emp_code" id="pdf_emp_code">
-                                        </form>
-                                        
-                                        <!-- Formulaire pour export PDF par département -->
+                                        <!-- Formulaire pour export PDF -->
                                         <form id="exportPdfByDeptForm" action="{{ route('reports.export-department-pdf') }}" method="POST" style="display: none;">
                                             @csrf
                                             <input type="hidden" name="start_date" id="pdf_by_dept_start_date">
@@ -73,11 +65,8 @@
                                                         <button type="button" class="btn btn-primary" id="generate_report">
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
-                                                        <button type="button" class="btn btn-danger" id="export_pdf">
-                                                            <i class="bi bi-file-pdf me-1"></i> Exporter PDF
-                                                        </button>
                                                         <button type="button" class="btn btn-danger" id="export_dept_pdf">
-                                                            <i class="bi bi-file-pdf me-1"></i> Exporter PDF Département
+                                                            <i class="bi bi-file-pdf me-1"></i> Exporter
                                                         </button>
                                                     </div>
                                                 </div>
@@ -349,16 +338,10 @@ $(document).ready(function() {
     function showPdfLoading() {
         isGeneratingPDF = true;
         
-        // Sauvegarder les textes originaux avant de les modifier
-        if (!$('#export_pdf').data('original-text')) {
-            $('#export_pdf').data('original-text', $('#export_pdf').html());
-        }
         if (!$('#export_dept_pdf').data('original-text')) {
             $('#export_dept_pdf').data('original-text', $('#export_dept_pdf').html());
         }
         
-        // Changer le texte du bouton pendant la génération
-        $('#export_pdf').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Génération...');
         $('#export_dept_pdf').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Génération...');
         
         // Afficher l'alerte de chargement PDF
@@ -376,9 +359,7 @@ $(document).ready(function() {
     function hidePdfLoading() {
         isGeneratingPDF = false;
         
-        // Restaurer les textes originaux des boutons
-        $('#export_pdf').prop('disabled', false).html($('#export_pdf').data('original-text') || '<i class="bi bi-file-pdf me-1"></i> Exporter PDF');
-        $('#export_dept_pdf').prop('disabled', false).html($('#export_dept_pdf').data('original-text') || '<i class="bi bi-file-pdf me-1"></i> Exporter PDF Département');
+        $('#export_dept_pdf').prop('disabled', false).html($('#export_dept_pdf').data('original-text') || '<i class="bi bi-file-pdf me-1"></i> Exporter');
         
         $('#pdf-loading-alert').addClass('d-none');
         $('#pdf-progress-container').addClass('d-none');
@@ -796,50 +777,7 @@ $(document).ready(function() {
         });
     }
     
-    // ========== EXPORT PDF STANDARD ==========
-    
-    function exportToPdf() {
-        if (!validateDatesForExport()) return;
-        
-        if (isGeneratingPDF) {
-            showSweetAlert('info', 'Opération en cours', 'Une génération PDF est déjà en cours. Veuillez patienter.');
-            return;
-        }
-        
-        var startDate = $('#report_start_date').val();
-        var endDate = $('#report_end_date').val();
-        var empCode = $('#report_emp_code').val();
-        var empName = $('#report_emp_code option:selected').text();
-        
-        var message = '<div class="text-start">' +
-                     '<p><strong>Confirmer l\'export PDF ?</strong></p>' +
-                     '<p><i class="bi bi-calendar me-1"></i> <strong>Période :</strong> ' + startDate + ' au ' + endDate + '</p>' +
-                     '<p><i class="bi bi-person me-1"></i> <strong>Employé :</strong> ' + empName + '</p>' +
-                     '<p class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Cette opération peut prendre quelques secondes.</p>' +
-                     '</div>';
-        
-        showSweetAlert('question', 'Exporter en PDF', message, true).then((result) => {
-            if (result.isConfirmed) {
-                showPdfLoading();
-                var progressInterval = simulatePdfProgress();
-                
-                $('#pdf_start_date').val(startDate);
-                $('#pdf_end_date').val(endDate);
-                $('#pdf_emp_code').val(empCode);
-                $('#exportPdfForm').submit();
-                
-                setTimeout(function() {
-                    clearInterval(progressInterval);
-                    updatePdfProgressBar(100, 'PDF généré avec succès !');
-                    setTimeout(function() {
-                        hidePdfLoading();
-                    }, 1000);
-                }, 3000);
-            }
-        });
-    }
-    
-    // ========== EXPORT PDF DÉPARTEMENT ==========
+    // ========== EXPORT PDF ==========
     
     function exportDeptToPdf() {
         if (!validateDatesForExport()) return;
@@ -860,7 +798,7 @@ $(document).ready(function() {
                      '- Détail des heures de pointage par employé et par jour</p>' +
                      '</div>';
         
-        showSweetAlert('question', 'Exporter le rapport par département', message, true).then((result) => {
+        showSweetAlert('question', 'Exporter', message, true).then((result) => {
             if (result.isConfirmed) {
                 showPdfLoading();
                 
@@ -908,10 +846,6 @@ $(document).ready(function() {
     
     $('#generate_report').on('click', function() {
         generateReport();
-    });
-    
-    $('#export_pdf').on('click', function() {
-        exportToPdf();
     });
     
     $('#export_dept_pdf').on('click', function() {

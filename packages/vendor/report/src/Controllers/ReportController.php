@@ -4,7 +4,6 @@ namespace Vendor\Report\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\Client;
 use App\Models\Device;
 use App\Models\EmployeeSchedule;
 use App\Models\Leave;
@@ -27,15 +26,10 @@ class ReportController extends Controller
      */
     public function absencesDelays(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
-        
-        if (!$client) {
-            return redirect()->route('home')->with('error', 'Client non trouvé.');
-        }
+        $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::where('client_id', $client->id)
-            ->whereNotNull('emp_code')
+        $employees = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -55,11 +49,7 @@ class ReportController extends Controller
     public function getData(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -80,7 +70,7 @@ class ReportController extends Controller
             Log::info("Rapport - Début: {$startDate}, Fin: {$endDate}, Employé: {$empCode}");
             
             // Récupérer TOUTES les données (sans pagination)
-            $allData = $this->getFullReportData($client->id, $startDate, $endDate, $empCode);
+            $allData = $this->getFullReportData(1, $startDate, $endDate, $empCode);
             
             // Pagination manuelle pour DataTables
             $totalRecords = count($allData);
@@ -162,27 +152,23 @@ class ReportController extends Controller
         }
         
         // Récupérer les permissions approuvées pour la période
-        $permissions = EmployeePermission::where('client_id', $clientId)
-            ->where('status', 'approved')
+        $permissions = EmployeePermission::where('status', 'approved')
             ->whereBetween('date', [$startDate, $endDate])
             ->get()
             ->groupBy('employee_id');
         
         // Récupérer les congés pour la période
-        $leaves = Leave::where('client_id', $clientId)
-            ->where('start_date', '<=', $endDate)
+        $leaves = Leave::where('start_date', '<=', $endDate)
             ->where('end_date', '>=', $startDate)
             ->get();
 
         // Récupérer les missions pour la période
-        $missions = \App\Models\Mission::where('client_id', $clientId)
-              ->where('start_date', '<=', $endDate . ' 23:59:59')
+        $missions = \App\Models\Mission::where('start_date', '<=', $endDate . ' 23:59:59')
               ->where('end_date', '>=', $startDate . ' 00:00:00')
              ->get();
         
         // Récupérer les employés concernés
-        $employeesQuery = Employee::where('client_id', $clientId)
-            ->whereNotNull('emp_code')
+        $employeesQuery = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -196,8 +182,7 @@ class ReportController extends Controller
         }
         
         // Récupérer TOUTES les données de daily_attendances (sans limit)
-        $query = DailyAttendance::where('client_id', $clientId)
-            ->whereBetween('attendance_date', [$startDate, $endDate]);
+        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate]);
         
         if ($empCode && $empCode !== 'all') {
             $query->where('emp_code', $empCode);
@@ -449,8 +434,7 @@ if ($isOnMission) {
         $dayOfWeek = $date->dayOfWeekIso;
         
         // 1. Chercher d'abord un planning spécifique à la date exacte
-        $specificSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $specificSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_date', $dateStr)
             ->first();
         
@@ -459,8 +443,7 @@ if ($isOnMission) {
         }
         
         // 2. Chercher un planning dans la plage de dates
-        $rangeSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $rangeSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where(function($query) use ($dateStr) {
                 $query->where('start_date', '<=', $dateStr)
                       ->where('end_date', '>=', $dateStr);
@@ -472,8 +455,7 @@ if ($isOnMission) {
         }
         
         // 3. Pour les types FIXE: chercher par jour de semaine
-        $fixedSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $fixedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_type', 'fixe')
             ->where('day_of_week', $dayOfWeek)
             ->first();
@@ -483,8 +465,7 @@ if ($isOnMission) {
         }
         
         // 4. Pour les types ROTATION
-        $rotationSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $rotationSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_type', 'rotation')
             ->first();
         
@@ -517,8 +498,7 @@ if ($isOnMission) {
         }
         
         // 5. Pour les types PLANIFIE
-        $plannedSchedule = EmployeeSchedule::where('client_id', $employee->client_id)
-            ->where('employee_id', $employee->id)
+        $plannedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
             ->where('schedule_type', 'planifie')
             ->first();
         
@@ -588,11 +568,7 @@ if ($isOnMission) {
     public function exportPdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return redirect()->back()->with('error', 'Client non trouvé.');
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -613,7 +589,7 @@ if ($isOnMission) {
             Log::info("Export PDF - Début: {$start_date}, Fin: {$end_date}, Employé: {$emp_code}");
             
             // Récupérer TOUTES les données via la méthode dédiée
-            $reportData = $this->getFullReportData($client->id, $start_date, $end_date, $emp_code);
+            $reportData = $this->getFullReportData(1, $start_date, $end_date, $emp_code);
             
             if (empty($reportData)) {
                 return redirect()->back()->with('error', 'Aucune donnée trouvée pour la période sélectionnée.');
@@ -626,7 +602,6 @@ if ($isOnMission) {
                 
                 if (!isset($groupedData[$empCode])) {
                     $employee = Employee::where('emp_code', $empCode)
-                        ->where('client_id', $client->id)
                         ->first();
                     $groupedData[$empCode] = [
                         'employee' => $employee,
@@ -723,11 +698,7 @@ if ($isOnMission) {
     public function previewPdf(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [
@@ -746,7 +717,7 @@ if ($isOnMission) {
             $emp_code = $request->input('emp_code', 'all');
             
             // Récupérer TOUTES les données
-            $reportData = $this->getFullReportData($client->id, $start_date, $end_date, $emp_code);
+            $reportData = $this->getFullReportData(1, $start_date, $end_date, $emp_code);
             
             if (empty($reportData)) {
                 return response()->json(['error' => 'Aucune donnée trouvée'], 404);
@@ -758,7 +729,6 @@ if ($isOnMission) {
                 $empCode = $record['employee_code'];
                 if (!isset($groupedData[$empCode])) {
                     $employee = Employee::where('emp_code', $empCode)
-                        ->where('client_id', $client->id)
                         ->first();
                     $groupedData[$empCode] = [
                         'employee' => $employee,
@@ -798,11 +768,7 @@ if ($isOnMission) {
     public function debugGetData(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
-            
-            if (!$client) {
-                return response()->json(['error' => 'Client non trouvé'], 404);
-            }
+            $client = \App\Models\Setting::company();
             
             // Simuler les paramètres
             $request->merge([
@@ -819,7 +785,7 @@ if ($isOnMission) {
             $data = json_decode($response->getContent(), true);
             
             // Compter le nombre total de données réelles
-            $totalData = count($this->getFullReportData($client->id, 
+            $totalData = count($this->getFullReportData(1, 
                 Carbon::now()->subDays(7)->format('Y-m-d'), 
                 Carbon::now()->format('Y-m-d'), 
                 'all'));
@@ -830,8 +796,8 @@ if ($isOnMission) {
                 'total_records_available' => $totalData,
                 'records_returned_in_pagination' => count($data['data'] ?? []),
                 'message' => 'Test réussi',
-                'daily_attendances_count' => DailyAttendance::where('client_id', $client->id)->count(),
-                'employees_count' => Employee::where('client_id', $client->id)->count()
+                'daily_attendances_count' => DailyAttendance::count(),
+                'employees_count' => Employee::count()
             ]);
             
         } catch (\Exception $e) {

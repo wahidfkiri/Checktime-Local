@@ -67,6 +67,7 @@ Route::prefix('install')->name('installer.')->middleware('web', InstallerMiddlew
     Route::get('/summary', [InstallerController::class, 'getSummary'])->name('summary');
     Route::post('/test-smtp', [InstallerController::class, 'testSmtp'])->name('test-smtp');
     Route::post('/install', [InstallerController::class, 'install'])->name('install');
+    Route::post('/sync-employees', [InstallerController::class, 'syncEmployees'])->name('sync-employees');
 });
 
 Route::get('/checktime/token', [CheckTimeController::class, 'testToken']);

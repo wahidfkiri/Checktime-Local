@@ -475,11 +475,11 @@ class ScheduleAssignmentController extends Controller
             $startDate = Carbon::parse($validated['start_date']);
             $endDate = Carbon::parse($validated['end_date']);
             
-            $companySettings = \App\Models\Setting::getGroup('company');
+            $client = \App\Models\Setting::company();
             
             $data = [
                 'employees' => [],
-                'client' => collect($companySettings),
+                'client' => $client,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'export_date' => now()

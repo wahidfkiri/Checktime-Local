@@ -325,12 +325,10 @@ class InstallerController extends Controller
                         $user->save();
                     }
 
-                    // Assign admin role if roles table exists
+                    // Assign admin role
                     if (Schema::hasTable('roles')) {
-                        $adminRole = Role::where('name', 'admin')->first();
-                        if ($adminRole) {
-                            $user->assignRole('admin');
-                        }
+                        $adminRole = Role::firstOrCreate(['name' => 'admin']);
+                        $user->assignRole('admin');
                     }
                 }
             }
@@ -415,6 +413,29 @@ class InstallerController extends Controller
                 'migration' => $name,
                 'batch' => $batch,
             ]);
+        }
+    }
+
+    /**
+     * Synchroniser les employés depuis l'API.
+     */
+    public function syncEmployees(Request $request)
+    {
+        try {
+            $apiUrl = $request->input('api_url');
+            $apiToken = $request->input('api_token');
+
+            $employeeController = app(\Vendor\Employee\Controllers\EmployeeController::class);
+            $syncRequest = new \Illuminate\Http\Request();
+            $syncRequest->replace(['api_url' => $apiUrl, 'api_token' => $apiToken]);
+
+            return $employeeController->syncWithCredentials($syncRequest);
+        } catch (\Exception $e) {
+            Log::error('Erreur syncEmployees (install): ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -508,17 +529,17 @@ class InstallerController extends Controller
         }
 
         $settings = [
-            ['key' => 'app_name', 'value' => $appInfo['app_name']],
-            ['key' => 'app_logo', 'value' => $appInfo['app_logo'] ?? ''],
-            ['key' => 'app_timezone', 'value' => $appInfo['timezone']],
-            ['key' => 'app_locale', 'value' => $appInfo['locale']],
-            ['key' => 'api_url', 'value' => $endpoint['api_url']],
-            ['key' => 'api_token', 'value' => $endpoint['api_token']],
-            ['key' => 'mail_host', 'value' => $smtp['mail_host'] ?? ''],
-            ['key' => 'mail_port', 'value' => $smtp['mail_port'] ?? ''],
-            ['key' => 'mail_username', 'value' => $smtp['mail_username'] ?? ''],
-            ['key' => 'mail_from_address', 'value' => $smtp['mail_from_address'] ?? ''],
-            ['key' => 'mail_from_name', 'value' => $smtp['mail_from_name'] ?? ''],
+            ['key' => 'app_name', 'value' => $appInfo['app_name'], 'group' => 'company'],
+            ['key' => 'app_logo', 'value' => $appInfo['app_logo'] ?? '', 'group' => 'company'],
+            ['key' => 'app_timezone', 'value' => $appInfo['timezone'], 'group' => 'company'],
+            ['key' => 'app_locale', 'value' => $appInfo['locale'], 'group' => 'company'],
+            ['key' => 'api_url', 'value' => $endpoint['api_url'], 'group' => 'company'],
+            ['key' => 'api_token', 'value' => $endpoint['api_token'], 'group' => 'company'],
+            ['key' => 'mail_host', 'value' => $smtp['mail_host'] ?? '', 'group' => 'company'],
+            ['key' => 'mail_port', 'value' => $smtp['mail_port'] ?? '', 'group' => 'company'],
+            ['key' => 'mail_username', 'value' => $smtp['mail_username'] ?? '', 'group' => 'company'],
+            ['key' => 'mail_from_address', 'value' => $smtp['mail_from_address'] ?? '', 'group' => 'company'],
+            ['key' => 'mail_from_name', 'value' => $smtp['mail_from_name'] ?? '', 'group' => 'company'],
         ];
 
         foreach ($settings as $setting) {

@@ -11,7 +11,6 @@ use App\Models\EmployeePermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -35,7 +34,7 @@ class ReportController extends Controller
                 ];
             });
         
-        $client = collect(Setting::getGroup('company'));
+        $client = \App\Models\Setting::company();
         
         return view('reports.index', compact('employees', 'client'));
     }
@@ -65,14 +64,12 @@ class ReportController extends Controller
             Log::info("Rapport - Début: {$startDate}, Fin: {$endDate}, Employé: {$empCode}");
             
             // Récupérer le token d'authentification
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
+            $token = \App\Services\CheckTimeService::getConfigToken();
+
+            if (!$token) {
                 return response()->json(['error' => 'Token d\'accès non configuré'], 400);
             }
-            
-            $token = $accessConfig->general_token;
-            
+
             // Récupérer tous les devices
             $devices = Device::all();
             
@@ -249,7 +246,7 @@ class ReportController extends Controller
                 ])->withOptions([
                     'verify' => false,
                     'timeout' => 30,
-                ])->get('http://54.37.15.111/iclock/api/transactions/', $apiParams);
+                ])->get(rtrim(\App\Services\CheckTimeService::getConfigBaseUrl(), '/') . '/iclock/api/transactions/', $apiParams);
                 
                 if (!$response->successful()) {
                     Log::warning("Erreur API device {$device->device_sn}: " . $response->status());
@@ -826,14 +823,12 @@ class ReportController extends Controller
         Log::info("Export PDF - Début: {$start_date}, Fin: {$end_date}, Employé: {$emp_code}");
         
         // Récupérer le token d'authentification
-        $accessConfig = DB::table('access_configs')->first();
-        
-        if (!$accessConfig || empty($accessConfig->general_token)) {
+        $token = \App\Services\CheckTimeService::getConfigToken();
+
+        if (!$token) {
             return redirect()->back()->with('error', 'Token d\'accès non configuré');
         }
-        
-        $token = $accessConfig->general_token;
-        
+
         // Récupérer tous les devices
         $devices = Device::all();
         
@@ -939,7 +934,7 @@ class ReportController extends Controller
             });
         }
         
-        $client = collect(Setting::getGroup('company'));
+        $client = \App\Models\Setting::company();
         
         // Données pour le PDF
         $data = [
@@ -973,7 +968,7 @@ class ReportController extends Controller
     public function previewPdf(Request $request)
     {
         try {
-            $client = collect(Setting::getGroup('company'));
+            $client = \App\Models\Setting::company();
             
             // Valider les paramètres
             $validator = \Validator::make($request->all(), [

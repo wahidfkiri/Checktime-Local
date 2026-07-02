@@ -8,7 +8,6 @@ use App\Models\WorkHourType;
 use App\Models\EmployeeSchedule;
 use App\Models\Department;
 use App\Models\Zone as Area;
-use App\Models\Client;
 use App\Models\Holiday;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,21 +21,18 @@ class ScheduleAssignmentController extends Controller
      */
     public function calendar(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
         // Récupérer les données pour le calendrier
-        $employees = Employee::where('client_id', $client->id)
-            // ->where('is_active', true)
-            ->with(['department', 'area'])
+        $employees = Employee::with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
-        $workHourTypes = WorkHourType::where('client_id', $client->id)
-            ->where('is_active', true)
+        $workHourTypes = WorkHourType::where('is_active', true)
             ->get();
             
-        $departments = Department::where('client_id', $client->id)->get();
-        $areas = Area::where('client_id', $client->id)->get();
+        $departments = Department::get();
+        $areas = Area::get();
         
         // Date par défaut (semaine courante)
         $startDate = $request->filled('start_date') 
@@ -55,20 +51,17 @@ class ScheduleAssignmentController extends Controller
      */
     public function massAssignForm(Request $request)
     {
-        $client = Client::where('user_id', auth()->user()->id)->first();
+        $client = \App\Models\Setting::company();
         
-        $employees = Employee::where('client_id', $client->id)
-           // ->where('is_active', true)
-            ->with(['department', 'area'])
+        $employees = Employee::with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
-        $workHourTypes = WorkHourType::where('client_id', $client->id)
-            ->where('is_active', true)
+        $workHourTypes = WorkHourType::where('is_active', true)
             ->get();
             
-        $departments = Department::where('client_id', $client->id)->get();
-        $areas = Area::where('client_id', $client->id)->get();
+        $departments = Department::get();
+        $areas = Area::get();
         
         return view('planning::schedules.mass-assign', compact(
             'employees', 'workHourTypes', 'departments', 'areas'
@@ -81,14 +74,7 @@ class ScheduleAssignmentController extends Controller
 public function getCellData(Request $request)
 {
     try {
-        $client = Client::where('user_id', auth()->user()->id)->first();
-        
-        if (!$client) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Client non trouvé.'
-            ], 404);
-        }
+        $client = \App\Models\Setting::company();
         
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -283,7 +269,7 @@ public function getCellData(Request $request)
     public function getSchedules(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             // $validated = $request->validate([
             //     'start_date' => 'required|date',
@@ -293,8 +279,7 @@ public function getCellData(Request $request)
             //     'area_id' => 'nullable|exists:areas,id'
             // ]);
             
-            $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType'])
-                ->where('client_id', $client->id);
+            $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType']);
                 // ->whereBetween('schedule_date', [
                 //     $validated['start_date'],
                 //     $validated['end_date']
@@ -353,7 +338,7 @@ public function getCellData(Request $request)
         try {
             DB::beginTransaction();
             
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'employee_id' => 'required|exists:employees,id',
@@ -365,21 +350,7 @@ public function getCellData(Request $request)
             
             // Vérifier que l'employé appartient au client
             $employee = Employee::find($validated['employee_id']);
-            if ($employee->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
-            
-            // Vérifier que le type d'horaire appartient au client
             $workHourType = WorkHourType::find($validated['work_hour_type_id']);
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
             
             $date = Carbon::parse($validated['date']);
             
@@ -398,7 +369,6 @@ public function getCellData(Request $request)
                     'schedule_date' => $validated['date']
                 ],
                 [
-                    'client_id' => $client->id,
                     'work_hour_type_id' => $validated['work_hour_type_id'],
                     'schedule_type' => 'planifie',
                     'day_of_week' => $date->dayOfWeekIso,
@@ -439,7 +409,7 @@ public function getCellData(Request $request)
         try {
             DB::beginTransaction();
             
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'employee_ids' => 'required|array',
@@ -458,12 +428,6 @@ public function getCellData(Request $request)
             ]);
             
             $workHourType = WorkHourType::find($validated['work_hour_type_id']);
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
             
             $startDate = Carbon::parse($validated['start_date']);
             $endDate = Carbon::parse($validated['end_date']);
@@ -473,11 +437,6 @@ public function getCellData(Request $request)
             
             foreach ($validated['employee_ids'] as $employeeId) {
                 $employee = Employee::find($employeeId);
-                
-                if ($employee->client_id != $client->id) {
-                    $skipped++;
-                    continue;
-                }
                 
                 // Déterminer les dates à assigner
                 $datesToAssign = [];
@@ -541,7 +500,6 @@ public function getCellData(Request $request)
                         }
                     } else {
                         EmployeeSchedule::create([
-                            'client_id' => $client->id,
                             'employee_id' => $employeeId,
                             'work_hour_type_id' => $validated['work_hour_type_id'],
                             'schedule_type' => 'fixe',
@@ -590,7 +548,7 @@ public function getCellData(Request $request)
     public function removeSchedule(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'employee_id' => 'required|exists:employees,id',
@@ -606,13 +564,6 @@ public function getCellData(Request $request)
                     'success' => false,
                     'message' => 'Planning non trouvé.'
                 ], 404);
-            }
-            
-            if ($schedule->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
             }
             
             $schedule->delete();
@@ -636,7 +587,7 @@ public function getCellData(Request $request)
     public function export(Request $request)
     {
         try {
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'start_date' => 'required|date',
@@ -647,7 +598,6 @@ public function getCellData(Request $request)
             ]);
             
             $query = Employee::with(['department', 'area'])
-                ->where('client_id', $client->id)
                 ->where('is_active', true);
             
             if ($request->filled('department_id')) {
@@ -770,11 +720,7 @@ public function getCellData(Request $request)
 public function exportPdf(Request $request)
 {
     try {
-        $client = Client::where('user_id', auth()->user()->id)->first();
-        
-        if (!$client) {
-            throw new \Exception('Client non trouvé.');
-        }
+        $client = \App\Models\Setting::company();
         
         $validator = \Validator::make($request->all(), [
             'start_date' => 'required|date',
@@ -799,8 +745,7 @@ public function exportPdf(Request $request)
             $employeeIds = is_array($decoded) ? array_map('intval', $decoded) : [];
         }
         
-        $employees = Employee::where('client_id', $client->id)
-            ->when(!empty($employeeIds), function($query) use ($employeeIds) {
+        $employees = Employee::when(!empty($employeeIds), function($query) use ($employeeIds) {
                 return $query->whereIn('id', $employeeIds);
             })
             ->with(['department', 'area'])
@@ -1152,7 +1097,7 @@ private function calculateRotationDay($rotationSchedule, $dateStr)
         try {
             DB::beginTransaction();
             
-            $client = Client::where('user_id', auth()->user()->id)->first();
+            $client = \App\Models\Setting::company();
             
             $validated = $request->validate([
                 'month' => 'required|integer|min:1|max:12',
@@ -1164,12 +1109,6 @@ private function calculateRotationDay($rotationSchedule, $dateStr)
             ]);
             
             $workHourType = WorkHourType::find($validated['default_work_hour_type_id']);
-            if ($workHourType->client_id != $client->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Non autorisé.'
-                ], 403);
-            }
             
             $startDate = Carbon::create($validated['year'], $validated['month'], 1);
             $endDate = $startDate->copy()->endOfMonth();
@@ -1177,10 +1116,6 @@ private function calculateRotationDay($rotationSchedule, $dateStr)
             
             foreach ($validated['employee_ids'] as $employeeId) {
                 $employee = Employee::find($employeeId);
-                
-                if ($employee->client_id != $client->id) {
-                    continue;
-                }
                 
                 $currentDate = $startDate->copy();
                 while ($currentDate <= $endDate) {
@@ -1203,7 +1138,6 @@ private function calculateRotationDay($rotationSchedule, $dateStr)
                     
                     if (!$exists) {
                         EmployeeSchedule::create([
-                            'client_id' => $client->id,
                             'employee_id' => $employeeId,
                             'work_hour_type_id' => $validated['default_work_hour_type_id'],
                             'schedule_type' => 'fixe',

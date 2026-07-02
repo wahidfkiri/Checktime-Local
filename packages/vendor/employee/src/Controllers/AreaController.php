@@ -6,9 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\CheckTimeService;
 use App\Models\Zone;
-use App\Models\Client;
 use Yajra\DataTables\Facades\DataTables;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -24,26 +22,12 @@ class AreaController extends Controller
 
     public function index(Request $request)
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        // Si l'utilisateur n'a pas de client associé
-        if (!$client) {
-            if ($request->ajax()) {
-                return response()->json(['data' => []]);
-            }
-            return view('employee::areas.index')->with('error', 'Aucun client associé à votre compte.');
-        }
-        
-        // Si c'est une requête AJAX pour DataTables
         if ($request->ajax()) {
-            // VÉRIFIER ET SYNCHRONISER avant de retourner les données
-            $this->checkAndSyncIfNeeded($client->id);
+            $this->checkAndSyncIfNeeded(1);
             return $this->getLocalZones($request);
         }
         
-        // Synchroniser automatiquement au premier chargement si nécessaire
-        $this->checkAndSyncIfNeeded($client->id);
+        $this->checkAndSyncIfNeeded(1);
         
         return view('employee::areas.index');
     }
@@ -53,16 +37,12 @@ class AreaController extends Controller
     try {
         // Valider les données d'entrée
         $validated = $request->validate([
-            // 'code' => 'required|string|max:50',
+           // 'code' => 'required|string|max:50',
             'name' => 'required|string|max:100'
         ]);
 
-         // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -74,7 +54,7 @@ class AreaController extends Controller
         $this->sync($request);
 
         // get max code 
-        $code = Zone::where('client_id', $client->id)->max('code');
+        $code = Zone::max('code');
         $nextCode = $code ? $code + 1 : 1;
 
         // Préparer les données pour l'API externe
@@ -95,7 +75,7 @@ class AreaController extends Controller
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->post('http://54.37.15.111/personnel/api/areas/', $apiData);
+        ->post(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/areas/', $apiData);
 
         // Vérifier la réponse
         if ($response->successful()) {
@@ -156,12 +136,8 @@ public function update(Request $request, $id)
             'name' => 'required|string|max:255',
         ]);
 
-        // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -169,11 +145,10 @@ public function update(Request $request, $id)
             ], 401);
         }
 
-         // Préparer les données pour l'API externe
+        // Préparer les données pour l'API externe
         $apiData = [
             'area_name' => $validated['name'],
         ];
-
 
         // Envoyer la requête à l'API externe pour mettre à jour
         $response = Http::withHeaders([
@@ -182,7 +157,7 @@ public function update(Request $request, $id)
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->patch('http://54.37.15.111/personnel/api/areas/' . $id . '/', $apiData);
+        ->patch(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/areas/' . $id . '/', $apiData);
 
         if ($response->successful()) {
             $responseData = $response->json();
@@ -227,12 +202,8 @@ public function update(Request $request, $id)
 public function destroy($id)
 {
     try {
-        // Récupérer la configuration d'accès du client
-           $client = Client::where('user_id', auth()->id())->first();
-            $accessConfig = DB::table('access_configs')->where('client_id', $client->id)->first();
-        // Récupérer le token d'authentification (à adapter selon votre configuration)
-        $token = $accessConfig ? $accessConfig->general_token : null;
-        
+        $token = $this->api->getGeneralToken();
+
         if (!$token) {
             return response()->json([
                 'success' => false,
@@ -247,7 +218,7 @@ public function destroy($id)
             "Content-Type" => "application/json"
         ])
         ->timeout(30)
-        ->delete('http://54.37.15.111/personnel/api/areas/' . $id . '/');
+        ->delete(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/areas/' . $id . '/');
 
         if ($response->successful()) {
             // Optionnel: Supprimer aussi en local
@@ -317,16 +288,13 @@ public function destroy($id)
         try {
             Log::info("Début de la synchronisation des zones pour le client {$clientId}");
             
-            // Récupérer la configuration d'accès du client
-            $accessConfig = DB::table('access_configs')->where('client_id', $clientId)->first();
-            
-            if (!$accessConfig) {
-                Log::warning("Aucune configuration d'accès trouvée pour le client {$clientId}");
+            $token = $this->api->getGeneralToken();
+
+            if (!$token) {
+                Log::warning("Aucun token configuré pour le client {$clientId}");
                 Cache::forget('zones_syncing_' . $clientId);
                 return 0;
             }
-            
-            $token = $accessConfig->general_token;
             
             // Récupérer toutes les zones de l'API
             $allZones = $this->fetchAllZonesFromAPI($token);
@@ -377,10 +345,11 @@ public function destroy($id)
                     "Authorization" => "Token " . $token,
                     "Accept" => "application/json"
                 ])
-                ->timeout(30)
-                ->get('http://54.37.15.111/personnel/api/areas/', [
+                ->timeout(60)
+                ->retry(3, 1000)
+                ->get(rtrim($this->api->getBaseUrl(), '/') . '/personnel/api/areas/', [
                     'page' => $page,
-                    'limit' => 100
+                    'limit' => 300
                 ]);
                 
                 if (!$response->successful()) {
@@ -431,7 +400,6 @@ public function destroy($id)
             
             // Vérifier si la zone existe déjà
             $existingZone = Zone::where('code', $zoneCode)
-                               ->where('client_id', $clientId)
                                ->where('area_id', $zoneData['id'] ?? 0)
                                ->first();
             
@@ -453,7 +421,7 @@ public function destroy($id)
             } else {
                 // Créer une nouvelle zone
                 $zoneAttributes['code'] = $zoneCode;
-                $zoneAttributes['client_id'] = $clientId;
+                // client_id no longer needed (single tenant)
                 $zoneAttributes['created_at'] = now();
                 
                 Zone::create($zoneAttributes);
@@ -487,9 +455,7 @@ public function destroy($id)
             }
             
             // Trouver les zones locales qui ne sont plus dans l'API
-            $zonesToDelete = Zone::where('client_id', $clientId)
-                                ->whereNotIn('code', $apiZoneCodes)
-                                ->get();
+            $zonesToDelete = Zone::whereNotIn('code', $apiZoneCodes)->get();
             
             // Supprimer les zones obsolètes
             $deletedCount = 0;
@@ -514,14 +480,7 @@ public function destroy($id)
     public function getLocalZones(Request $request)
     {
         if ($request->ajax()) {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
-                return DataTables::of([])->make(true);
-            }
-            
-            $query = Zone::where('client_id', $client->id);
+            $query = Zone::query();
             
             // Appliquer les filtres
             $this->applyFilters($query, $request);
@@ -601,26 +560,14 @@ public function destroy($id)
     public function sync(Request $request)
     {
         try {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
-            
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
-                ], 404);
-            }
-            
-            $clientId = $client->id;
+            $clientId = 1;
             $force = $request->get('force', false);
             
-            // Forcer la synchronisation en ignorant le cache
             if ($force) {
                 Cache::forget('zones_last_sync_' . $clientId);
                 Cache::forget('zones_syncing_' . $clientId);
             }
             
-            // Lancer la synchronisation
             $syncedCount = $this->syncZonesForClientNow($clientId);
             
             return response()->json([
@@ -638,63 +585,32 @@ public function destroy($id)
         }
     }
 
-    /**
-     * Statut de synchronisation
-     */
     public function syncStatus()
     {
-        // Récupérer le client de l'utilisateur connecté
-        $client = Client::where('user_id', auth()->id())->first();
-        
-        if (!$client) {
-            return response()->json([
-                'total_zones' => 0,
-                'last_sync' => 'Jamais',
-                'is_syncing' => false,
-                'client_name' => 'Non associé'
-            ]);
-        }
-        
-        $clientId = $client->id;
+        $clientId = 1;
         
         $status = [
-            'total_zones' => Zone::where('client_id', $clientId)->count(),
+            'total_zones' => Zone::count(),
             'last_sync' => Cache::get('zones_last_sync_' . $clientId) ? 
                 date('d/m/Y H:i:s', Cache::get('zones_last_sync_' . $clientId)) : 'Jamais',
             'is_syncing' => Cache::get('zones_syncing_' . $clientId, false),
-            'client_name' => $client->raison_sociale ?? 'Client #' . $clientId
+            'client_name' => config('app.name')
         ];
         
         return response()->json($status);
     }
 
-    /**
-     * Vider et resynchroniser toutes les zones du client
-     */
     public function resetAndSync(Request $request)
     {
         try {
-            // Récupérer le client de l'utilisateur connecté
-            $client = Client::where('user_id', auth()->id())->first();
+            $clientId = 1;
             
-            if (!$client) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucun client associé à votre compte.'
-                ], 404);
-            }
+            Zone::truncate();
+            Log::info("Toutes les zones ont été supprimées");
             
-            $clientId = $client->id;
-            
-            // Vider toutes les zones du client
-            Zone::where('client_id', $clientId)->delete();
-            Log::info("Toutes les zones du client {$clientId} ont été supprimées");
-            
-            // Vider le cache spécifique au client
             Cache::forget('zones_last_sync_' . $clientId);
             Cache::forget('zones_syncing_' . $clientId);
             
-            // Resynchroniser
             $syncedCount = $this->syncZonesForClientNow($clientId);
             
             return response()->json([

@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: checktime-app
+    restart: unless-stopped
+    ports:
+      - "${APP_HOST_IP:-0.0.0.0}:80:80"
+      - "${APP_HOST_IP:-0.0.0.0}:443:443"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: false
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: checktime
+      DB_USERNAME: checktime_user
+      DB_PASSWORD: "${DB_PASSWORD:-ChangeMe123!}"
+    volumes:
+      - ./storage:/var/www/storage
+      - ./public/storage:/var/www/public/storage
+      - ./bootstrap/cache:/var/www/bootstrap/cache
+      - app_uploads:/var/www/public/uploads
+    networks:
+      - checktime-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mysql:
+    image: mysql:8.0
+    container_name: checktime-mysql
+    restart: unless-stopped
+    ports:
+      - "${APP_HOST_IP:-0.0.0.0}:3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-RootChange123!}"
+      MYSQL_DATABASE: checktime
+      MYSQL_USER: checktime_user
+      MYSQL_PASSWORD: "${DB_PASSWORD:-ChangeMe123!}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - checktime-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: checktime-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "${APP_HOST_IP:-0.0.0.0}:8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: "${MYSQL_ROOT_PASSWORD:-RootChange123!}"
+      UPLOAD_LIMIT: 100M
+    networks:
+      - checktime-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+networks:
+  checktime-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  app_uploads:

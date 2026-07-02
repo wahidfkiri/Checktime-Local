@@ -37,7 +37,7 @@ class DashboardController extends Controller
         $totalAbsentToday = $activeEmployees - $totalPresentToday;
         
         $totalRetardToday = DailyAttendance::whereDate('attendance_date', $today)
-            ->where('is_late', true)
+            ->where('late_minutes', '>', 0)
             ->count();
         
         $totalDepartments = Department::count();
@@ -189,16 +189,14 @@ class DashboardController extends Controller
             Cache::put('devices_syncing', true, 300);
             
             Log::info("Dashboard - Synchronisation des devices");
-            
-            $accessConfig = DB::table('access_configs')->first();
-            
-            if (!$accessConfig || empty($accessConfig->general_token)) {
-                Log::warning("Dashboard - Aucune configuration d'accès trouvée");
+
+            $token = \App\Services\CheckTimeService::getConfigToken();
+
+            if (!$token) {
+                Log::warning("Dashboard - Aucun token configuré");
                 Cache::forget('devices_syncing');
                 return;
             }
-            
-            $token = $accessConfig->general_token;
             $allDevices = $this->fetchAllDevicesFromAPI($token);
             
             if (empty($allDevices)) {
@@ -242,7 +240,7 @@ class DashboardController extends Controller
                     "Accept" => "application/json"
                 ])
                 ->timeout(30)
-                ->get('http://54.37.15.111/iclock/api/terminals/', [
+                ->get(rtrim(\App\Services\CheckTimeService::getConfigBaseUrl(), '/') . '/iclock/api/terminals/', [
                     'page' => $page,
                     'limit' => 100
                 ]);
@@ -378,7 +376,7 @@ class DashboardController extends Controller
                 ->count();
             
             $retard = DailyAttendance::whereDate('attendance_date', $date)
-                ->where('is_late', true)
+                ->where('late_minutes', '>', 0)
                 ->count();
 
             $absent = DailyAttendance::whereDate('attendance_date', $date)
@@ -426,7 +424,7 @@ class DashboardController extends Controller
             'totalPresentToday' => $totalPresentToday,
             'totalAbsentToday' => $activeEmployees - $totalPresentToday,
             'totalRetardToday' => DailyAttendance::whereDate('attendance_date', $today)
-                ->where('is_late', true)
+                ->where('late_minutes', '>', 0)
                 ->count(),
             'totalDepartments' => Department::count(),
             'totalZones' => Zone::count(),

@@ -62,9 +62,9 @@ class SyncZonesJob implements ShouldQueue
      */
     private function syncZones()
     {
-        $config = DB::table('access_configs')->first();
+        $token = \App\Services\CheckTimeService::getConfigToken();
 
-        if (!$config || !$config->general_token) {
+        if (!$token) {
             Log::warning('Pas de token configuré pour la synchronisation des zones');
             return;
         }
@@ -75,7 +75,7 @@ class SyncZonesJob implements ShouldQueue
         $batchSize = config('services.zones.batch_size', 100);
 
         while ($hasMore && $page <= config('services.zones.max_pages', 50)) {
-            $response = $this->fetchApiPage($config, $page, $batchSize);
+            $response = $this->fetchApiPage($token, $page, $batchSize);
 
             if (!$response || !isset($response['results'])) {
                 break;
@@ -112,11 +112,11 @@ class SyncZonesJob implements ShouldQueue
     /**
      * Récupère une page de l'API
      */
-    private function fetchApiPage($config, $page, $limit)
+    private function fetchApiPage($token, $page, $limit)
     {
         try {
             $response = Http::withHeaders([
-                "Authorization" => "Token " . $config->general_token,
+                "Authorization" => "Token " . $token,
                 "Accept" => "application/json"
             ])
             ->timeout(45)

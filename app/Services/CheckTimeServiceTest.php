@@ -3,17 +3,39 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use App\Models\Setting;
+use Illuminate\Support\Facades\DB;
 
 class CheckTimeServiceTest
 {
-    private string $baseUrl = "http://54.37.15.111";
-    private string $username = "CICA";
-    private string $password = "CICA@2025";
+    private ?string $baseUrl = null;
+    private ?string $username = "CICA";
+    private ?string $password = "CICA@2025";
 
     private ?string $jwtToken = null;
     private ?string $generalToken = null;
 
-    // Test api 
+    public function __construct()
+    {
+        $this->loadConfig();
+    }
+
+    private function loadConfig(): void
+    {
+        try {
+            $settings = Setting::getGroup('company');
+            $this->baseUrl = $settings['api_url']
+                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+            $this->generalToken = $settings['api_token'] ?? null;
+
+            if (!$this->generalToken) {
+                $config = DB::table('access_configs')->first();
+                $this->generalToken = $config->general_token ?? null;
+            }
+        } catch (\Exception $e) {
+            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
+        }
+    }
 
     public function testCredentials(string $login, string $password)
     {
@@ -28,6 +50,7 @@ class CheckTimeServiceTest
 
         return true;
     }
+
     /**
      * Get JWT Token (for GET only)
      */

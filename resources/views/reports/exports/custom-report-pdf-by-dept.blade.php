@@ -256,8 +256,11 @@
 <body>
     <!-- En-tête -->
     <div class="header">
-        @if(isset($client->logo) && $client->logo)
-            <img src="{{ public_path('storage/app/public/' . $client->logo) }}" alt="{{ $client->raison_sociale }}" class="client-logo">
+        @php
+            $appLogo = \App\Models\Setting::where('key', 'app_logo')->value('value');
+        @endphp
+        @if($appLogo)
+            <img src="{{ public_path($appLogo) }}" alt="Logo" class="client-logo">
         @endif
         <div class="header-content">
             <div class="title">RAPPORT DE PRÉSENCE DU PERSONNEL</div>
@@ -266,7 +269,6 @@
                 ({{ $period_days }} jours ouvrés)
             </div>
             <div class="client-info">
-                <strong>Client :</strong> {{ $client->name }} | 
                 <strong>Départements :</strong> {{ $total_departments }} | 
                 <strong>Employés :</strong> {{ $totals['total_employees'] ?? 0 }} |
                 <strong>Export :</strong> {{ $export_date->format('d/m/Y H:i') }}

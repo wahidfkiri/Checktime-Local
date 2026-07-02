@@ -139,7 +139,7 @@
     <!-- ── En-tête ─────────────────────────────────────────────── -->
     <div class="header">
         @if(isset($client->logo) && $client->logo)
-            <img src="{{ public_path('storage/app/public/' . $client->logo) }}"
+            <img src="{{ public_path($client->logo) }}"
                  alt="{{ $client->raison_sociale ?? '' }}"
                  class="client-logo">
         @endif

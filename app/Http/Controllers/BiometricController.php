@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\BiometricService;
+use App\Services\CheckTimeService;
 use Illuminate\Http\Request;
 
 class BiometricController extends Controller
@@ -20,8 +21,7 @@ class BiometricController extends Controller
     public function getTransactions(Request $request)
     {
         try {
-            $access_configs = \App\Models\AccessConfig::first();
-            $generalToken = $access_configs->general_token ?? null;
+            $generalToken = CheckTimeService::getConfigToken();
             $response = $this->biometricService->getTransactions($request, $generalToken);
             return response()->json($response);
         } catch (\Exception $e) {

@@ -253,7 +253,7 @@ $(document).ready(function() {
             }
         ],
         language: {
-            url: "//cdn.datatables.net/plug-ins/1.10.25/i18n/French.json"
+            url: "https://cdn.datatables.net/plug-ins/1.10.25/i18n/French.json"
         },
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]],
@@ -405,7 +405,7 @@ $(document).ready(function() {
     // Charger le statut de synchronisation
     function loadSyncStatus() {
         $.ajax({
-            url: "{{ url('departments/sync-status') }}",
+            url: "{{ route('departments.status') }}",
             type: 'GET',
             success: function(response) {
                 if (response.client_name !== 'Non associé') {
