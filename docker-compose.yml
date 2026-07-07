@@ -17,7 +17,7 @@ services:
       DB_PORT: 3306
       DB_DATABASE: checktime
       DB_USERNAME: checktime_user
-      DB_PASSWORD: "${DB_PASSWORD:-ChangeMe123!}"
+      DB_PASSWORD: "${DB_PASSWORD:-P@ssw0rd}"
     volumes:
       - ./storage:/var/www/storage
       - ./public/storage:/var/www/public/storage

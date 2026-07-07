@@ -1042,10 +1042,11 @@ class EmployeeScheduleController extends Controller
                 'errors' => $errors
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Log::error('Erreur bulkCreate plannings: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur d\'importation : ' . $e->getMessage()
+                'message' => 'Erreur : ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1110,7 +1111,6 @@ class EmployeeScheduleController extends Controller
                 }
                 $groupedData[$employeeId]['schedules'][] = $schedule;
             }
-            
             $data = [
                 'grouped_data' => $groupedData,
                 'client' => $client,
@@ -1128,14 +1128,27 @@ class EmployeeScheduleController extends Controller
                     
                     // Générer le PDF
                     $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($pdfView, $data);
+                    \Log::info('PDF loadView OK');
                     
                     $filename = 'plannings-employes-' . date('Y-m-d-H-i') . '.pdf';
                     
-                    // Retourner l'URL de téléchargement
+                    // Sauvegarder dans public/storage/pdfs/
+                    $pdfDir = public_path('storage/pdfs');
+                    if (!file_exists($pdfDir)) {
+                        mkdir($pdfDir, 0755, true);
+                    }
+                    $pdfPath = $pdfDir . '/' . $filename;
+                    \Log::info('Before save: ' . $pdfPath);
+                    $pdf->save($pdfPath);
+                    \Log::info('After save OK');
+                    
+                    $pdfUrl = asset('storage/pdfs/' . $filename);
+                    \Log::info('PDF URL: ' . $pdfUrl);
+                    
                     return response()->json([
                         'success' => true,
                         'message' => 'PDF généré avec succès',
-                        'download_url' => 'data:application/pdf;base64,' . base64_encode($pdf->output()),
+                        'download_url' => $pdfUrl,
                         'filename' => $filename,
                         'data' => [
                             'total_schedules' => $schedules->count(),
@@ -1144,8 +1157,12 @@ class EmployeeScheduleController extends Controller
                         ]
                     ]);
                     
-                } catch (\Exception $pdfException) {
-                    \Log::error('PDF Generation Error: ' . $pdfException->getMessage());
+                } catch (\Throwable $pdfException) {
+                    \Log::error('PDF Generation Error: ' . $pdfException->getMessage(), [
+                        'file' => $pdfException->getFile(),
+                        'line' => $pdfException->getLine(),
+                        'trace' => $pdfException->getTraceAsString()
+                    ]);
                     return response()->json([
                         'success' => false,
                         'message' => 'Erreur lors de la génération du PDF : ' . $pdfException->getMessage(),
@@ -1180,8 +1197,10 @@ class EmployeeScheduleController extends Controller
                 ]);
             }
             
-        } catch (\Exception $e) {
-            \Log::error('Export Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        } catch (\Throwable $e) {
+            \Log::error('Export Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l\'export : ' . $e->getMessage(),

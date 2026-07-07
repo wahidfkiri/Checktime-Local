@@ -461,21 +461,7 @@
                 const response = await fetch('{{ route("installer.endpoint") }}', { method: 'POST', body: new FormData(document.getElementById('formStep3')), headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } });
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-success alert-custom"><i class="fas fa-check-circle me-2"></i>Connexion API réussie ! <i class="fas fa-spinner fa-spin me-1"></i>Synchronisation des employés...</div>';
-                    try {
-                        const syncForm = new FormData();
-                        syncForm.append('api_url', document.getElementById('api_url').value);
-                        syncForm.append('api_token', document.getElementById('api_token').value);
-                        const syncResp = await fetch('{{ route("installer.sync-employees") }}', { method: 'POST', body: syncForm, headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } });
-                        const syncData = await syncResp.json();
-                        if (syncData.success) {
-                            document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-success alert-custom"><i class="fas fa-check-circle me-2"></i>Connexion API réussie !<br><small><i class="fas fa-users me-1"></i>' + (syncData.message || 'Employés synchronisés.') + '</small></div>';
-                        } else {
-                            document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-warning alert-custom"><i class="fas fa-check-circle me-2"></i>Connexion API réussie !<br><small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>' + (syncData.message || 'Erreur synchro employés.') + '</small></div>';
-                        }
-                    } catch(e) {
-                        document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-success alert-custom"><i class="fas fa-check-circle me-2"></i>Connexion API réussie !<br><small class="text-muted"><i class="fas fa-info-circle me-1"></i>Synchro employés non disponible.</small></div>';
-                    }
+                    document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-success alert-custom"><i class="fas fa-check-circle me-2"></i>Connexion API réussie !</div>';
                 } else {
                     document.getElementById('apiTestResult').innerHTML = '<div class="alert alert-danger alert-custom"><i class="fas fa-times-circle me-2"></i>' + (data.message || 'Connexion échouée.') + '</div>';
                 }

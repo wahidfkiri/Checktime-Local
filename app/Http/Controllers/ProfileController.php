@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ScheduledNotification;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -10,7 +12,11 @@ class ProfileController extends Controller
 {
     public function index()
     {
-        return view('profile');
+        $scheduledJobs = ScheduledNotification::orderBy('id')->get();
+        $mail = Setting::mailConfig();
+        $smsApiKey = Setting::where('key', 'sms_api_key')->value('value') ?? config('sms.fastway.api_key', '');
+
+        return view('profile', compact('scheduledJobs', 'mail', 'smsApiKey'));
     }
 
     public function update(Request $request)

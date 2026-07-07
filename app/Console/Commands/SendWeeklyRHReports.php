@@ -83,11 +83,13 @@ class SendWeeklyRHReports extends Command
             return 0;
         }
 
-        $rhEmail = $settings->email ?? null;
-        if (!$rhEmail) {
-            $this->warn("⚠️  Pas d'email RH configuré dans les paramètres");
+        // Destinataires : liste configurée par tâche (profil), sinon repli sur settings->email.
+        $recipients = $this->resolveRecipients($settings);
+        if (empty($recipients)) {
+            $this->warn("⚠️  Aucun destinataire RH valide (configurez-les dans Profil › Notifications)");
             return 0;
         }
+        $rhEmail = implode(', ', $recipients);
 
         $this->info("\n--- Rapport RH pour: {$rhEmail} ---");
 
@@ -286,7 +288,7 @@ class SendWeeklyRHReports extends Command
         ];
 
         try {
-            Mail::to($rhEmail)->send(new WeeklyRHAttendanceReport(
+            Mail::to($recipients)->send(new WeeklyRHAttendanceReport(
                 $reportData,
                 null,
                 $startOfWeek->format('d/m/Y'),
@@ -313,6 +315,23 @@ class SendWeeklyRHReports extends Command
         Log::info("Rapports RH hebdomadaires terminés");
         
         return 0;
+    }
+
+    /**
+     * Résout la liste des destinataires : tâche planifiée (profil) puis repli settings->email.
+     */
+    private function resolveRecipients($settings): array
+    {
+        $job = \App\Models\ScheduledNotification::where('command', 'attendance:send-weekly-rh-reports')->first();
+        $recipients = $job && is_array($job->recipients) ? $job->recipients : [];
+
+        if (empty($recipients) && !empty($settings->email)) {
+            $recipients = [$settings->email];
+        }
+
+        return array_values(array_filter($recipients, function ($email) {
+            return filter_var(trim($email), FILTER_VALIDATE_EMAIL);
+        }));
     }
 
     private function getDayNameFrench(int $dayOfWeekIso): string

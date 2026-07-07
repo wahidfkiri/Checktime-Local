@@ -41,6 +41,25 @@ class Setting extends Model
         return self::where('group', $group)->pluck('value', 'key')->toArray();
     }
 
+    /**
+     * Récupère la configuration SMTP stockée en base (groupe "mail"),
+     * avec repli sur la config applicative (.env) pour préremplir le formulaire.
+     */
+    public static function mailConfig(): array
+    {
+        $db = self::where('group', 'mail')->pluck('value', 'key')->toArray();
+
+        return [
+            'mail_host'         => $db['mail_host']         ?? config('mail.mailers.smtp.host', ''),
+            'mail_port'         => $db['mail_port']         ?? config('mail.mailers.smtp.port', 587),
+            'mail_encryption'   => $db['mail_encryption']   ?? config('mail.mailers.smtp.encryption', ''),
+            'mail_username'     => $db['mail_username']     ?? config('mail.mailers.smtp.username', ''),
+            'mail_password'     => $db['mail_password']     ?? config('mail.mailers.smtp.password', ''),
+            'mail_from_address' => $db['mail_from_address'] ?? config('mail.from.address', ''),
+            'mail_from_name'    => $db['mail_from_name']    ?? config('mail.from.name', config('app.name', 'CheckTime')),
+        ];
+    }
+
     public static function company(): \stdClass
     {
         $settings = self::where('group', 'company')->pluck('value', 'key')->toArray();

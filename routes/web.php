@@ -27,6 +27,7 @@ use App\Http\Controllers\CustomReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\BiometricController;
 use App\Http\Controllers\MissionController;
+use App\Http\Controllers\NotificationSettingsController;
 use App\Http\Controllers\InstallerController;
 use App\Http\Middleware\InstallerMiddleware;
 
@@ -120,6 +121,16 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
     Route::put('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
+
+    // Paramètres de notification (onglet du profil)
+    Route::prefix('profile/notifications')->name('profile.notifications.')->group(function () {
+        Route::post('/smtp', [NotificationSettingsController::class, 'smtp'])->name('smtp');
+        Route::post('/smtp/test', [NotificationSettingsController::class, 'testSmtp'])->name('smtp.test');
+        Route::post('/sms', [NotificationSettingsController::class, 'sms'])->name('sms');
+        Route::post('/sms/test', [NotificationSettingsController::class, 'testSms'])->name('sms.test');
+        Route::post('/jobs', [NotificationSettingsController::class, 'updateJobs'])->name('jobs');
+        Route::post('/jobs/run', [NotificationSettingsController::class, 'runJob'])->name('jobs.run');
+    });
 
     // Rotating schedules
     Route::prefix('rotations')->name('rotations.')->group(function () {

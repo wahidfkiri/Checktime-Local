@@ -29,7 +29,7 @@ IP_FIXE=${IP_FIXE:-$DEFAULT_IP}
 echo -e "${GREEN}IP configurée: $IP_FIXE${NC}"
 
 INSTALL_DIR="/opt/checktime"
-DB_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9!@#%^&*()_+' | head -c 20)
+DB_PASSWORD="P@ssw0rd"
 MYSQL_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9!@#%^&*()_+' | head -c 25)
 
 # ---- 1. Installer Docker ----
@@ -87,7 +87,7 @@ if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR"
     # À adapter : remplacer par votre dépôt Git
     echo -e "${YELLOW}Veuillez cloner votre dépôt Git manuellement:${NC}"
-    echo "  git clone <votre-depot> $INSTALL_DIR"
+    echo "  git clone https://github.com/wahidfkiri/Checktime-Local $INSTALL_DIR"
     echo "  cd $INSTALL_DIR"
     echo "  sudo bash docker/install-ubuntu.sh"
     exit 0

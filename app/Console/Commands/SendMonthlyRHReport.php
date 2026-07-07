@@ -64,12 +64,15 @@ class SendMonthlyRHReport extends Command
             return;
         }
 
-        if (empty($settings->email) || !filter_var(trim($settings->email), FILTER_VALIDATE_EMAIL)) {
-            $this->warn("⚠️  Email invalide ou absent dans les paramètres");
+        // Destinataires : liste configurée par tâche (profil), sinon repli sur settings->email.
+        $recipients = $this->resolveRecipients($settings);
+
+        if (empty($recipients)) {
+            $this->warn("⚠️  Aucun destinataire valide (configurez-les dans Profil › Notifications)");
             return;
         }
 
-        $rhEmail = trim($settings->email);
+        $rhEmail = implode(', ', $recipients);
         $this->info("✅  Config OK (" . $rhEmail . ")");
 
         // ── Générer les données rapport ─────────────────────────────
@@ -99,7 +102,7 @@ class SendMonthlyRHReport extends Command
 
         // ── Envoyer l'email ────────────────────────────────────────
         $this->info("📤  Envoi email à " . $rhEmail . "...");
-        $this->sendReportEmail($rhEmail, $reportData, $startOfMonth, $endOfMonth, $pdfPath);
+        $this->sendReportEmail($rhEmail, $reportData, $startOfMonth, $endOfMonth, $pdfPath, $recipients);
 
         $this->info("✅  Email envoyé à " . $rhEmail);
 
@@ -410,7 +413,24 @@ class SendMonthlyRHReport extends Command
     // EMAIL
     // ══════════════════════════════════════════════════════════════
 
-    private function sendReportEmail($rhEmail, $reportData, $startDate, $endDate, $pdfPath)
+    /**
+     * Résout la liste des destinataires : tâche planifiée (profil) puis repli settings->email.
+     */
+    private function resolveRecipients($settings): array
+    {
+        $job = \App\Models\ScheduledNotification::where('command', 'reports:send-monthly-rh')->first();
+        $recipients = $job && is_array($job->recipients) ? $job->recipients : [];
+
+        if (empty($recipients) && !empty($settings->email)) {
+            $recipients = [$settings->email];
+        }
+
+        return array_values(array_filter($recipients, function ($email) {
+            return filter_var(trim($email), FILTER_VALIDATE_EMAIL);
+        }));
+    }
+
+    private function sendReportEmail($rhEmail, $reportData, $startDate, $endDate, $pdfPath, array $recipients = [])
     {
         $settings = Setting::first();
         $appName  = $settings->app_name ?? config('app.name', 'CheckTime');
@@ -438,7 +458,7 @@ class SendMonthlyRHReport extends Command
             'mime' => 'application/pdf',
         ]);
 
-        Mail::to($rhEmail)->send($mail);
+        Mail::to(!empty($recipients) ? $recipients : $rhEmail)->send($mail);
 
         Log::info('Rapport mensuel RH envoyé à ' . $rhEmail);
     }

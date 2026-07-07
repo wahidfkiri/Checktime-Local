@@ -1465,10 +1465,11 @@ $(document).ready(function() {
                 Swal.close();
                 
                 if (response.success) {
-                    // Télécharger le PDF
+                    // Télécharger le PDF via URL
                     let link = document.createElement('a');
                     link.href = response.download_url;
                     link.download = response.filename;
+                    link.style.display = 'none';
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);

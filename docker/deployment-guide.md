@@ -35,7 +35,7 @@
 ```bash
 # 1. Cloner le projet
 sudo mkdir -p /opt/checktime
-sudo git clone <URL_DU_DEPOT> /opt/checktime
+sudo git clone https://github.com/wahidfkiri/Checktime-Local /opt/checktime
 cd /opt/checktime
 
 # 2. Lancer l'installation
@@ -117,7 +117,7 @@ sudo mkdir -p /opt/checktime
 cd /opt/checktime
 
 # Copier les fichiers du projet (via git, scp, clé USB...)
-git clone <URL_DU_DEPOT> .
+git clone https://github.com/wahidfkiri/Checktime-Local .
 
 # Configuration
 cp .env.example .env
@@ -136,7 +136,7 @@ DB_HOST=mysql
 DB_PORT=3306
 DB_DATABASE=checktime
 DB_USERNAME=checktime_user
-DB_PASSWORD=ChangeMe123!
+DB_PASSWORD=P@ssw0rd
 
 QUEUE_CONNECTION=database
 SESSION_DRIVER=file
@@ -145,7 +145,7 @@ SESSION_DRIVER=file
 ### 4. Lancer les conteneurs
 
 ```bash
-export DB_PASSWORD="ChangeMe123!"
+export DB_PASSWORD="P@ssw0rd"
 export MYSQL_ROOT_PASSWORD="RootChange123!"
 
 # Avec docker compose (plugin)

@@ -285,6 +285,8 @@ class InstallerController extends Controller
      */
     public function install(Request $request)
     {
+        set_time_limit(0);
+
         if (InstallationLock::isInstalled()) {
             return response()->json([
                 'success' => false,
@@ -306,10 +308,14 @@ class InstallerController extends Controller
         }
 
         try {
-            // 1. Run migrations safely (handles pre-existing tables)
+            // 1. Clear caches BEFORE any .env changes to avoid inconsistent state
+            try { Artisan::call('config:clear'); } catch (\Throwable $e) { Log::warning('Install: config:clear failed: ' . $e->getMessage()); }
+            try { Artisan::call('cache:clear'); } catch (\Throwable $e) { Log::warning('Install: cache:clear failed: ' . $e->getMessage()); }
+
+            // 2. Run migrations safely (handles pre-existing tables)
             $this->runMigrationsSafely();
 
-            // 2. Create administrator account
+            // 3. Create administrator account
             if (Schema::hasTable('users')) {
                 $adminExists = User::where('email', $admin['email'])->exists();
 
@@ -333,25 +339,20 @@ class InstallerController extends Controller
                 }
             }
 
-            // 3. Lock the application FIRST so even if something fails after,
-            // the installer won't allow retry (prevents partial re-runs)
-            InstallationLock::lock();
-
             // 4. Update .env file
             $this->updateEnvFile($appInfo, $endpoint, $smtp ?? []);
 
             // 5. Save settings to database (optional, gracefully skip if schema mismatch)
             try {
                 $this->saveSettings($appInfo, $endpoint, $smtp ?? []);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 // Settings table schema may not match expected format, skip
             }
 
-            // 6. Clear caches (skip config:cache to avoid runtime crashes)
-            try { Artisan::call('config:clear'); } catch (\Exception $e) { Log::warning('Install: config:clear failed: ' . $e->getMessage()); }
-            try { Artisan::call('cache:clear'); } catch (\Exception $e) { Log::warning('Install: cache:clear failed: ' . $e->getMessage()); }
+            // 6. Lock the application AFTER everything succeeds
+            InstallationLock::lock();
 
-            // 7. Flush entire session (clears stale encrypted cookies)
+            // 7. Flush session before returning response
             $request->session()->flush();
             $request->session()->regenerate();
 
@@ -361,7 +362,7 @@ class InstallerController extends Controller
                 'redirect' => route('login'),
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Installation failed: ' . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -501,7 +502,7 @@ class InstallerController extends Controller
             'MAIL_PORT' => $smtp['mail_port'] ?? '',
             'MAIL_USERNAME' => $smtp['mail_username'] ?? '',
             'MAIL_PASSWORD' => $smtp['mail_password'] ?? '',
-            'MAIL_ENCRYPTION' => ($smtp['mail_encryption'] ?? '') ?: 'null',
+            'MAIL_ENCRYPTION' => ($smtp['mail_encryption'] ?? '') ?: '',
             'MAIL_FROM_ADDRESS' => !empty($smtp['mail_from_address']) ? ('"' . $smtp['mail_from_address'] . '"') : '""',
             'MAIL_FROM_NAME' => !empty($smtp['mail_from_name']) ? ('"' . $smtp['mail_from_name'] . '"') : '"' . ($appInfo['app_name'] ?? 'CheckTime') . '"',
         ];
