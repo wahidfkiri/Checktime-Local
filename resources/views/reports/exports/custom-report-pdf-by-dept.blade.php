@@ -637,6 +637,9 @@
         @endif
     @endforeach
 
+    <!-- Cartouche de signatures (aligné à droite, avant la légende) -->
+    @include('reports.exports.partials.signataires', ['signatairePostes' => $signatairePostes ?? collect()])
+
     <!-- Légende -->
     <div style="margin-top: 15px; font-size: 8px; color: #666;">
         <p><strong>Légende :</strong></p>

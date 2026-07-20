@@ -27,18 +27,39 @@ class BiometricService
     }
 
     /**
-     * Générer une réponse biométrique
+     * Générer une réponse biométrique à partir d'un emp_code.
+     *
+     * ATTENTION : les emp_code peuvent être en doublon. Cette méthode retourne
+     * le premier employé correspondant et reste utilisée par le flux des
+     * transactions (qui ne dispose que du emp_code). Pour une identification
+     * fiable, utiliser generateBiometricResponseForEmployee().
      */
     public function generateBiometricResponse($employeeCode, $terminalUid = null)
     {
         try {
             // Récupérer l'employé depuis la base de données
             $employee = Employee::where('emp_code', $employeeCode)->first();
-            
+
             if (!$employee) {
                 throw new Exception("Employee with code {$employeeCode} not found");
             }
-            
+
+            return $this->generateBiometricResponseForEmployee($employee, $terminalUid);
+        } catch (Exception $e) {
+            Log::error('BiometricService Error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error'   => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Générer une réponse biométrique pour un employé précis et unique.
+     */
+    public function generateBiometricResponseForEmployee(Employee $employee, $terminalUid = null)
+    {
+        try {
             // Générer le cpbv_id (CPBV- + date du jour + séquence)
             $cpbvId = $this->generateCpbvId();
             

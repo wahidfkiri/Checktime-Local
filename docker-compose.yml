@@ -8,16 +8,20 @@ services:
     container_name: checktime-app
     restart: unless-stopped
     ports:
-      - "${APP_HOST_IP:-0.0.0.0}:80:80"
-      - "${APP_HOST_IP:-0.0.0.0}:443:443"
+      - "${APP_BIND_IP:-0.0.0.0}:80:80"
+      - "${APP_BIND_IP:-0.0.0.0}:443:443"
     environment:
       APP_ENV: production
       APP_DEBUG: false
+      # URL publique = IP fixe LAN (APP_HOST_IP, défini dans le .env à la racine).
+      # Sert aux liens absolus générés hors requête (e-mails, notifications, jobs).
+      APP_URL: "http://${APP_HOST_IP:-192.168.100.169}"
       DB_HOST: mysql
       DB_PORT: 3306
       DB_DATABASE: checktime
       DB_USERNAME: checktime_user
       DB_PASSWORD: "${DB_PASSWORD:-P@ssw0rd}"
+      QUEUE_CONNECTION: database
     volumes:
       - ./storage:/var/www/storage
       - ./public/storage:/var/www/public/storage
@@ -39,12 +43,12 @@ services:
     container_name: checktime-mysql
     restart: unless-stopped
     ports:
-      - "${APP_HOST_IP:-0.0.0.0}:3306:3306"
+      - "${APP_BIND_IP:-0.0.0.0}:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-RootChange123!}"
       MYSQL_DATABASE: checktime
       MYSQL_USER: checktime_user
-      MYSQL_PASSWORD: "${DB_PASSWORD:-ChangeMe123!}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-P@ssw0rd}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -60,7 +64,7 @@ services:
     container_name: checktime-phpmyadmin
     restart: unless-stopped
     ports:
-      - "${APP_HOST_IP:-0.0.0.0}:8080:80"
+      - "${APP_BIND_IP:-0.0.0.0}:8080:80"
     environment:
       PMA_HOST: mysql
       PMA_PORT: 3306

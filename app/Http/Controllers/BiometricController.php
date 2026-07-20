@@ -32,17 +32,23 @@ class BiometricController extends Controller
     }
     
     /**
-     * Générer une réponse biométrique pour un employé spécifique
+     * Générer une réponse biométrique pour un employé spécifique.
+     * Identification par employee_id (id externe unique) — les emp_code
+     * peuvent être en doublon.
      */
-    public function getBiometricVerification($employeeCode)
+    public function getBiometricVerification($id)
     {
-       // try {
-            $biometricData = $this->biometricService->generateBiometricResponse($employeeCode);
-            return response()->json($biometricData);
-        // } catch (\Exception $e) {
-        //     return response()->json([
-        //         'error' => $e->getMessage()
-        //     ], 404);
-        // }
+        $employee = \App\Models\Employee::where('employee_id', $id)->first();
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'error'   => "Employé introuvable (employee_id {$id})",
+            ], 404);
+        }
+
+        $biometricData = $this->biometricService->generateBiometricResponseForEmployee($employee);
+
+        return response()->json($biometricData);
     }
 }

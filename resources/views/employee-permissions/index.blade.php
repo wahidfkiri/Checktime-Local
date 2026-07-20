@@ -93,8 +93,8 @@
                                 <thead>
                                     <tr>
                                         <th>Employé</th>
-                                        <th>Date</th>
-                                        <th>Période</th>
+                                        <th>Dates</th>
+                                        <th>Horaire</th>
                                         <th>Durée</th>
                                         <th>Raison</th>
                                         <th>Statut</th>
@@ -135,10 +135,15 @@
                             </select>
                             <div class="invalid-feedback" id="employee_id-error"></div>
                         </div>
-                        <div class="col-md-6">
-                            <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="date" name="date" required>
-                            <div class="invalid-feedback" id="date-error"></div>
+                        <div class="col-md-3">
+                            <label for="date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="date_debut" name="date_debut" required>
+                            <div class="invalid-feedback" id="date_debut-error"></div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="date_fin" class="form-label">Date fin <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="date_fin" name="date_fin" required>
+                            <div class="invalid-feedback" id="date_fin-error"></div>
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -197,10 +202,15 @@
                             </select>
                             <div class="invalid-feedback" id="edit_employee_id-error"></div>
                         </div>
-                        <div class="col-md-6">
-                            <label for="edit_date" class="form-label">Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="edit_date" name="date" required>
-                            <div class="invalid-feedback" id="edit_date-error"></div>
+                        <div class="col-md-3">
+                            <label for="edit_date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="edit_date_debut" name="date_debut" required>
+                            <div class="invalid-feedback" id="edit_date_debut-error"></div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="edit_date_fin" class="form-label">Date fin <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="edit_date_fin" name="date_fin" required>
+                            <div class="invalid-feedback" id="edit_date_fin-error"></div>
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -521,7 +531,8 @@ $('#export-button').on('click', function() {
 
                     $('#edit_permission_id').val(permission.id);
                     $('#edit_employee_id').val(permission.employee_id);
-                    $('#edit_date').val(formatForDateInput(permission.date));
+                    $('#edit_date_debut').val(formatForDateInput(permission.date_debut || permission.date));
+                    $('#edit_date_fin').val(formatForDateInput(permission.date_fin || permission.date_debut || permission.date));
                     $('#edit_start_time').val(permission.start_time);
                     $('#edit_end_time').val(permission.end_time);
                     $('#edit_duration_minutes').val(permission.duration_minutes);
@@ -693,8 +704,12 @@ $('#export-button').on('click', function() {
                     $('#delete-permission-employee').text(
                         `${permission.employee.first_name} ${permission.employee.last_name}`
                     );
+                    var dStart = permission.date_debut || permission.date;
+                    var dEnd = permission.date_fin || permission.date_debut || permission.date;
+                    var startStr = dStart ? new Date(dStart).toLocaleDateString('fr-FR') : '';
+                    var endStr = dEnd ? new Date(dEnd).toLocaleDateString('fr-FR') : startStr;
                     $('#delete-permission-date').text(
-                        new Date(permission.date).toLocaleDateString('fr-FR')
+                        startStr === endStr ? startStr : (startStr + ' → ' + endStr)
                     );
                     $('#delete-permission-raison').text(permission.raison);
                     $('#deletePermissionModal').modal('show');

@@ -25,6 +25,7 @@ use App\Http\Controllers\EmployeeScheduleController;
 use App\Http\Controllers\EmployeePermissionController;
 use App\Http\Controllers\CustomReportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SignataireController;
 use App\Http\Controllers\BiometricController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\NotificationSettingsController;
@@ -221,6 +222,14 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::post('/test-rh', [SettingsController::class, 'testRhEmail'])->name('settings.test.rh');
         Route::post('/test-employees', [SettingsController::class, 'testEmployeesEmail'])->name('settings.test.employees');
         Route::get('/status', [SettingsController::class, 'getStatus'])->name('settings.status');
+
+        // Signataires (cartouche de signatures des rapports)
+        Route::get('/signataires', [SignataireController::class, 'index'])->name('settings.signataires.index');
+        Route::post('/signataires/postes', [SignataireController::class, 'storePoste'])->name('settings.signataires.postes.store');
+        Route::put('/signataires/postes/{id}', [SignataireController::class, 'updatePoste'])->name('settings.signataires.postes.update');
+        Route::delete('/signataires/postes/{id}', [SignataireController::class, 'destroyPoste'])->name('settings.signataires.postes.destroy');
+        Route::post('/signataires/responsables', [SignataireController::class, 'storeSignataire'])->name('settings.signataires.responsables.store');
+        Route::delete('/signataires/responsables/{id}', [SignataireController::class, 'destroySignataire'])->name('settings.signataires.responsables.destroy');
     });
 
     // Custom reports
@@ -243,6 +252,6 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
 Route::middleware(['auth', 'web', 'installed'])->group(function () {
     // Transactions
     Route::get('/api/transactions', [BiometricController::class, 'getTransactions']);
-    // Biometric verification
-    Route::get('/api/biometric/{employeeCode}', [BiometricController::class, 'getBiometricVerification']);
+    // Biometric verification — identification par id unique (les emp_code peuvent être en doublon)
+    Route::get('/api/biometric/{id}', [BiometricController::class, 'getBiometricVerification']);
 });

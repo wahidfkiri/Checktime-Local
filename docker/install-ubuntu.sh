@@ -22,10 +22,16 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # ---- Demander l'IP fixe ----
-DEFAULT_IP=$(ip -o -4 addr show | awk '{print $4}' | cut -d/ -f1 | grep -v 127.0.0.1 | head -1)
-DEFAULT_IP=${DEFAULT_IP:-192.168.1.100}
-read -p "Adresse IP fixe du serveur [${DEFAULT_IP}] : " IP_FIXE
-IP_FIXE=${IP_FIXE:-$DEFAULT_IP}
+# IP par défaut du serveur CheckTime. Pour installer sur une autre IP :
+#   sudo IP_FIXE=192.168.1.50 bash docker/install-ubuntu.sh   (sans question)
+# ou répondre à l'invite ci-dessous.
+DEFAULT_IP="192.168.100.169"
+if [ -n "$IP_FIXE" ]; then
+    echo -e "${GREEN}IP fournie via la variable IP_FIXE: $IP_FIXE${NC}"
+else
+    read -p "Adresse IP fixe du serveur [${DEFAULT_IP}] : " IP_FIXE
+    IP_FIXE=${IP_FIXE:-$DEFAULT_IP}
+fi
 echo -e "${GREEN}IP configurée: $IP_FIXE${NC}"
 
 INSTALL_DIR="/opt/checktime"
@@ -81,6 +87,13 @@ NETPLAN
     echo -e "${GREEN}IP fixe $IP_FIXE configurée.${NC}"
 fi
 
+# Ouvrir les ports LAN si le pare-feu ufw est présent/actif
+if command -v ufw >/dev/null 2>&1; then
+    ufw allow 80/tcp   || true   # Application web
+    ufw allow 8080/tcp || true   # phpMyAdmin (retirer si non souhaité sur le LAN)
+    echo -e "${GREEN}Pare-feu : ports 80 et 8080 autorisés.${NC}"
+fi
+
 # ---- 3. Cloner le projet ----
 echo -e "${YELLOW}[3/8] Clonage de l'application...${NC}"
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -103,6 +116,13 @@ sed -i "s|^APP_NAME=.*|APP_NAME=CheckTime|" .env
 sed -i "s|^APP_ENV=.*|APP_ENV=production|" .env
 sed -i "s|^APP_DEBUG=.*|APP_DEBUG=false|" .env
 sed -i "s|^APP_URL=.*|APP_URL=http://${IP_FIXE}|" .env
+# APP_HOST_IP est relu par docker-compose.yml : l'IP survit aux prochains
+# "docker compose up -d" sans devoir relancer ce script.
+if grep -q "^APP_HOST_IP=" .env; then
+    sed -i "s|^APP_HOST_IP=.*|APP_HOST_IP=${IP_FIXE}|" .env
+else
+    echo "APP_HOST_IP=${IP_FIXE}" >> .env
+fi
 sed -i "s|^DB_HOST=.*|DB_HOST=mysql|" .env
 sed -i "s|^DB_DATABASE=.*|DB_DATABASE=checktime|" .env
 sed -i "s|^DB_USERNAME=.*|DB_USERNAME=checktime_user|" .env

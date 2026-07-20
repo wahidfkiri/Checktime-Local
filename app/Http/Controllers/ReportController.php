@@ -111,7 +111,7 @@ class ReportController extends Controller
             
             // Récupérer les permissions approuvées
             $permissions = EmployeePermission::where('status', 'approved')
-                ->whereBetween('date', [$startDate, $endDate])
+                ->overlappingPeriod($startDate, $endDate)
                 ->get()
                 ->groupBy('employee_id');
             
@@ -604,7 +604,8 @@ class ReportController extends Controller
     {
         if (isset($permissions[$employeeId])) {
             foreach ($permissions[$employeeId] as $permission) {
-                if (Carbon::parse($permission->date)->format('Y-m-d') == $date) {
+                // Prend en compte la plage de dates (date_debut → date_fin).
+                if ($permission->coversDate($date)) {
                     return true;
                 }
             }
@@ -852,7 +853,7 @@ class ReportController extends Controller
         
         // Récupérer les permissions approuvées
         $permissions = EmployeePermission::where('status', 'approved')
-            ->whereBetween('date', [$start_date, $end_date])
+            ->overlappingPeriod($start_date, $end_date)
             ->get()
             ->groupBy('employee_id');
         

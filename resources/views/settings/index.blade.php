@@ -194,6 +194,52 @@
                     </div>
                 </div>
                 
+                <!-- Section Signataires -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                                <div>
+                                    <h4 class="card-title">✍️ Signataires des rapports</h4>
+                                    <p class="card-subtitle text-muted mb-0">
+                                        Postes (colonnes) et responsables affichés dans le cartouche de signatures
+                                        du PDF de présence &amp; ponctualité.
+                                    </p>
+                                </div>
+                                <button type="button" class="btn btn-primary" id="add-poste-btn">
+                                    <i class="bi bi-plus-circle me-1"></i> Ajouter un poste
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Chaque <strong>poste</strong> (ex : Rédacteur, Vérificateur, Approbateur) devient une
+                                    colonne. Chaque poste peut contenir <strong>plusieurs responsables</strong>
+                                    (nom complet + fonction). Les lignes <em>Date</em> et <em>VISA</em> restent vides
+                                    pour signature manuelle.
+                                </div>
+
+                                <!-- Message vide -->
+                                <div id="signataires-empty" class="text-center py-4 d-none">
+                                    <i class="bi bi-pen display-6 text-muted"></i>
+                                    <p class="text-muted mb-0 mt-2">Aucun poste configuré. Cliquez sur « Ajouter un poste ».</p>
+                                </div>
+
+                                <!-- Chargement -->
+                                <div id="signataires-loading" class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Chargement...</span>
+                                    </div>
+                                    <span class="text-muted ms-2">Chargement des signataires...</span>
+                                </div>
+
+                                <!-- Colonnes des postes -->
+                                <div class="row g-3" id="signataires-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Boutons d'action -->
                 <div class="row mt-3">
                     <div class="col-md-12">
@@ -585,6 +631,247 @@ $(document).ready(function() {
     }
     
     checkCronStatus();
+});
+</script>
+
+<!-- Gestion des signataires -->
+<script>
+$(document).ready(function() {
+    var csrfToken = "{{ csrf_token() }}";
+    var routes = {
+        index:            "{{ route('settings.signataires.index') }}",
+        posteStore:       "{{ route('settings.signataires.postes.store') }}",
+        posteUpdateBase:  "{{ url('settings/signataires/postes') }}",
+        posteDeleteBase:  "{{ url('settings/signataires/postes') }}",
+        respStore:        "{{ route('settings.signataires.responsables.store') }}",
+        respDeleteBase:   "{{ url('settings/signataires/responsables') }}"
+    };
+
+    function escapeHtml(str) {
+        return $('<div>').text(str == null ? '' : str).html();
+    }
+
+    function toast(icon, title) {
+        Swal.fire({
+            icon: icon, title: title, toast: true, position: 'top-end',
+            showConfirmButton: false, timer: 3000, timerProgressBar: true
+        });
+    }
+
+    // Charger et afficher les postes + responsables
+    function loadSignataires() {
+        $('#signataires-loading').removeClass('d-none');
+        $.ajax({
+            url: routes.index,
+            type: 'GET',
+            success: function(response) {
+                $('#signataires-loading').addClass('d-none');
+                if (response.success) {
+                    renderSignataires(response.postes || []);
+                }
+            },
+            error: function() {
+                $('#signataires-loading').addClass('d-none');
+                toast('error', 'Erreur de chargement des signataires');
+            }
+        });
+    }
+
+    function renderSignataires(postes) {
+        var container = $('#signataires-container');
+        container.empty();
+
+        if (!postes.length) {
+            $('#signataires-empty').removeClass('d-none');
+            return;
+        }
+        $('#signataires-empty').addClass('d-none');
+
+        postes.forEach(function(poste) {
+            var respHtml = '';
+            (poste.signataires || []).forEach(function(r) {
+                respHtml +=
+                    '<li class="list-group-item d-flex justify-content-between align-items-start">' +
+                        '<div>' +
+                            '<div class="fw-bold">' + escapeHtml(r.full_name) + '</div>' +
+                            '<small class="text-muted">' + (r.fonction ? escapeHtml(r.fonction) : '<em>Sans fonction</em>') + '</small>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger delete-resp-btn" ' +
+                            'data-id="' + r.id + '" title="Supprimer"><i class="bi bi-x-lg"></i></button>' +
+                    '</li>';
+            });
+            if (!respHtml) {
+                respHtml = '<li class="list-group-item text-muted small">Aucun responsable</li>';
+            }
+
+            var col =
+                '<div class="col-md-6 col-lg-4">' +
+                    '<div class="card h-100 border">' +
+                        '<div class="card-header d-flex justify-content-between align-items-center bg-white">' +
+                            '<span class="fw-bold text-uppercase">' + escapeHtml(poste.name) + '</span>' +
+                            '<span>' +
+                                '<button type="button" class="btn btn-sm btn-outline-secondary edit-poste-btn me-1" ' +
+                                    'data-id="' + poste.id + '" data-name="' + escapeHtml(poste.name) + '" title="Renommer">' +
+                                    '<i class="bi bi-pencil"></i></button>' +
+                                '<button type="button" class="btn btn-sm btn-outline-danger delete-poste-btn" ' +
+                                    'data-id="' + poste.id + '" title="Supprimer le poste"><i class="bi bi-trash"></i></button>' +
+                            '</span>' +
+                        '</div>' +
+                        '<ul class="list-group list-group-flush">' + respHtml + '</ul>' +
+                        '<div class="card-footer bg-light">' +
+                            '<div class="mb-2"><input type="text" class="form-control form-control-sm resp-name" placeholder="Nom complet"></div>' +
+                            '<div class="mb-2"><input type="text" class="form-control form-control-sm resp-fonction" placeholder="Fonction"></div>' +
+                            '<button type="button" class="btn btn-sm btn-success w-100 add-resp-btn" data-poste="' + poste.id + '">' +
+                                '<i class="bi bi-plus-lg me-1"></i> Ajouter le responsable</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            container.append(col);
+        });
+    }
+
+    // Ajouter un poste
+    $('#add-poste-btn').on('click', function() {
+        Swal.fire({
+            title: 'Nouveau poste',
+            input: 'text',
+            inputLabel: 'Nom du poste (ex : Rédacteur, Vérificateur, Approbateur)',
+            inputPlaceholder: 'Nom du poste',
+            showCancelButton: true,
+            confirmButtonText: 'Ajouter',
+            cancelButtonText: 'Annuler',
+            inputValidator: function(value) {
+                if (!value || !value.trim()) return 'Le nom du poste est requis';
+            }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: routes.posteStore,
+                    type: 'POST',
+                    data: { _token: csrfToken, name: result.value.trim() },
+                    success: function(res) {
+                        if (res.success) { toast('success', res.message); loadSignataires(); }
+                        else { toast('error', res.message || 'Erreur'); }
+                    },
+                    error: function(xhr) {
+                        toast('error', xhr.responseJSON?.message || 'Erreur lors de l\'ajout');
+                    }
+                });
+            }
+        });
+    });
+
+    // Renommer un poste
+    $('#signataires-container').on('click', '.edit-poste-btn', function() {
+        var id = $(this).data('id');
+        var currentName = $(this).data('name');
+        Swal.fire({
+            title: 'Renommer le poste',
+            input: 'text',
+            inputValue: currentName,
+            showCancelButton: true,
+            confirmButtonText: 'Enregistrer',
+            cancelButtonText: 'Annuler',
+            inputValidator: function(value) {
+                if (!value || !value.trim()) return 'Le nom du poste est requis';
+            }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: routes.posteUpdateBase + '/' + id,
+                    type: 'POST',
+                    data: { _token: csrfToken, _method: 'PUT', name: result.value.trim() },
+                    success: function(res) {
+                        if (res.success) { toast('success', res.message); loadSignataires(); }
+                        else { toast('error', res.message || 'Erreur'); }
+                    },
+                    error: function(xhr) {
+                        toast('error', xhr.responseJSON?.message || 'Erreur');
+                    }
+                });
+            }
+        });
+    });
+
+    // Supprimer un poste
+    $('#signataires-container').on('click', '.delete-poste-btn', function() {
+        var id = $(this).data('id');
+        Swal.fire({
+            title: 'Supprimer ce poste ?',
+            text: 'Tous les responsables de ce poste seront également supprimés.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Oui, supprimer',
+            cancelButtonText: 'Annuler'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: routes.posteDeleteBase + '/' + id,
+                    type: 'POST',
+                    data: { _token: csrfToken, _method: 'DELETE' },
+                    success: function(res) {
+                        if (res.success) { toast('success', res.message); loadSignataires(); }
+                        else { toast('error', res.message || 'Erreur'); }
+                    },
+                    error: function(xhr) {
+                        toast('error', xhr.responseJSON?.message || 'Erreur');
+                    }
+                });
+            }
+        });
+    });
+
+    // Ajouter un responsable
+    $('#signataires-container').on('click', '.add-resp-btn', function() {
+        var posteId = $(this).data('poste');
+        var card = $(this).closest('.card');
+        var fullName = card.find('.resp-name').val();
+        var fonction = card.find('.resp-fonction').val();
+
+        if (!fullName || !fullName.trim()) {
+            toast('warning', 'Le nom complet est requis');
+            return;
+        }
+
+        $.ajax({
+            url: routes.respStore,
+            type: 'POST',
+            data: {
+                _token: csrfToken,
+                poste_id: posteId,
+                full_name: fullName.trim(),
+                fonction: (fonction || '').trim()
+            },
+            success: function(res) {
+                if (res.success) { toast('success', res.message); loadSignataires(); }
+                else { toast('error', res.message || 'Erreur'); }
+            },
+            error: function(xhr) {
+                toast('error', xhr.responseJSON?.message || 'Erreur lors de l\'ajout');
+            }
+        });
+    });
+
+    // Supprimer un responsable
+    $('#signataires-container').on('click', '.delete-resp-btn', function() {
+        var id = $(this).data('id');
+        $.ajax({
+            url: routes.respDeleteBase + '/' + id,
+            type: 'POST',
+            data: { _token: csrfToken, _method: 'DELETE' },
+            success: function(res) {
+                if (res.success) { toast('success', res.message); loadSignataires(); }
+                else { toast('error', res.message || 'Erreur'); }
+            },
+            error: function(xhr) {
+                toast('error', xhr.responseJSON?.message || 'Erreur');
+            }
+        });
+    });
+
+    // Chargement initial
+    loadSignataires();
 });
 </script>
 

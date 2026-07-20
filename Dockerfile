@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     freetype-dev \
     oniguruma-dev \
+    icu-dev \
     nodejs \
     npm \
     bash
@@ -45,7 +46,8 @@ ENV APP_DEBUG=false
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Install & build frontend assets
-RUN npm ci --no-audit --no-fund && \
+# npm install (et non npm ci) car le projet ne fournit pas de package-lock.json
+RUN npm install --no-audit --no-fund && \
     npm run build && \
     rm -rf node_modules
 

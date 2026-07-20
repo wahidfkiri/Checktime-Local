@@ -10,11 +10,20 @@ fi
 # Update .env with docker-compose environment variables
 sed -i "s|^APP_ENV=.*|APP_ENV=${APP_ENV:-production}|" /var/www/.env
 sed -i "s|^APP_DEBUG=.*|APP_DEBUG=${APP_DEBUG:-false}|" /var/www/.env
+# URL publique (IP fixe LAN) — utilisée pour les liens absolus hors requête.
+sed -i "s|^APP_URL=.*|APP_URL=${APP_URL:-http://localhost}|" /var/www/.env
 sed -i "s|^DB_HOST=.*|DB_HOST=${DB_HOST:-mysql}|" /var/www/.env
 sed -i "s|^DB_PORT=.*|DB_PORT=${DB_PORT:-3306}|" /var/www/.env
 sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-checktime}|" /var/www/.env
 sed -i "s|^DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME:-checktime_user}|" /var/www/.env
-sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|" /var/www/.env
+# Écrire DB_PASSWORD via awk/ENVIRON : la valeur n'est pas interprétée comme une
+# regex/replacement, donc robuste aux caractères spéciaux (| & / \ etc.).
+export DB_PASSWORD
+awk '/^DB_PASSWORD=/{print "DB_PASSWORD=" ENVIRON["DB_PASSWORD"]; next} {print}' \
+    /var/www/.env > /var/www/.env.tmp && mv /var/www/.env.tmp /var/www/.env
+# Driver de file d'attente : doit correspondre aux workers gérés par Supervisor
+# (queue:work). Par défaut "database" pour un vrai traitement asynchrone.
+sed -i "s|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}|" /var/www/.env
 
 # Generate APP_KEY if not set
 CURRENT_KEY=$(grep '^APP_KEY=' /var/www/.env | cut -d= -f2)

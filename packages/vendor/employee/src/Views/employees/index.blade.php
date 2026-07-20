@@ -744,7 +744,8 @@ $(document).ready(function() {
                 data-address="${row.address || ''}">
                 <i class="bi bi-pencil"></i>
             </button>
-            <button type="button" class="btn btn-sm btn-info biometric-btn" 
+            <button type="button" class="btn btn-sm btn-info biometric-btn"
+                data-id="${row.employee_id}"
                 data-emp_code="${row.emp_code}"
                 data-full_name="${row.full_name}"
                 title="Vérification biométrique">
@@ -819,6 +820,7 @@ $(document).ready(function() {
 
     // Bouton Biométrique
     $(document).on('click', '.biometric-btn', function() {
+        const empId    = $(this).data('id');
         const empCode  = $(this).data('emp_code');
         const fullName = $(this).data('full_name');
 
@@ -826,9 +828,10 @@ $(document).ready(function() {
         $('#biometricModalLabel').html(
             `<i class="bi bi-fingerprint me-2"></i>Vérification Biométrique - ${fullName}`
         );
+        $('#biometricModal').data('emp_id', empId);
         $('#biometricModal').data('emp_code', empCode);
         $('#biometricModal').data('full_name', fullName);
-        loadBiometricData(empCode);
+        loadBiometricData(empId);
     });
 
     // Garder attachActionButtons() et attachBiometricButtons() vides —
@@ -837,8 +840,8 @@ $(document).ready(function() {
     function attachActionButtons() { /* délégation gérée sur document */ }
     function attachBiometricButtons() { /* délégation gérée sur document */ }
 
-// Fonction pour charger les données biométriques
-function loadBiometricData(empCode) {
+// Fonction pour charger les données biométriques (par id unique de l'employé)
+function loadBiometricData(empId) {
     // Afficher le loader
     $('#biometric-loading').show();
     $('#biometric-content').hide();
@@ -846,7 +849,7 @@ function loadBiometricData(empCode) {
     $('#biometric-error-alert').hide();
     
     $.ajax({
-        url: `/api/biometric/${empCode}`,
+        url: `/api/biometric/${empId}`,
         type: 'GET',
         headers: {
             'X-CSRF-TOKEN': '{{ csrf_token() }}'
@@ -967,9 +970,9 @@ function copyToClipboard(elementId) {
 
 // Gestion du bouton rafraîchir
 $('#refresh-biometric-btn').on('click', function() {
-    const empCode = $('#biometricModal').data('emp_code');
-    if (empCode) {
-        loadBiometricData(empCode);
+    const empId = $('#biometricModal').data('emp_id');
+    if (empId) {
+        loadBiometricData(empId);
     }
 });
 

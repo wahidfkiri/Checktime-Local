@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\SignatairePoste;
 use App\Models\DailyAttendance;
 use App\Models\EmployeeSchedule;
 use App\Models\Mission;
@@ -30,7 +31,18 @@ class CustomReportController extends Controller
                 ];
             });
 
-        return view('reports.custom-report', compact('employees'));
+        // Récupérer les départements pour le filtre à partir du champ dept_name des employés.
+        // dept_name est chiffré (cast "encrypted"), on doit donc déchiffrer côté PHP
+        // pour obtenir la liste distincte des départements réellement présents.
+        $departments = Employee::get()
+            ->pluck('dept_name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter(fn ($name) => $name !== '')
+            ->unique()
+            ->sort()
+            ->values();
+
+        return view('reports.custom-report', compact('employees', 'departments'));
     }
 
     /**
@@ -42,7 +54,9 @@ class CustomReportController extends Controller
             $validator = \Validator::make($request->all(), [
                 'start_date' => 'required|date',
                 'end_date'   => 'required|date|after_or_equal:start_date',
-                'emp_code'   => 'nullable|string'
+                'emp_code'   => 'nullable|string',
+                'department_ids' => 'nullable|array',
+                'department_ids.*' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
@@ -52,8 +66,14 @@ class CustomReportController extends Controller
             $startDate = $request->input('start_date');
             $endDate   = $request->input('end_date');
             $empCode   = $request->input('emp_code', 'all');
+            $departmentIds = $request->input('department_ids', ['all']);
 
-            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode);
+            // Normaliser : si "all" est présent, on ignore les autres valeurs.
+            if (in_array('all', (array) $departmentIds)) {
+                $departmentIds = ['all'];
+            }
+
+            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds);
 
             return response()->json([
                 'success'         => true,
@@ -75,7 +95,55 @@ class CustomReportController extends Controller
      * Récupérer les données de présence et ponctualité depuis la base de données
      * en utilisant EmployeeSchedule pour le calcul des retards
      */
-    private function getPresencePonctualiteData($startDate, $endDate, $empCode)
+    /**
+     * Filtrer une collection d'employés par nom de département.
+     *
+     * dept_name étant chiffré en base (cast "encrypted"), un LIKE SQL ne peut pas
+     * fonctionner. On filtre donc côté PHP par recherche « contient », insensible
+     * à la casse, sur la valeur déchiffrée par Eloquent.
+     */
+    private function filterEmployeesByDepartment($employees, $departmentIds)
+    {
+        if (!$departmentIds || !is_array($departmentIds) || in_array('all', $departmentIds)) {
+            return $employees->values();
+        }
+
+        $selectedDepts = array_values(array_filter(array_map(
+            fn ($d) => mb_strtolower(trim((string) $d)),
+            $departmentIds
+        ), fn ($d) => $d !== ''));
+
+        if (empty($selectedDepts)) {
+            return $employees->values();
+        }
+
+        return $employees->filter(function ($employee) use ($selectedDepts) {
+            $deptName = mb_strtolower(trim((string) ($employee->dept_name ?? '')));
+            if ($deptName === '') {
+                return false;
+            }
+            foreach ($selectedDepts as $selected) {
+                if (str_contains($deptName, $selected)) {
+                    return true;
+                }
+            }
+            return false;
+        })->values();
+    }
+
+    /**
+     * Récupérer les postes de signataires (avec leurs responsables),
+     * pour le cartouche de signatures affiché en fin de PDF.
+     */
+    private function getSignatairePostes()
+    {
+        return SignatairePoste::with('signataires')
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds = ['all'])
     {
         $employeesQuery = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
@@ -85,6 +153,9 @@ class CustomReportController extends Controller
         }
 
         $employees = $employeesQuery->orderBy('emp_code')->get();
+
+        // Filtrer par département(s) sélectionné(s) sur le champ dept_name (chiffré → filtre PHP).
+        $employees = $this->filterEmployeesByDepartment($employees, $departmentIds);
 
         if ($employees->isEmpty()) {
             return [];
@@ -305,6 +376,12 @@ class CustomReportController extends Controller
         try {
             $startDate = $request->input('start_date');
             $endDate   = $request->input('end_date');
+            $empCode   = $request->input('emp_code', 'all');
+            $departmentIds = $request->input('department_ids', ['all']);
+
+            if (in_array('all', (array) $departmentIds)) {
+                $departmentIds = ['all'];
+            }
 
             $workingDays = $this->countWorkingDays($startDate, $endDate);
 
@@ -333,9 +410,19 @@ class CustomReportController extends Controller
                 })
                 ->get();
 
-            $employees = Employee::orderBy('dept_name')
+            $employeesQuery = Employee::query();
+
+            if ($empCode && $empCode !== 'all') {
+                $employeesQuery->where('emp_code', $empCode);
+            }
+
+            $employees = $employeesQuery
+                ->orderBy('dept_name')
                 ->orderBy('first_name')
                 ->get();
+
+            // Filtrer par département(s) sélectionné(s) sur dept_name (chiffré → filtre PHP).
+            $employees = $this->filterEmployeesByDepartment($employees, $departmentIds);
 
             $attendanceByEmployee = [];
             foreach ($attendances as $att) {
@@ -656,6 +743,7 @@ class CustomReportController extends Controller
                 'total_departments' => count($reportData),
                 'period_days'       => $workingDays,
                 'days_list'         => $daysList,
+                'signatairePostes'  => $this->getSignatairePostes(),
             ];
 
             $pdf = Pdf::loadView('reports.exports.custom-report-pdf-by-dept', $data);
@@ -679,7 +767,9 @@ class CustomReportController extends Controller
             $validator = \Validator::make($request->all(), [
                 'start_date' => 'required|date',
                 'end_date'   => 'required|date|after_or_equal:start_date',
-                'emp_code'   => 'nullable|string'
+                'emp_code'   => 'nullable|string',
+                'department_ids' => 'nullable|array',
+                'department_ids.*' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
@@ -689,8 +779,13 @@ class CustomReportController extends Controller
             $startDate = $request->input('start_date');
             $endDate   = $request->input('end_date');
             $empCode   = $request->input('emp_code', 'all');
+            $departmentIds = $request->input('department_ids', ['all']);
 
-            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode);
+            if (in_array('all', (array) $departmentIds)) {
+                $departmentIds = ['all'];
+            }
+
+            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds);
             $totals = $this->calculateTotals($reportData);
 
             $data = [
@@ -701,6 +796,7 @@ class CustomReportController extends Controller
                 'totals'          => $totals,
                 'total_employees' => count($reportData),
                 'period_days'     => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1,
+                'signatairePostes' => $this->getSignatairePostes(),
             ];
 
             $pdf = Pdf::loadView('reports.exports.custom-report-pdf', $data);

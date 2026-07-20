@@ -7,6 +7,8 @@ docker-compose.yml
 docker-compose*.yml
 *.md
 node_modules
+**/node_modules
+checktime-electron
 vendor
 storage/framework/sessions/*
 storage/framework/cache/data/*

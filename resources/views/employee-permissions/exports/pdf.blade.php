@@ -243,8 +243,8 @@
         <thead>
             <tr>
                 <th width="15%">Employé</th>
-                <th width="10%">Date</th>
-                <th width="15%">Période</th>
+                <th width="12%">Dates</th>
+                <th width="13%">Horaire</th>
                 <th width="10%">Durée</th>
                 <th width="30%">Raison</th>
                 <th width="10%">Statut</th>
@@ -254,7 +254,15 @@
             @foreach($permissions as $permission)
             <tr>
                 <td>{{ $permission->employee->first_name }} {{ $permission->employee->last_name }}</td>
-                <td>{{ \Carbon\Carbon::parse($permission->date)->format('d/m/Y') }}</td>
+                <td>
+                    @php
+                        $pStart = $permission->getEffectiveStartDate();
+                        $pEnd = $permission->getEffectiveEndDate();
+                        $pStartStr = \Carbon\Carbon::parse($pStart)->format('d/m/Y');
+                        $pEndStr = $pEnd ? \Carbon\Carbon::parse($pEnd)->format('d/m/Y') : $pStartStr;
+                    @endphp
+                    {{ $pStartStr === $pEndStr ? $pStartStr : $pStartStr . ' → ' . $pEndStr }}
+                </td>
                 <td>
                     @if($permission->start_time && $permission->end_time)
                         {{ \Carbon\Carbon::parse($permission->start_time)->format('H:i') }} - 
