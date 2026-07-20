@@ -200,7 +200,9 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
-        App\Providers\TelescopeServiceProvider::class,
+        // TelescopeServiceProvider est enregistré conditionnellement dans
+        // AppServiceProvider::register() : laravel/telescope est une dépendance
+        // de développement, absente d'un build « composer install --no-dev ».
         App\Providers\SmsServiceProvider::class,
 
     ],

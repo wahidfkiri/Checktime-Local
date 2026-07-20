@@ -10,7 +10,13 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        //
+        // Telescope n'est installé qu'en développement (require-dev). Le test
+        // class_exists évite l'erreur fatale en production, où « composer
+        // install --no-dev » ne fournit pas la classe parente du provider.
+        if ($this->app->environment('local') && class_exists(\Laravel\Telescope\Telescope::class)) {
+            $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
+            $this->app->register(TelescopeServiceProvider::class);
+        }
     }
 
     public function boot()
