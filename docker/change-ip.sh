@@ -48,10 +48,19 @@ echo -e "${YELLOW}[2/3] Mise à jour de l'IP système...${NC}"
 NETPLAN_FILE="/etc/netplan/01-checktime-static.yaml"
 if [ -f "$NETPLAN_FILE" ]; then
     sed -i "s|- [0-9.]*/24|- ${NEW_IP}/24|" "$NETPLAN_FILE"
+    chmod 600 "$NETPLAN_FILE"
     netplan apply || echo -e "${RED}Erreur netplan. Vérifiez $NETPLAN_FILE manuellement.${NC}"
     echo -e "${GREEN}IP système mise à jour.${NC}"
 else
-    echo -e "${YELLOW}$NETPLAN_FILE absent : IP système à configurer manuellement.${NC}"
+    # Cas Wi-Fi / Ubuntu Desktop : l'IP est gérée par NetworkManager.
+    echo -e "${YELLOW}$NETPLAN_FILE absent : IP système gérée hors netplan.${NC}"
+    if command -v nmcli >/dev/null 2>&1; then
+        echo -e "${YELLOW}Avec NetworkManager :${NC}"
+        echo "  nmcli connection show"
+        echo "  sudo nmcli connection modify \"<NomDeLaConnexion>\" \\"
+        echo "    ipv4.method manual ipv4.addresses ${NEW_IP}/24 \\"
+        echo "    ipv4.gateway <passerelle> ipv4.dns \"8.8.8.8,1.1.1.1\""
+    fi
 fi
 
 # ---- 3. Redémarrer les conteneurs et vider le cache Laravel ----

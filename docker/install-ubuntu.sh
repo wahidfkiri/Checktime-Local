@@ -38,11 +38,17 @@ INSTALL_DIR="/opt/checktime"
 DB_PASSWORD="P@ssw0rd"
 MYSQL_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9!@#%^&*()_+' | head -c 25)
 
-# ---- 1. Installer Docker ----
-echo -e "${YELLOW}[1/8] Installation de Docker...${NC}"
+# ---- 1. Paquets de base ----
+# Ubuntu Server minimal n'inclut ni git ni curl : sans ça, le clonage du dépôt
+# et l'ajout de la clé GPG Docker échouent ("git: command not found").
+echo -e "${YELLOW}[1/9] Installation des paquets de base...${NC}"
+apt-get update -qq
+apt-get install -y -qq git curl wget nano unzip ca-certificates gnupg lsb-release openssl net-tools
+echo -e "${GREEN}Paquets de base installés (git $(git --version | awk '{print $3}')).${NC}"
+
+# ---- 2. Installer Docker ----
+echo -e "${YELLOW}[2/9] Installation de Docker...${NC}"
 if ! command -v docker &>/dev/null; then
-    apt-get update -qq
-    apt-get install -y -qq ca-certificates curl gnupg lsb-release
     mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
@@ -55,36 +61,107 @@ else
     echo -e "${GREEN}Docker déjà installé.${NC}"
 fi
 
-# ---- 2. Configurer l'IP fixe ----
-echo -e "${YELLOW}[2/8] Configuration de l'IP fixe ${IP_FIXE}...${NC}"
+# ---- 3. Configurer l'IP fixe ----
+echo -e "${YELLOW}[3/9] Configuration de l'IP fixe ${IP_FIXE}...${NC}"
 # Vérifier l'interface réseau active
 INTERFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -1)
+GATEWAY=$(ip -o -4 route show to default | awk '{print $3}' | head -1)
+NETPLAN_FILE="/etc/netplan/01-checktime-static.yaml"
+
+# Vérifie que le DNS et la route par défaut fonctionnent encore.
+network_ok() {
+    ping -c 1 -W 3 "${GATEWAY:-8.8.8.8}" >/dev/null 2>&1 &&
+    getent hosts registry-1.docker.io >/dev/null 2>&1
+}
+
 if [ -z "$INTERFACE" ]; then
     echo -e "${RED}Impossible de détecter l'interface réseau. Configuration manuelle requise.${NC}"
     echo -e "${YELLOW}Après l'installation, configurez l'IP fixe avec:${NC}"
-    echo "  sudo nano /etc/netplan/00-installer-config.yaml"
-    echo "  sudo netplan apply"
+    echo "  sudo nmcli connection show     # puis ipv4.method manual"
+    echo "  ou  sudo nano /etc/netplan/00-installer-config.yaml && sudo netplan apply"
+
+# Carte Wi-Fi (wl*) : netplan « ethernets » ne s'applique pas, et un bloc
+# « wifis » exigerait le SSID et la clé. On laisse la main à NetworkManager
+# plutôt que de casser la connexion (et donc le DNS) du serveur.
+elif [ "${INTERFACE#wl}" != "$INTERFACE" ]; then
+    echo -e "${YELLOW}Interface Wi-Fi détectée : $INTERFACE${NC}"
+    echo -e "${YELLOW}L'IP fixe n'est PAS configurée automatiquement en Wi-Fi.${NC}"
+    echo -e "${YELLOW}Configurez-la avec NetworkManager :${NC}"
+    echo "  nmcli connection show"
+    echo "  sudo nmcli connection modify \"<NomDuWifi>\" \\"
+    echo "    ipv4.method manual ipv4.addresses ${IP_FIXE}/24 \\"
+    echo "    ipv4.gateway ${GATEWAY:-192.168.100.1} ipv4.dns \"8.8.8.8,1.1.1.1\""
+    echo "  sudo nmcli connection down \"<NomDuWifi>\" && sudo nmcli connection up \"<NomDuWifi>\""
+    echo -e "${YELLOW}L'installation continue avec l'adresse IP actuelle.${NC}"
+
 else
     echo "Interface détectée: $INTERFACE"
-    # Créer config Netplan pour IP fixe
-    cat > /etc/netplan/01-checktime-static.yaml << NETPLAN
+
+    # Le renderer doit correspondre au gestionnaire réseau réellement actif :
+    # networkd sur Ubuntu Server, NetworkManager sur Ubuntu Desktop. Se tromper
+    # rend la configuration inopérante et casse la résolution DNS.
+    if systemctl is-active --quiet NetworkManager; then
+        RENDERER="NetworkManager"
+    else
+        RENDERER="networkd"
+    fi
+    echo "Gestionnaire réseau: $RENDERER"
+
+    # Sauvegarde pour pouvoir revenir en arrière si le réseau tombe.
+    BACKUP=""
+    if [ -f "$NETPLAN_FILE" ]; then
+        BACKUP="${NETPLAN_FILE}.bak.$(date +%s)"
+        cp "$NETPLAN_FILE" "$BACKUP"
+    fi
+
+    cat > "$NETPLAN_FILE" << NETPLAN
 network:
   version: 2
-  renderer: networkd
+  renderer: $RENDERER
   ethernets:
     $INTERFACE:
       addresses:
         - $IP_FIXE/24
       routes:
         - to: default
-          via: $(ip -o -4 route show to default | awk '{print $3}')
+          via: ${GATEWAY:-192.168.100.1}
       nameservers:
         addresses:
           - 8.8.8.8
           - 1.1.1.1
 NETPLAN
-    netplan apply || echo -e "${RED}Erreur netplan. Vérifiez manuellement.${NC}"
-    echo -e "${GREEN}IP fixe $IP_FIXE configurée.${NC}"
+    # Netplan refuse un fichier lisible par tous (avertissement "permissions too open").
+    chmod 600 "$NETPLAN_FILE"
+
+    if netplan apply; then
+        sleep 3
+        if network_ok; then
+            echo -e "${GREEN}IP fixe $IP_FIXE configurée.${NC}"
+        else
+            echo -e "${RED}Le réseau ne répond plus après netplan apply : retour en arrière.${NC}"
+            if [ -n "$BACKUP" ]; then
+                mv "$BACKUP" "$NETPLAN_FILE"
+            else
+                rm -f "$NETPLAN_FILE"
+            fi
+            netplan apply || true
+            echo -e "${YELLOW}IP fixe à configurer manuellement. L'installation continue.${NC}"
+        fi
+    else
+        echo -e "${RED}Erreur netplan : configuration retirée.${NC}"
+        if [ -n "$BACKUP" ]; then mv "$BACKUP" "$NETPLAN_FILE"; else rm -f "$NETPLAN_FILE"; fi
+        netplan apply || true
+    fi
+fi
+
+# Sans DNS, le téléchargement des images Docker échoue plus loin avec
+# "failed to resolve reference docker.io/library/mysql:8.0".
+if ! getent hosts registry-1.docker.io >/dev/null 2>&1; then
+    echo -e "${RED}ATTENTION : la résolution DNS ne fonctionne pas.${NC}"
+    echo -e "${YELLOW}Le téléchargement des images Docker va échouer. Vérifiez :${NC}"
+    echo "  ping -c 3 8.8.8.8"
+    echo "  resolvectl status"
+    echo "  cat /etc/resolv.conf"
 fi
 
 # Ouvrir les ports LAN si le pare-feu ufw est présent/actif
@@ -94,8 +171,8 @@ if command -v ufw >/dev/null 2>&1; then
     echo -e "${GREEN}Pare-feu : ports 80 et 8080 autorisés.${NC}"
 fi
 
-# ---- 3. Cloner le projet ----
-echo -e "${YELLOW}[3/8] Clonage de l'application...${NC}"
+# ---- 4. Cloner le projet ----
+echo -e "${YELLOW}[4/9] Clonage de l'application...${NC}"
 if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR"
     # À adapter : remplacer par votre dépôt Git
@@ -107,8 +184,8 @@ if [ ! -d "$INSTALL_DIR" ]; then
 fi
 cd "$INSTALL_DIR"
 
-# ---- 4. Créer le fichier .env ----
-echo -e "${YELLOW}[4/8] Configuration de l'environnement...${NC}"
+# ---- 5. Créer le fichier .env ----
+echo -e "${YELLOW}[5/9] Configuration de l'environnement...${NC}"
 if [ ! -f .env ]; then
     cp .env.example .env
 fi
@@ -130,8 +207,8 @@ sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|" .env
 sed -i "s|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=database|" .env
 sed -i "s|^SESSION_DRIVER=.*|SESSION_DRIVER=file|" .env
 
-# ---- 5. Créer les répertoires persistants ----
-echo -e "${YELLOW}[5/8] Création des répertoires de données...${NC}"
+# ---- 6. Créer les répertoires persistants ----
+echo -e "${YELLOW}[6/9] Création des répertoires de données...${NC}"
 mkdir -p storage/app/public
 mkdir -p storage/framework/cache/data
 mkdir -p storage/framework/sessions
@@ -141,8 +218,8 @@ mkdir -p bootstrap/cache
 mkdir -p public/storage
 chmod -R 775 storage bootstrap/cache public/storage
 
-# ---- 6. Lancer Docker Compose ----
-echo -e "${YELLOW}[6/8] Lancement des conteneurs Docker...${NC}"
+# ---- 7. Lancer Docker Compose ----
+echo -e "${YELLOW}[7/9] Lancement des conteneurs Docker...${NC}"
 export DB_PASSWORD
 export MYSQL_ROOT_PASSWORD
 export APP_HOST_IP="${IP_FIXE}"
@@ -160,8 +237,8 @@ fi
 echo -e "${GREEN}Conteneurs démarrés. Attente de la base de données...${NC}"
 sleep 10
 
-# ---- 7. Commandes Laravel ----
-echo -e "${YELLOW}[7/8] Exécution des commandes Laravel...${NC}"
+# ---- 8. Commandes Laravel ----
+echo -e "${YELLOW}[8/9] Exécution des commandes Laravel...${NC}"
 
 # Attendre que l'app soit prête
 for i in $(seq 1 30); do
@@ -216,8 +293,8 @@ docker exec checktime-app php artisan tinker --execute="
 
 echo -e "${GREEN}Admin: admin@checktime.local / admin123${NC}"
 
-# ---- 8. Configuration finale ----
-echo -e "${YELLOW}[8/8] Finalisation...${NC}"
+# ---- 9. Configuration finale ----
+echo -e "${YELLOW}[9/9] Finalisation...${NC}"
 
 # Ajouter au démarrage automatique
 docker update --restart unless-stopped checktime-app checktime-mysql 2>/dev/null || true
