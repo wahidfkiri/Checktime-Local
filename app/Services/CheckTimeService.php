@@ -60,11 +60,13 @@ class CheckTimeService
     public function testTokenValid(string $token): bool
     {
         try {
-            // Utilise une requête GET simple pour tester la validité du token
+            // Utilise une requête GET simple pour tester la validité du token.
+            // Timeout explicite : sans lui, une requête HTTP peut rester
+            // bloquée indéfiniment si l'appareil biométrique est injoignable.
             $response = Http::withHeaders([
                 "Authorization" => "Token " . $token,
                 "Accept" => "application/json"
-            ])->get($this->baseUrl . '/iclock/api/terminals/');
+            ])->timeout(15)->connectTimeout(10)->get($this->baseUrl . '/iclock/api/terminals/');
 
             
             

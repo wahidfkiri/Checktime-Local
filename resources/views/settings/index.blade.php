@@ -194,9 +194,23 @@
                                         <div class="form-text">Masquée par défaut, et jamais réaffichée une fois enregistrée.</div>
                                     </div>
                                     <div class="col-md-4">
-                                        <button type="button" class="btn btn-primary" id="save-access-key">
-                                            <i class="bi bi-key me-1"></i> Enregistrer la clé
-                                        </button>
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <button type="button" class="btn btn-primary" id="save-access-key">
+                                                <i class="bi bi-key me-1"></i> Enregistrer
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" id="test-access-key">
+                                                <span id="test-access-key-text"><i class="bi bi-plug me-1"></i> Tester</span>
+                                                <span id="test-access-key-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            Sans saisie, teste la clé actuellement active (enregistrée, ou repli <code>.env</code>).
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2" id="test-access-key-result-row" style="display:none">
+                                    <div class="col-md-12">
+                                        <div class="alert mb-0" id="test-access-key-result"></div>
                                     </div>
                                 </div>
                             </div>
@@ -715,7 +729,55 @@ $(document).ready(function() {
             }
         });
     });
-    
+
+    // Tester la clé d'accès — requête réelle en arrière-plan vers l'appareil
+    // biométrique, sans bloquer le reste de la page.
+    $('#test-access-key').on('click', function() {
+        var btn = $(this);
+        var spinner = $('#test-access-key-spinner');
+        var text = $('#test-access-key-text');
+        var resultRow = $('#test-access-key-result-row');
+        var resultBox = $('#test-access-key-result');
+
+        btn.prop('disabled', true);
+        spinner.removeClass('d-none');
+        text.addClass('d-none');
+        resultRow.hide();
+
+        $.ajax({
+            url: "{{ route('settings.access-key.test') }}",
+            type: 'POST',
+            timeout: 20000, // le serveur a son propre timeout (15s) sur l'appel réel
+            data: {
+                _token: "{{ csrf_token() }}",
+                access_key: $('#access_key').val()
+            },
+            success: function(response) {
+                resultRow.show();
+                if (response.success && response.valid) {
+                    resultBox.attr('class', 'alert alert-success mb-0')
+                        .html('<i class="bi bi-check-circle-fill me-1"></i> ' + response.message);
+                } else {
+                    resultBox.attr('class', 'alert alert-danger mb-0')
+                        .html('<i class="bi bi-x-circle-fill me-1"></i> ' + response.message);
+                }
+            },
+            error: function(xhr) {
+                resultRow.show();
+                var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                    ? xhr.responseJSON.message
+                    : 'Le test a échoué (délai dépassé ou serveur injoignable).';
+                resultBox.attr('class', 'alert alert-danger mb-0')
+                    .html('<i class="bi bi-x-circle-fill me-1"></i> ' + msg);
+            },
+            complete: function() {
+                btn.prop('disabled', false);
+                spinner.addClass('d-none');
+                text.removeClass('d-none');
+            }
+        });
+    });
+
     // Auto-save sur changement d'email (optionnel)
     var emailTimer;
     $('#rh_email').on('keyup', function() {

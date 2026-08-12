@@ -240,6 +240,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::post('/test-employees', [SettingsController::class, 'testEmployeesEmail'])->name('settings.test.employees');
         Route::get('/status', [SettingsController::class, 'getStatus'])->name('settings.status');
         Route::post('/access-key', [SettingsController::class, 'updateAccessKey'])->name('settings.access-key.update');
+        Route::post('/access-key/test', [SettingsController::class, 'testAccessKey'])->name('settings.access-key.test');
 
         // Signataires (cartouche de signatures des rapports)
         Route::get('/signataires', [SignataireController::class, 'index'])->name('settings.signataires.index');

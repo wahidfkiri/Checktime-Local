@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Services\CheckTimeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -104,6 +105,60 @@ class SettingsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur serveur: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Teste la validité de la clé d'accès via une requête réelle vers
+     * l'appareil biométrique (en arrière-plan, ne bloque pas la page).
+     *
+     * - Si le formulaire contient une valeur (candidate pas encore
+     *   enregistrée), c'est ELLE qui est testée.
+     * - Sinon, teste la clé actuellement active, quelle que soit sa source
+     *   (table settings, ou repli .env CHECKTIME_TOKEN).
+     */
+    public function testAccessKey(Request $request)
+    {
+        try {
+            $token = trim((string) $request->input('access_key', ''));
+            $source = 'saisie dans le formulaire';
+
+            if ($token === '') {
+                $token = (string) CheckTimeService::getConfigToken();
+                $source = !empty(Setting::getGroup('company')['api_token'] ?? null)
+                    ? 'enregistrée dans les paramètres'
+                    : 'repli .env (CHECKTIME_TOKEN)';
+            }
+
+            if ($token === '') {
+                return response()->json([
+                    'success' => false,
+                    'valid' => false,
+                    'message' => "Aucune clé à tester : rien n'est enregistré ni défini dans .env.",
+                ], 400);
+            }
+
+            $service = new CheckTimeService();
+            $isValid = $service->testTokenValid($token);
+
+            Log::info('Test de la clé d\'accès API', ['source' => $source, 'valid' => $isValid]);
+
+            return response()->json([
+                'success' => true,
+                'valid' => $isValid,
+                'source' => $source,
+                'message' => $isValid
+                    ? "Clé valide (source : {$source}) — connexion à l'appareil biométrique réussie."
+                    : "Clé invalide ou rejetée par l'appareil biométrique (source : {$source}).",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur test clé d\'accès: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'valid' => false,
+                'message' => 'Erreur lors du test (connexion impossible) : ' . $e->getMessage(),
             ], 500);
         }
     }
