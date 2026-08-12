@@ -32,21 +32,21 @@
                                         </form>
                                         
                                         <div class="row g-3">
-                                            <div class="col-md-2">
+                                            <div class="col-6 col-sm-4 col-lg-2">
                                                 <div class="form-group">
                                                     <label for="report_start_date" class="form-label">Date début</label>
                                                     <input type="date" class="form-control" id="report_start_date"
                                                            value="{{ date('Y-m-d', strtotime('-1 days')) }}">
                                                 </div>
                                             </div>
-                                            <div class="col-md-2">
+                                            <div class="col-6 col-sm-4 col-lg-2">
                                                 <div class="form-group">
                                                     <label for="report_end_date" class="form-label">Date fin</label>
                                                     <input type="date" class="form-control" id="report_end_date"
                                                            value="{{ date('Y-m-d') }}">
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-12 col-sm-4 col-lg-3">
                                                 <div class="form-group">
                                                     <label for="report_departments" class="form-label">Département(s)</label>
                                                     <select class="form-control" id="report_departments" multiple style="height: auto; min-height: 38px;">
@@ -59,7 +59,7 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-2">
+                                            <div class="col-12 col-sm-6 col-lg-2">
                                                 <div class="form-group">
                                                     <label for="report_emp_code" class="form-label">Employé</label>
                                                     <select class="form-control search_utilisateur" id="report_emp_code">
@@ -72,7 +72,7 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-12 col-sm-6 col-lg-3">
                                                 <div class="form-group text-start">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
                                                     <div class="d-flex flex-wrap gap-2">
