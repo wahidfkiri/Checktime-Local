@@ -79,6 +79,9 @@
                                                         <button type="button" class="btn btn-primary" id="apply_filters">
                                                             <i class="bi bi-funnel me-1"></i> Appliquer
                                                         </button>
+                                                        <button type="button" id="syncDataBtn" class="btn btn-success ms-2">
+                                                            <i class="fas fa-sync-alt me-1"></i> Synchroniser
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -92,6 +95,22 @@
                     <div class="card-body">
 
                         <!-- Barres de progression -->
+                        <div class="alert alert-success d-none" id="sync-progress-container" role="alert">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-sync-alt fa-spin me-2"></i>
+                                <strong id="sync-progress-title">Synchronisation en cours...</strong>
+                            </div>
+                            <div class="progress" style="height: 25px;">
+                                <div id="sync-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                     role="progressbar" style="width: 0%;"
+                                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                            </div>
+                            <p class="mb-0 small mt-2 text-muted" id="sync-progress-details">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Récupération des données depuis l'API externe...
+                            </p>
+                        </div>
+
                         <div class="alert alert-primary d-none" id="data-progress-container" role="alert">
                             <div class="d-flex align-items-center mb-2">
                                 <i class="bi bi-bar-chart-steps me-2"></i>
@@ -207,9 +226,154 @@ $(document).ready(function() {
     // ========== VARIABLES GLOBALES ==========
     var isGeneratingPDF = false;
     var isGeneratingReport = false;
-    
+    var isSyncing = false;
+
+    // ========== FONCTIONS DE PROGRESSION (SYNCHRONISATION) ==========
+
+    function showSyncProgress(title, details = '') {
+        isSyncing = true;
+        $('#syncDataBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Synchronisation...');
+
+        $('#sync-progress-title').text(title || 'Synchronisation en cours...');
+        $('#sync-progress-details').html('<i class="bi bi-info-circle me-1"></i> ' + details);
+        $('#sync-progress-container').removeClass('d-none');
+        updateSyncProgressBar(0);
+
+        $('#data-progress-container').addClass('d-none');
+        $('#pdf-progress-container').addClass('d-none');
+        $('#loading-alert').addClass('d-none');
+        $('#pdf-loading-alert').addClass('d-none');
+    }
+
+    function hideSyncProgress() {
+        isSyncing = false;
+        $('#syncDataBtn').prop('disabled', false).html('<i class="fas fa-sync-alt me-1"></i> Synchroniser');
+        $('#sync-progress-container').addClass('d-none');
+    }
+
+    function updateSyncProgressBar(percentage, message = null) {
+        percentage = Math.min(100, Math.max(0, percentage));
+        $('#sync-progress-bar')
+            .css('width', percentage + '%')
+            .attr('aria-valuenow', percentage)
+            .text(percentage + '%');
+
+        if (message) {
+            $('#sync-progress-details').html('<i class="bi bi-info-circle me-1"></i> ' + message);
+        }
+    }
+
+    function simulateSyncProgress(callback) {
+        var progress = 0;
+        var steps = [
+            { progress: 10, message: 'Initialisation de la connexion API...' },
+            { progress: 25, message: 'Récupération des transactions...' },
+            { progress: 40, message: 'Analyse des pointages...' },
+            { progress: 60, message: 'Mise à jour des présences...' },
+            { progress: 80, message: 'Calcul des statistiques...' },
+            { progress: 95, message: 'Finalisation...' }
+        ];
+        var stepIndex = 0;
+
+        var interval = setInterval(function() {
+            if (stepIndex < steps.length && progress < steps[stepIndex].progress) {
+                progress = steps[stepIndex].progress;
+                updateSyncProgressBar(progress, steps[stepIndex].message);
+                stepIndex++;
+            } else {
+                progress += Math.random() * 5;
+                if (progress >= 100) {
+                    progress = 100;
+                    updateSyncProgressBar(progress, 'Synchronisation terminée !');
+                    clearInterval(interval);
+                    if (callback) setTimeout(callback, 500);
+                } else {
+                    updateSyncProgressBar(progress, 'Traitement en cours...');
+                }
+            }
+        }, 400);
+
+        return interval;
+    }
+
+    // Bouton de synchronisation — appelle réellement l'API biométrique
+    // (contrairement à "Appliquer", qui ne fait que relire la base locale).
+    $('#syncDataBtn').on('click', function() {
+        if (isGeneratingPDF || isGeneratingReport || isSyncing) {
+            showSweetAlert('info', 'Info', 'Une opération est déjà en cours. Veuillez patienter.');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Synchroniser les pointages?',
+            html: '<p class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i> Cela peut prendre quelques instants.</p>',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="fas fa-sync-alt me-1"></i> Synchroniser',
+            cancelButtonText: 'Annuler'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showSyncProgress('Synchronisation en cours...', 'Récupération des données depuis l\'API...');
+
+                var progressInterval = simulateSyncProgress();
+
+                $.ajax({
+                    url: "{{ route('admin.daily-attendance.sync.data') }}",
+                    type: 'POST',
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        days_back: 30 // Maximum autorisé côté serveur
+                    },
+                    success: function(response) {
+                        clearInterval(progressInterval);
+
+                        if (response.success) {
+                            updateSyncProgressBar(100, 'Synchronisation terminée !');
+
+                            setTimeout(function() {
+                                hideSyncProgress();
+
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Synchronisation réussie!',
+                                    html: response.message + '<br>' +
+                                          'Présents: ' + response.stats.present + '<br>' +
+                                          'Absents: ' + response.stats.absent + '<br>' +
+                                          'Total employés: ' + response.stats.total_employees,
+                                    timer: 5000,
+                                    showConfirmButton: true
+                                });
+
+                                // Recharger le tableau des retards avec les filtres actuels
+                                $('#apply_filters').click();
+                            }, 500);
+                        } else {
+                            clearInterval(progressInterval);
+                            hideSyncProgress();
+                            showSweetAlert('error', 'Erreur', response.message || 'Erreur lors de la synchronisation.');
+                        }
+                    },
+                    error: function(xhr) {
+                        clearInterval(progressInterval);
+                        hideSyncProgress();
+
+                        var errorMessage = 'Une erreur est survenue lors de la synchronisation.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+
+                        showSweetAlert('error', 'Erreur', errorMessage);
+                        console.error('Erreur synchronisation:', xhr);
+                    }
+                });
+            }
+        });
+    });
+
     // ========== FONCTIONS DE PROGRESSION ==========
-    
+
     // Progression pour la génération des données
     function showDataProgress(title, details = '') {
         isGeneratingReport = true;

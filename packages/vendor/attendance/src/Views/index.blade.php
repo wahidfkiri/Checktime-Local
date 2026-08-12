@@ -911,7 +911,7 @@ $(document).ready(function() {
                     type: 'POST',
                     data: {
                         _token: "{{ csrf_token() }}",
-                        days_back: 7 // Synchroniser les 7 derniers jours par défaut
+                        days_back: 30 // Maximum autorisé côté serveur — au-delà, une requête web risquerait le timeout
                     },
                     success: function(response) {
                         clearInterval(progressInterval);
