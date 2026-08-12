@@ -263,7 +263,12 @@ class AttendanceSyncService
                         'sync_status' => $cleanData['sync_status'] ?? null,
                         'sync_time' => isset($cleanData['sync_time']) ? Carbon::parse($cleanData['sync_time']) : null,
                         'temperature' => $cleanData['temperature'] ?? null,
-                        'mask_flag' => $cleanData['mask_flag'] ?? null,
+                        // La colonne mask_flag est un booléen NOT NULL (default false) ;
+                        // l'API ne renvoie pas toujours ce champ, et cleanTransactionData()
+                        // retire les valeurs null — un repli à null cassait donc l'insertion
+                        // (SQLSTATE 23000 : "Column 'mask_flag' cannot be null") sur CHAQUE
+                        // transaction, empêchant toute synchronisation de pointages.
+                        'mask_flag' => $cleanData['mask_flag'] ?? false,
                         'company' => $cleanData['company'] ?? null,
                         'terminal' => $cleanData['terminal'] ?? null,
                         'processed' => false,
