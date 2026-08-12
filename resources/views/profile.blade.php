@@ -33,12 +33,14 @@
                             <i class="bi bi-person-circle me-1"></i> Mon Profil
                         </button>
                     </li>
+                    @role('admin')
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-notif-btn" data-bs-toggle="tab"
                                 data-bs-target="#tab-notif" type="button" role="tab">
                             <i class="bi bi-bell me-1"></i> Paramètres de notification
                         </button>
                     </li>
+                    @endrole
                 </ul>
 
                 <div class="tab-content" id="profileTabsContent">
@@ -247,7 +249,8 @@
                         </div>
                     </div>
 
-                    {{-- ================= ONGLET NOTIFICATIONS ================= --}}
+                    {{-- ================= ONGLET NOTIFICATIONS (admin uniquement) ================= --}}
+                    @role('admin')
                     <div class="tab-pane fade" id="tab-notif" role="tabpanel">
 
                         {{-- Zone d'alerte notifications --}}
@@ -498,6 +501,7 @@
                             </div>
                         </div>
                     </div>
+                    @endrole
                 </div>
             </section>
         </div>
