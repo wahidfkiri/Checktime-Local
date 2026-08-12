@@ -62,7 +62,7 @@
                                             <div class="col-md-2">
                                                 <div class="form-group">
                                                     <label for="report_emp_code" class="form-label">Employé</label>
-                                                    <select class="form-control" id="report_emp_code">
+                                                    <select class="form-control search_utilisateur" id="report_emp_code">
                                                         <option value="all">Tous les employés</option>
                                                         @foreach($employees as $employee)
                                                             <option value="{{ $employee['emp_code'] }}">
@@ -265,12 +265,17 @@
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/sumoselect.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/jquery.sumoselect.min.js"></script>
 <script>
 $(document).ready(function() {
+    // Filtre employé avec recherche (même comportement que /admin/daily-attendance)
+    $('.search_utilisateur').SumoSelect({search: true, searchText: 'Sélectionner un employé...'});
+
     // Variables pour suivre l'état
     var isGeneratingPDF = false;
     var isGeneratingReport = false;
-    
+
     // ========== FONCTIONS DE PROGRESSION ==========
     
     // Progression pour la génération des données
