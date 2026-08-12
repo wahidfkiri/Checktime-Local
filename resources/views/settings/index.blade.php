@@ -164,7 +164,7 @@
                 </div>
                 
                 <!-- Section Clé d'accès (API biométrique) -->
-                <div class="row mt-3">
+                <div class="row mt-3" style="display:none">
                     <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">

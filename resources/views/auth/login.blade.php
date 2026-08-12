@@ -320,7 +320,7 @@
         <div class="login-card">
             <div class="login-header">
                 <div class="login-logo">
-                    <img src="{{ $appLogo }}" alt="Logo" width="150" height="100">
+                    <img src="{{ $appLogo }}" alt="Logo" width="100%">
                 </div>
                 <p class="login-subtitle">Connectez-vous à votre compte</p>
             </div>

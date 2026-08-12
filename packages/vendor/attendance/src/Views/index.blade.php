@@ -387,36 +387,36 @@ $(document).ready(function() {
     }
     
     // Simuler la progression pour la synchronisation
-    function simulateSyncProgress(callback) {
+    // Animation visuelle uniquement — plafonnée à 90% et ne dit jamais
+    // "terminée" : seule la vraie réponse AJAX (voir le success handler du
+    // bouton Synchroniser) peut afficher 100%. Avant ce plafond, cette fausse
+    // progression atteignait 100% en ~4s quel que soit le temps réel de la
+    // synchro (jusqu'à 30 jours de données), laissant l'écran bloqué sur
+    // "terminée" pendant que la vraie requête tournait encore en arrière-plan.
+    function simulateSyncProgress() {
         var progress = 0;
         var steps = [
             { progress: 10, message: 'Initialisation de la connexion API...' },
             { progress: 25, message: 'Récupération des transactions...' },
             { progress: 40, message: 'Analyse des pointages...' },
             { progress: 60, message: 'Mise à jour des présences...' },
-            { progress: 80, message: 'Calcul des statistiques...' },
-            { progress: 95, message: 'Finalisation...' }
+            { progress: 75, message: 'Calcul des statistiques...' },
+            { progress: 85, message: 'Finalisation...' }
         ];
         var stepIndex = 0;
-        
+
         var interval = setInterval(function() {
             if (stepIndex < steps.length && progress < steps[stepIndex].progress) {
                 progress = steps[stepIndex].progress;
                 updateSyncProgressBar(progress, steps[stepIndex].message);
                 stepIndex++;
-            } else {
-                progress += Math.random() * 5;
-                if (progress >= 100) {
-                    progress = 100;
-                    updateSyncProgressBar(progress, 'Synchronisation terminée !');
-                    clearInterval(interval);
-                    if (callback) setTimeout(callback, 500);
-                } else {
-                    updateSyncProgressBar(progress, 'Traitement en cours...');
-                }
+            } else if (progress < 90) {
+                progress = Math.min(90, progress + Math.random() * 3);
+                updateSyncProgressBar(progress, 'Traitement en cours (peut prendre jusqu\'à une minute)...');
             }
+            // Au-delà de 90%, on n'avance plus : on attend la vraie réponse du serveur.
         }, 400);
-        
+
         return interval;
     }
     
@@ -917,6 +917,7 @@ $(document).ready(function() {
                         clearInterval(progressInterval);
                         
                         if (response.success) {
+                            $('#sync-progress-title').text('Synchronisation terminée !');
                             updateSyncProgressBar(100, 'Synchronisation terminée !');
                             
                             setTimeout(function() {
