@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\AttendanceSyncService;
+use App\Services\CheckTimeService;
 
 class DailyAttendanceController extends Controller
 {
@@ -1491,9 +1492,11 @@ class DailyAttendanceController extends Controller
                 $carbonDate = Carbon::parse($date);
                 
                 // Synchroniser les transactions depuis l'API
-                $accessConfig = DB::table('access_configs')->whereRaw('1 = 1')->first();
-                
-                if (!$accessConfig || !$accessConfig->general_token) {
+                // Utilise la même résolution que le reste de l'app (settings
+                // d'abord, access_configs en repli) : interroger access_configs
+                // seul donnait un faux "non configuré" quand le token est
+                // enregistré via la page Paramètres.
+                if (!CheckTimeService::getConfigToken()) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Token d\'accès non configuré.'
@@ -2439,10 +2442,9 @@ class DailyAttendanceController extends Controller
                 'force' => $force
             ]);
             
-            // Vérifier la configuration d'accès
-            $accessConfig = DB::table('access_configs')->whereRaw('1 = 1')->first();
-            
-            if (!$accessConfig || !$accessConfig->general_token) {
+            // Vérifier la configuration d'accès (settings d'abord, access_configs
+            // en repli — voir la note dans CheckTimeService::getConfigToken()).
+            if (!CheckTimeService::getConfigToken()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Token d\'accès non configuré. Veuillez contacter l\'administrateur.'
@@ -2470,10 +2472,11 @@ class DailyAttendanceController extends Controller
                 if (method_exists($this->attendanceService, 'syncClientAttendances')) {
                     $result = $this->attendanceService->syncClientAttendances($client, $daysBack);
                 } else {
-                    // Alternative: utiliser syncForPeriod ou syncAllClients
-                    $endDate = Carbon::today();
-                    $startDate = Carbon::today()->subDays($daysBack);
-                    $this->attendanceService->syncForPeriod($startDate, $endDate);
+                    // syncForPeriod()/syncAllClients() n'existent pas sur
+                    // AttendanceSyncService — syncAll($daysBack) fait déjà
+                    // exactement ça (synchronise tous les employés actifs
+                    // sur la fenêtre des derniers jours demandée).
+                    $this->attendanceService->syncAll($daysBack);
                     $result = true;
                 }
                 

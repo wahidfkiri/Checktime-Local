@@ -370,7 +370,10 @@ public function destroy($id)
                     'employee_id' => $employeeId,
                     'emp_code' => (string) $employeeCode,
                     'first_name' => $firstName,
-                    'last_name' => $lastName ?? $firstName,
+                    // Ne jamais recopier first_name ici : l'API renvoie parfois le nom
+                    // complet dans first_name sans last_name, et dupliquer produirait
+                    // "ADJARO Mourtala ADJARO Mourtala" dans le nom complet affiché.
+                    'last_name' => $lastName ?? '',
                     'email' => $employeeData['email'] ?? null,
                     'phone' => $employeeData['mobile'] ?? $employeeData['contact_tel'] ?? null,
                     'area_name' => $areaName,
@@ -829,7 +832,9 @@ public function destroy($id)
                     'employee_id' => $employeeData['id'] ?? null,
                     'emp_code' => (string) $employeeCode,
                     'first_name' => $firstName,
-                    'last_name' => $employeeData['last_name'] ?? $firstName,
+                    // Voir la note équivalente dans fetchAllEmployeesWithPagination() /
+                    // le premier bloc de sync : ne pas dupliquer first_name ici.
+                    'last_name' => $employeeData['last_name'] ?? '',
                     'email' => $employeeData['email'] ?? null,
                     'phone' => $employeeData['mobile'] ?? $employeeData['contact_tel'] ?? null,
                     'area_name' => $employeeData['area'][0]['area_name'] ?? null,

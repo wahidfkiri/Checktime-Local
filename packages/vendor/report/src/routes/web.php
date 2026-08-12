@@ -6,7 +6,7 @@ use Vendor\Report\Controllers\CustomReportController;
 
 
 Auth::routes();
-Route::middleware(['web','auth', 'role:admin','client.active'])->group(function () {
+Route::middleware(['web','auth', 'role_or_permission:admin|menu.reports','client.active'])->group(function () {
     // Your routes here
 // Rapports
 Route::prefix('admin/reports')->name('admin.reports.')->group(function () {

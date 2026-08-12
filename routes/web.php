@@ -30,6 +30,7 @@ use App\Http\Controllers\BiometricController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\NotificationSettingsController;
 use App\Http\Controllers\InstallerController;
+use App\Http\Controllers\UserController;
 use App\Http\Middleware\InstallerMiddleware;
 
 /*
@@ -99,7 +100,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
 
     // Devices
-    Route::prefix('devices')->name('devices.')->group(function () {
+    Route::middleware('role_or_permission:admin|menu.devices')->prefix('devices')->name('devices.')->group(function () {
         Route::get('/', [DeviceController::class, 'index'])->name('index');
         Route::get('/local', [DeviceController::class, 'getLocalDevices'])->name('local');
         Route::post('/sync', [DeviceController::class, 'sync'])->name('sync');
@@ -109,7 +110,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     });
 
     // Leaves
-    Route::prefix('leaves')->name('leaves.')->group(function () {
+    Route::middleware('role_or_permission:admin|menu.leaves')->prefix('leaves')->name('leaves.')->group(function () {
         Route::get('/', [LeaveController::class, 'index'])->name('index');
         Route::post('/', [LeaveController::class, 'store'])->name('store');
         Route::put('/{id}', [LeaveController::class, 'update'])->name('update');
@@ -163,7 +164,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         });
 
         // Employee permissions
-        Route::prefix('employee-permissions')->name('employee-permissions.')->group(function () {
+        Route::middleware('role_or_permission:admin|menu.employee-permissions')->prefix('employee-permissions')->name('employee-permissions.')->group(function () {
             Route::get('/', [EmployeePermissionController::class, 'index'])->name('index');
             Route::post('/', [EmployeePermissionController::class, 'store'])->name('store');
             Route::get('/{employeePermission}', [EmployeePermissionController::class, 'show'])->name('show');
@@ -177,7 +178,9 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         });
 
         // Leaves (existing)
-        Route::resource('leaves', LeaveController::class);
+        Route::middleware('role_or_permission:admin|menu.leaves')->group(function () {
+            Route::resource('leaves', LeaveController::class);
+        });
     });
 
     // Daily attendance
@@ -216,12 +219,13 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     });
 
     // Settings
-    Route::prefix('settings')->group(function () {
+    Route::middleware('role_or_permission:admin|menu.settings')->prefix('settings')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
         Route::post('/test-rh', [SettingsController::class, 'testRhEmail'])->name('settings.test.rh');
         Route::post('/test-employees', [SettingsController::class, 'testEmployeesEmail'])->name('settings.test.employees');
         Route::get('/status', [SettingsController::class, 'getStatus'])->name('settings.status');
+        Route::post('/access-key', [SettingsController::class, 'updateAccessKey'])->name('settings.access-key.update');
 
         // Signataires (cartouche de signatures des rapports)
         Route::get('/signataires', [SignataireController::class, 'index'])->name('settings.signataires.index');
@@ -239,13 +243,24 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     Route::post('/rapport/presence-ponctualite/export-dept-pdf', [CustomReportController::class, 'exportCustomPdfByDept'])->name('reports.export-department-pdf');
 
     // Missions
-    Route::prefix('missions')->name('missions.')->group(function () {
+    Route::middleware('role_or_permission:admin|menu.missions')->prefix('missions')->name('missions.')->group(function () {
         Route::get('/', [MissionController::class, 'index'])->name('index');
         Route::post('/', [MissionController::class, 'store'])->name('store');
         Route::get('/generate-reference', [MissionController::class, 'generateReference'])->name('generate-reference');
         Route::get('/{id}', [MissionController::class, 'show'])->name('show');
         Route::put('/{id}', [MissionController::class, 'update'])->name('update');
         Route::delete('/{id}', [MissionController::class, 'destroy'])->name('destroy');
+    });
+
+    // Utilisateurs & permissions — réservé au rôle admin (pas de délégation
+    // possible via permission, pour éviter qu'un utilisateur ne s'octroie
+    // lui-même des droits supplémentaires).
+    Route::middleware('role:admin')->prefix('users')->name('users.')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('index');
+        Route::post('/', [UserController::class, 'store'])->name('store');
+        Route::get('/{user}', [UserController::class, 'show'])->name('show');
+        Route::put('/{user}', [UserController::class, 'update'])->name('update');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
     });
 });
 

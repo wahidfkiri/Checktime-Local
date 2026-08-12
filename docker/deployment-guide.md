@@ -397,6 +397,7 @@ cat backup.sql | docker exec -i checktime-mysql mysql -u root -p checktime
 | Problème | Solution |
 |----------|----------|
 | `git: command not found` / `git : commande introuvable` | `sudo apt update && sudo apt install -y git` (voir étape 0) |
+| `composer install` échoue : `were not loaded, because they are affected by security advisories` | Composer récent (≥ 2.9) bloque par défaut l'installation de paquets ayant des failles connues. `laravel/framework` 9.x est en fin de support et n'a aucune version indemne. Déjà réglé dans `composer.json` (`config.policy.advisories.block: false`) — `git pull` si l'erreur persiste sur un checkout ancien |
 | `curl: command not found` | `sudo apt install -y curl` |
 | `docker: command not found` | Docker pas installé — refaire l'étape 1 |
 | `docker compose` inconnu mais `docker` OK | `sudo apt install -y docker-compose-plugin` |

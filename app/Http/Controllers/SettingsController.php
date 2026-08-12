@@ -14,8 +14,13 @@ class SettingsController extends Controller
     public function index()
     {
         $settings = Setting::first();
-        
-        return view('settings.index', compact('settings'));
+
+        // La clé d'accès n'est jamais renvoyée au navigateur une fois enregistrée
+        // (voir updateAccessKey ci-dessous) : on indique seulement si elle est
+        // configurée, pour ne pas exposer le secret dans le HTML de la page.
+        $hasAccessKey = !empty(Setting::getGroup('company')['api_token'] ?? null);
+
+        return view('settings.index', compact('settings', 'hasAccessKey'));
     }
     
     /**
@@ -64,6 +69,45 @@ class SettingsController extends Controller
         }
     }
     
+    /**
+     * Enregistrer / remplacer la clé d'accès (token API biométrique).
+     *
+     * Stockée en base via Setting::set('api_token', ..., 'company') — même
+     * emplacement que celui lu par CheckTimeService et rempli par
+     * l'installateur, pour que la synchronisation des employés / présences
+     * fonctionne dès l'enregistrement.
+     */
+    public function updateAccessKey(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'access_key' => 'required|string|max:500',
+            ]);
+
+            Setting::set('api_token', trim($validated['access_key']), 'company');
+
+            Log::info('Clé d\'accès API mise à jour depuis les paramètres.');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Clé d\'accès enregistrée avec succès.',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Erreur mise à jour clé d\'accès: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Tester l'envoi d'email RH
      */

@@ -163,6 +163,47 @@
                     </div>
                 </div>
                 
+                <!-- Section Clé d'accès (API biométrique) -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">🔑 Clé d'accès</h4>
+                                <p class="card-subtitle">Token utilisé pour synchroniser les employés et les pointages depuis l'appareil biométrique</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="row align-items-end">
+                                    <div class="col-md-8">
+                                        <label for="access_key" class="form-label" id="access_key-label">
+                                            Clé d'accès
+                                            @if($hasAccessKey)
+                                                <span class="badge bg-success ms-1"><i class="bi bi-check-circle me-1"></i>Configurée</span>
+                                            @else
+                                                <span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle me-1"></i>Non configurée</span>
+                                            @endif
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="password" class="form-control" id="access_key" name="access_key"
+                                                   placeholder="{{ $hasAccessKey ? 'Laisser vide pour conserver la clé actuelle' : "Entrez la clé d'accès" }}"
+                                                   autocomplete="off">
+                                            <span class="input-group-text" style="cursor:pointer" onclick="toggleAccessKeyVisibility()">
+                                                <i class="bi bi-eye" id="access_key-eye"></i>
+                                            </span>
+                                        </div>
+                                        <div class="invalid-feedback" id="access_key-error"></div>
+                                        <div class="form-text">Masquée par défaut, et jamais réaffichée une fois enregistrée.</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-primary" id="save-access-key">
+                                            <i class="bi bi-key me-1"></i> Enregistrer la clé
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section SMS (optionnelle) -->
                 <div class="row mt-3">
                     <div class="col-md-12">
@@ -286,6 +327,19 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+// Global (appelée par l'attribut onclick, donc hors de $(document).ready)
+function toggleAccessKeyVisibility() {
+    var field = document.getElementById('access_key');
+    var icon = document.getElementById('access_key-eye');
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        field.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+}
+
 $(document).ready(function() {
     // Variables
     var originalSettings = {};
@@ -610,6 +664,56 @@ $(document).ready(function() {
     // Fermer les alerts
     $('.alert .btn-close').on('click', function() {
         $(this).closest('.alert').addClass('d-none');
+    });
+
+    // Enregistrer la clé d'accès (token API biométrique)
+    $('#save-access-key').on('click', function() {
+        if (isSaving) return;
+
+        var accessKey = $('#access_key').val();
+        if (!accessKey) {
+            showErrorAlert('Clé requise', 'Veuillez saisir une clé d\'accès avant d\'enregistrer.');
+            return;
+        }
+
+        hideAlerts();
+        $('#access_key').removeClass('is-invalid');
+        $('#access_key-error').text('');
+
+        var btn = $(this);
+        btn.prop('disabled', true);
+
+        $.ajax({
+            url: "{{ route('settings.access-key.update') }}",
+            type: 'POST',
+            data: {
+                _token: "{{ csrf_token() }}",
+                access_key: accessKey
+            },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessAlert('Succès', response.message);
+                    $('#access_key').val('').attr('placeholder', 'Laisser vide pour conserver la clé actuelle');
+                    $('#access_key-label .badge').remove();
+                    $('#access_key-label').append(
+                        '<span class="badge bg-success ms-1"><i class="bi bi-check-circle me-1"></i>Configurée</span>'
+                    );
+                } else {
+                    showErrorAlert('Erreur', response.message);
+                }
+            },
+            error: function(xhr) {
+                if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors && xhr.responseJSON.errors.access_key) {
+                    $('#access_key').addClass('is-invalid');
+                    $('#access_key-error').text(xhr.responseJSON.errors.access_key[0]);
+                } else {
+                    showErrorAlert('Erreur', 'Une erreur est survenue lors de l\'enregistrement.');
+                }
+            },
+            complete: function() {
+                btn.prop('disabled', false);
+            }
+        });
     });
     
     // Auto-save sur changement d'email (optionnel)

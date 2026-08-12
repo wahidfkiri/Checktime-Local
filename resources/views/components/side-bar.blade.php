@@ -25,34 +25,43 @@
         </li>
 
         <!-- Gestion des Employés -->
+        @canany(['menu.employees', 'menu.departments', 'menu.areas'])
         <li class="sidebar-item has-sub @if(request()->routeIs('employees.*') || request()->routeIs('departments.*') || request()->routeIs('areas.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-people-fill"></i>
             <span>Gestion des <br>Employés</span>
           </a>
           <ul class="submenu @if(request()->routeIs('employees.*') || request()->routeIs('departments.*') || request()->routeIs('areas.*')) active @endif">
+            @can('menu.employees')
             <li class="submenu-item @if(request()->routeIs('employees.*')) active @endif">
               <a href="{{route('employees.index')}}" class="submenu-link">
                 <i class="bi bi-list-ul"></i>
                 <span>Liste des employés</span>
               </a>
             </li>
+            @endcan
+            @can('menu.departments')
             <li class="submenu-item @if(request()->routeIs('departments.*')) active @endif">
               <a href="{{route('departments.index')}}" class="submenu-link">
                 <i class="bi bi-building"></i>
                 <span>Départements</span>
               </a>
             </li>
+            @endcan
+            @can('menu.areas')
             <li class="submenu-item @if(request()->routeIs('areas.*')) active @endif">
               <a href="{{route('areas.index')}}" class="submenu-link">
                 <i class="bi bi-geo-alt"></i>
                 <span>Zones</span>
               </a>
             </li>
+            @endcan
           </ul>
         </li>
+        @endcanany
 
         <!-- Gestion des Plannings -->
+@canany(['menu.work-hours', 'menu.employee-schedules', 'menu.schedules'])
 <li class="sidebar-item has-sub @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('employee-schedules.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-calendar-week-fill"></i>
@@ -60,13 +69,15 @@
     </a>
     <ul class="submenu @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('schedules.*') || request()->routeIs('rotations.*')) active @endif">
         <!-- Types d'horaires -->
+        @can('menu.work-hours')
         <li class="submenu-item @if(request()->routeIs('work-hours.*')) active @endif">
             <a href="{{ route('work-hours.index') }}" class="submenu-link">
                 <i class="bi bi-clock-history"></i>
                 <span>Types d'horaires</span>
             </a>
         </li>
-        
+        @endcan
+
         <!-- Horaires rotatifs -->
         <li class="d-none submenu-item @if(request()->routeIs('rotations.*')) active @endif">
             <a href="{{ route('rotations.index') }}" class="submenu-link">
@@ -74,25 +85,30 @@
                 <span>Horaires rotatifs</span>
             </a>
         </li>
-        
-        
+
+        @can('menu.employee-schedules')
                <li class="submenu-item @if(request()->routeIs('employee-schedules.*')) active @endif">
     <a href="{{ route('employee-schedules.index') }}" class="sidebar-link">
         <i class="bi bi-calendar-check"></i>
         <span>Plannings Employés</span>
     </a>
 </li>
+        @endcan
         <!-- Calendrier d'assignation -->
+        @can('menu.schedules')
         <li class="submenu-item @if(request()->routeIs('schedules.calendar')) active @endif">
             <a href="{{ route('schedules.calendar') }}" class="submenu-link">
                 <i class="bi bi-calendar3"></i>
                 <span>Calendrier</span>
             </a>
         </li>
+        @endcan
     </ul>
 </li>
+@endcanany
 
         <!-- Gestion des autorisations -->
+        @canany(['menu.employee-permissions', 'menu.missions', 'menu.leaves'])
         <li class="sidebar-item has-sub @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-clipboard-check-fill"></i>
@@ -106,19 +122,23 @@
                 <span>Absences</span>
               </a>
             </li> -->
+            @can('menu.employee-permissions')
             <li class="submenu-item @if(request()->routeIs('permissions.*')) active @endif">
               <a href="{{route('authorizations.employee-permissions.index')}}" class="submenu-link">
                 <i class="bi bi-check-circle-fill"></i>
                 <span>Permissions</span>
               </a>
             </li>
+            @endcan
+            @can('menu.missions')
             <li class="submenu-item {{ request()->routeIs('missions.*') ? 'active' : '' }}">
     <a href="{{ route('missions.index') }}" class="submenu-link">
         <i class="bi bi-briefcase me-2"></i>
         <span>Missions</span>
     </a>
 </li>
-            
+            @endcan
+
             <!-- Retards -->
             <!-- <li class="submenu-item @if(request()->routeIs('delays.*')) active @endif">
               <a href="{{route('authorizations.delays.index')}}">
@@ -126,14 +146,16 @@
                 <span>Retards</span>
               </a>
             </li> -->
-            
+
             <!-- Congés -->
+            @can('menu.leaves')
             <li class="submenu-item @if(request()->routeIs('leaves.*')) active @endif">
               <a href="{{route('leaves.index')}}" class="submenu-link">
                 <i class="bi bi-calendar-check"></i>
                 <span>Congés</span>
               </a>
             </li>
+            @endcan
             <!-- Congés -->
             <!-- <li class="submenu-item @if(request()->routeIs('leaves.*')) active @endif">
               <a href="{{route('leaves.index')}}">
@@ -143,8 +165,10 @@
             </li> -->
           </ul>
         </li>
+        @endcanany
 
        <!-- Gestion des Présences avec sous-menu -->
+@can('menu.daily-attendance')
 <li class="sidebar-item has-sub @if(request()->routeIs('admin.daily-attendance.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-clock-history"></i>
@@ -158,7 +182,7 @@
                 <span>Historique complet</span>
             </a>
         </li>
-        
+
         <!-- Liste des présences -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.presence')) active @endif">
             <a href="{{ route('admin.daily-attendance.presence') }}" class="submenu-link">
@@ -166,7 +190,7 @@
                 <span>Liste des présences</span>
             </a>
         </li>
-        
+
         <!-- Liste des absences -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.absence')) active @endif">
             <a href="{{ route('admin.daily-attendance.absence') }}" class="submenu-link">
@@ -174,7 +198,7 @@
                 <span>Liste des absences</span>
             </a>
         </li>
-        
+
         <!-- Liste des retards -->
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.retards')) active @endif">
             <a href="{{ route('admin.daily-attendance.retards') }}" class="submenu-link">
@@ -184,8 +208,10 @@
         </li>
     </ul>
 </li>
+@endcan
 
 <!-- Rapports des Présences (inchangé) -->
+@can('menu.reports')
 <li class="sidebar-item has-sub @if(request()->routeIs('reports.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-bar-chart-fill"></i>
@@ -206,21 +232,36 @@
         </li>
     </ul>
 </li>
+@endcan
 
         <!-- Appareils (existant) -->
+        @can('menu.devices')
         <li class="sidebar-item @if(request()->routeIs('devices.*')) active @endif">
           <a href="{{route('devices.index')}}" class="sidebar-link">
             <i class="bi bi-hdd"></i>
             <span>Appareils</span>
           </a>
         </li>
-        
+        @endcan
+
+        @can('menu.settings')
         <li class="sidebar-item @if(request()->routeIs('settings.*')) active @endif">
           <a href="{{route('settings.index')}}" class="sidebar-link">
             <i class="bi bi-gear"></i>
             <span>Paramètres</span>
           </a>
         </li>
+        @endcan
+
+        <!-- Utilisateurs & permissions (admin uniquement) -->
+        @role('admin')
+        <li class="sidebar-item @if(request()->routeIs('users.*')) active @endif">
+          <a href="{{route('users.index')}}" class="sidebar-link">
+            <i class="bi bi-person-gear"></i>
+            <span>Utilisateurs</span>
+          </a>
+        </li>
+        @endrole
 
       </ul>
     </div>
