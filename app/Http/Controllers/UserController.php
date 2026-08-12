@@ -12,6 +12,7 @@ use Spatie\Permission\Models\Permission;
 class UserController extends Controller
 {
     /**
+    * Retourne la liste des permissions disponibles pour les utilisateurs.
      * Catalogue des permissions liées aux liens du menu, groupées pour
      * l'affichage du formulaire (voir resources/views/components/side-bar.blade.php
      * pour la correspondance avec chaque lien).
