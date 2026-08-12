@@ -35,8 +35,14 @@ class UserController extends Controller
                 'menu.leaves' => 'Congés',
             ],
             'Suivi' => [
-                'menu.daily-attendance' => 'Historique des pointages',
-                'menu.reports' => 'Rapports des présences',
+                'menu.daily-attendance' => 'Historique des pointages (toutes les sous-pages)',
+                'menu.attendance-history' => '↳ Historique complet',
+                'menu.attendance-presence' => '↳ Liste des présences',
+                'menu.attendance-absence' => '↳ Liste des absences',
+                'menu.attendance-retards' => '↳ Liste des retards',
+                'menu.reports' => 'Rapports des présences (toutes les sous-pages)',
+                'menu.reports-absences-delays' => "↳ État de pointage (arrivées – départs)",
+                'menu.reports-custom-presence' => "↳ Rapport d'assiduité et de ponctualité",
             ],
             'Administration' => [
                 'menu.devices' => 'Appareils',

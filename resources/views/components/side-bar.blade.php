@@ -168,7 +168,7 @@
         @endcanany
 
        <!-- Gestion des Présences avec sous-menu -->
-@can('menu.daily-attendance')
+@canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
 <li class="sidebar-item has-sub @if(request()->routeIs('admin.daily-attendance.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-clock-history"></i>
@@ -176,63 +176,75 @@
     </a>
     <ul class="submenu @if(request()->routeIs('admin.daily-attendance.*')) active @endif">
         <!-- Historique complet -->
+        @canany(['menu.daily-attendance', 'menu.attendance-history'])
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.index')) active @endif">
             <a href="{{ route('admin.daily-attendance.index') }}" class="submenu-link">
                 <i class="bi bi-table"></i>
                 <span>Historique complet</span>
             </a>
         </li>
+        @endcanany
 
         <!-- Liste des présences -->
+        @canany(['menu.daily-attendance', 'menu.attendance-presence'])
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.presence')) active @endif">
             <a href="{{ route('admin.daily-attendance.presence') }}" class="submenu-link">
                 <i class="bi bi-person-check-fill text-success"></i>
                 <span>Liste des présences</span>
             </a>
         </li>
+        @endcanany
 
         <!-- Liste des absences -->
+        @canany(['menu.daily-attendance', 'menu.attendance-absence'])
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.absence')) active @endif">
             <a href="{{ route('admin.daily-attendance.absence') }}" class="submenu-link">
                 <i class="bi bi-person-x-fill text-danger"></i>
                 <span>Liste des absences</span>
             </a>
         </li>
+        @endcanany
 
         <!-- Liste des retards -->
+        @canany(['menu.daily-attendance', 'menu.attendance-retards'])
         <li class="submenu-item @if(request()->routeIs('admin.daily-attendance.retards')) active @endif">
             <a href="{{ route('admin.daily-attendance.retards') }}" class="submenu-link">
                 <i class="bi bi-person-x-fill text-warning"></i>
                 <span>Liste des retards</span>
             </a>
         </li>
+        @endcanany
     </ul>
 </li>
-@endcan
+@endcanany
 
-<!-- Rapports des Présences (inchangé) -->
-@can('menu.reports')
+<!-- Rapports des Présences -->
+@canany(['menu.reports', 'menu.reports-absences-delays', 'menu.reports-custom-presence'])
 <li class="sidebar-item has-sub @if(request()->routeIs('reports.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-bar-chart-fill"></i>
         <span>Rapports des Présences</span>
     </a>
     <ul class="submenu @if(request()->routeIs('reports.*')) active @endif">
+        @canany(['menu.reports', 'menu.reports-absences-delays'])
         <li class="submenu-item @if(request()->routeIs('reports.absences-delays')) active @endif">
             <a href="{{ route('reports.absences-delays') }}" class="submenu-link">
                 <i class="bi bi-exclamation-triangle"></i>
                 <span>État de pointage <br>(arrivées – départs)</span>
             </a>
         </li>
+        @endcanany
+        @canany(['menu.reports', 'menu.reports-custom-presence'])
         <li class="submenu-item @if(request()->routeIs('reports.custom.presence')) active @endif">
             <a href="{{ route('reports.custom.presence') }}" class="submenu-link">
                 <i class="bi bi-funnel"></i>
                 <span>Rapport d'assiduité et de ponctualité</span>
             </a>
         </li>
+        @endcanany
     </ul>
 </li>
-@endcan
+@endcanany
 
         <!-- Appareils (existant) -->
         @can('menu.devices')

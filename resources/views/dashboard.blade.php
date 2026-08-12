@@ -36,6 +36,7 @@
             <section class="section">
                 <div class="row">
                     <!-- Employés Totaux -->
+                    @can('menu.employees')
                     <div class="col-lg-3 col-md-6">
                         <div class="card">
                             <div class="card-body px-4 py-4-5">
@@ -56,8 +57,10 @@
                             </div>
                         </div>
                     </div>
+                    @endcan
 
                     <!-- Présents Aujourd'hui -->
+                    @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
                     <div class="col-lg-3 col-md-6">
                         <div class="card">
                             <div class="card-body px-4 py-4-5">
@@ -122,6 +125,7 @@
                             </div>
                         </div>
                     </div>
+                    @endcanany
                 </div>
             </section>
 
@@ -129,6 +133,7 @@
             <section class="section mt-3">
                 <div class="row">
                     <!-- Départements -->
+                    @can('menu.departments')
                     <div class="col-lg-4 col-md-6">
                         <div class="card">
                             <div class="card-body px-4 py-4-5">
@@ -149,8 +154,10 @@
                             </div>
                         </div>
                     </div>
+                    @endcan
 
                     <!-- Zones -->
+                    @can('menu.areas')
                     <div class="col-lg-4 col-md-6">
                         <div class="card">
                             <div class="card-body px-4 py-4-5">
@@ -171,8 +178,10 @@
                             </div>
                         </div>
                     </div>
+                    @endcan
 
                     <!-- Appareils -->
+                    @can('menu.devices')
                     <div class="col-lg-4 col-md-6">
                         <div class="card">
                             <div class="card-body px-4 py-4-5">
@@ -193,6 +202,7 @@
                             </div>
                         </div>
                     </div>
+                    @endcan
                 </div>
             </section>
 
@@ -200,6 +210,7 @@
             <section class="section">
                 <div class="row">
                     <!-- Statut des Appareils (remplace Statut des Employés) -->
+                    @can('menu.devices')
                     <div class="col-lg-4">
                         <div class="card">
                             <div class="card-header">
@@ -215,8 +226,10 @@
                             </div>
                         </div>
                     </div>
+                    @endcan
 
                     <!-- Présence du Jour -->
+                    @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
                     <div class="col-lg-4">
                         <div class="card">
                             <div class="card-header">
@@ -232,8 +245,10 @@
                             </div>
                         </div>
                     </div>
+                    @endcanany
 
                     <!-- Top Départements -->
+                    @canany(['menu.employees', 'menu.departments'])
                     <div class="col-lg-4">
                         <div class="card">
                             <div class="card-header">
@@ -244,9 +259,11 @@
                             </div>
                         </div>
                     </div>
+                    @endcanany
                 </div>
 
                 <!-- Présence Hebdomadaire (Présence vs Absence) -->
+                @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
                 @if(isset($weeklyAttendance) && count($weeklyAttendance) > 0)
                 <div class="row mt-4">
                     <div class="col-12">
@@ -261,8 +278,10 @@
                     </div>
                 </div>
                 @endif
+                @endcanany
 
                 <!-- Dernières Présences -->
+                @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
@@ -330,8 +349,10 @@
                         </div>
                     </div>
                 </div>
+                @endcanany
 
                 <!-- Tableau des Derniers Employés -->
+                @can('menu.employees')
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
@@ -391,8 +412,10 @@
                         </div>
                     </div>
                 </div>
+                @endcan
 
                 <!-- Vue d'Ensemble Graphique -->
+                @can('menu.employees')
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card">
@@ -405,6 +428,7 @@
                         </div>
                     </div>
                 </div>
+                @endcan
             </section>
         </div>
     </div>
@@ -460,6 +484,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Graphique de statut des appareils
+    @can('menu.devices')
     var deviceStatusOptions = {
         series: [
             {{ $activeDevices ?? 0 }},
@@ -485,8 +510,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var deviceStatusChart = new ApexCharts(document.querySelector("#device-status-chart"), deviceStatusOptions);
     deviceStatusChart.render();
+    @endcan
 
     // Graphique de présence aujourd'hui
+    @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
     @if(isset($attendanceTodayData))
     var attendanceTodayOptions = {
         series: [
@@ -515,8 +542,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var attendanceTodayChart = new ApexCharts(document.querySelector("#attendance-today-chart"), attendanceTodayOptions);
     attendanceTodayChart.render();
     @endif
+    @endcanany
 
     // Graphique de présence hebdomadaire
+    @canany(['menu.daily-attendance', 'menu.attendance-history', 'menu.attendance-presence', 'menu.attendance-absence', 'menu.attendance-retards'])
     @if(isset($weeklyAttendance) && count($weeklyAttendance) > 0)
     var weeklyDays = @json(array_column($weeklyAttendance, 'day'));
     var weeklyPresent = @json(array_column($weeklyAttendance, 'present'));
@@ -583,8 +612,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var weeklyChart = new ApexCharts(document.querySelector("#weekly-attendance-chart"), weeklyAttendanceOptions);
     weeklyChart.render();
     @endif
+    @endcanany
 
     // Graphique des top départements
+    @canany(['menu.employees', 'menu.departments'])
     @if(isset($topDepartmentsCountData) && isset($topDepartmentsLabels))
     var departmentsOptions = {
         series: [{
@@ -625,8 +656,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var departmentsChart = new ApexCharts(document.querySelector("#departments-chart"), departmentsOptions);
     departmentsChart.render();
     @endif
+    @endcanany
 
     // Graphique de croissance mensuelle
+    @can('menu.employees')
     @if(isset($monthlyNewEmployees) && isset($monthlyLabels))
     var monthlyGrowthOptions = {
         series: [{
@@ -669,6 +702,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var monthlyChart = new ApexCharts(document.querySelector("#monthly-growth-chart"), monthlyGrowthOptions);
     monthlyChart.render();
     @endif
+    @endcan
 });
 </script>
 @endsection

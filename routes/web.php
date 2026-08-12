@@ -197,25 +197,39 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     });
 
     // Reports
+    // Cette section n'était protégée par aucune permission jusqu'ici (accessible
+    // à tout utilisateur connecté) — corrigé ici, avec le même découpage fin
+    // que « Historique des pointages » (menu.reports reste un raccourci
+    // « accès à tout », complété par les permissions par sous-page).
     Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/absences-delays', [ReportController::class, 'absencesDelays'])->name('absences-delays');
-        Route::get('/attendances', [ReportController::class, 'absencesDelays'])->name('attendance');
-        Route::get('/custom', [ReportController::class, 'custom'])->name('custom');
-        Route::get('/export', [ReportController::class, 'export'])->name('export');
-        Route::get('/automated', [ReportController::class, 'automated'])->name('automated');
-        Route::get('/data', [ReportController::class, 'getData'])->name('data');
-        Route::get('/debug', [ReportController::class, 'debugGetData'])->name('reports.debug');
-        Route::post('/export/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
-        Route::get('/preview/pdf', [ReportController::class, 'previewPdf'])->name('preview.pdf');
 
-        Route::post('/custom/export-pdf', [CustomReportController::class, 'exportCustomPdf'])
-            ->name('reports.custom.export.pdf');
-        Route::get('/custom/check-pdf-status/{request_id}', [CustomReportController::class, 'checkPdfStatus'])
-            ->name('reports.custom.check-pdf-status');
-        Route::get('/custom/download-pdf/{request_id}', [CustomReportController::class, 'downloadPdf'])
-            ->name('reports.custom.download-pdf');
-        Route::post('/custom/export-pdf-sync', [CustomReportController::class, 'exportCustomPdfSync'])
-            ->name('reports.custom.export.pdf.sync');
+        // État de pointage (arrivées / départs)
+        Route::middleware('role_or_permission:admin|menu.reports|menu.reports-absences-delays')->group(function () {
+            Route::get('/absences-delays', [ReportController::class, 'absencesDelays'])->name('absences-delays');
+            Route::get('/attendances', [ReportController::class, 'absencesDelays'])->name('attendance');
+        });
+
+        // Fonctions partagées / rapport personnalisé — le découpage précédent
+        // ne distinguait pas ces actions par sous-page, on les rend donc
+        // accessibles dès qu'on a accès à l'un des deux rapports.
+        Route::middleware('role_or_permission:admin|menu.reports|menu.reports-absences-delays|menu.reports-custom-presence')->group(function () {
+            Route::get('/custom', [ReportController::class, 'custom'])->name('custom');
+            Route::get('/export', [ReportController::class, 'export'])->name('export');
+            Route::get('/automated', [ReportController::class, 'automated'])->name('automated');
+            Route::get('/data', [ReportController::class, 'getData'])->name('data');
+            Route::get('/debug', [ReportController::class, 'debugGetData'])->name('reports.debug');
+            Route::post('/export/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
+            Route::get('/preview/pdf', [ReportController::class, 'previewPdf'])->name('preview.pdf');
+
+            Route::post('/custom/export-pdf', [CustomReportController::class, 'exportCustomPdf'])
+                ->name('reports.custom.export.pdf');
+            Route::get('/custom/check-pdf-status/{request_id}', [CustomReportController::class, 'checkPdfStatus'])
+                ->name('reports.custom.check-pdf-status');
+            Route::get('/custom/download-pdf/{request_id}', [CustomReportController::class, 'downloadPdf'])
+                ->name('reports.custom.download-pdf');
+            Route::post('/custom/export-pdf-sync', [CustomReportController::class, 'exportCustomPdfSync'])
+                ->name('reports.custom.export.pdf.sync');
+        });
     });
 
     // Settings
@@ -236,11 +250,13 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::delete('/signataires/responsables/{id}', [SignataireController::class, 'destroySignataire'])->name('settings.signataires.responsables.destroy');
     });
 
-    // Custom reports
-    Route::get('/rapport/presence-ponctualite', [CustomReportController::class, 'presencePonctualite'])->name('reports.custom.presence');
-    Route::post('/rapport/presence-ponctualite/generate', [CustomReportController::class, 'generateCustomReport'])->name('reports.custom.generate');
-    Route::post('/rapport/presence-ponctualite/export-pdf', [CustomReportController::class, 'exportCustomPdf'])->name('reports.custom.export.pdf');
-    Route::post('/rapport/presence-ponctualite/export-dept-pdf', [CustomReportController::class, 'exportCustomPdfByDept'])->name('reports.export-department-pdf');
+    // Custom reports — lien sidebar « Rapport d'assiduité et de ponctualité »
+    Route::middleware('role_or_permission:admin|menu.reports|menu.reports-custom-presence')->group(function () {
+        Route::get('/rapport/presence-ponctualite', [CustomReportController::class, 'presencePonctualite'])->name('reports.custom.presence');
+        Route::post('/rapport/presence-ponctualite/generate', [CustomReportController::class, 'generateCustomReport'])->name('reports.custom.generate');
+        Route::post('/rapport/presence-ponctualite/export-pdf', [CustomReportController::class, 'exportCustomPdf'])->name('reports.custom.export.pdf');
+        Route::post('/rapport/presence-ponctualite/export-dept-pdf', [CustomReportController::class, 'exportCustomPdfByDept'])->name('reports.export-department-pdf');
+    });
 
     // Missions
     Route::middleware('role_or_permission:admin|menu.missions')->prefix('missions')->name('missions.')->group(function () {
