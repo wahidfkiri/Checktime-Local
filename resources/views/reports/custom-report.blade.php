@@ -73,9 +73,9 @@
                                                 </div>
                                             </div>
                                             <div class="col-12 col-sm-6 col-lg-3">
-                                                <div class="form-group text-start">
+                                                <div class="form-group text-end">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
-                                                    <div class="d-flex flex-wrap gap-2">
+                                                    <div class="d-flex flex-wrap justify-content-end gap-2">
                                                         <button type="button" class="btn btn-primary" id="generate_report">
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
