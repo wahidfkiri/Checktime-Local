@@ -98,7 +98,7 @@ class AttendanceSyncService
                 if ($response && isset($response['data']) && count($response['data']) > 0) {
                     $allTransactions = array_merge($allTransactions, $response['data']);
                     
-                    if (isset($response['next']) && $response['next'] && count($response['data']) >= 100) {
+                    if (isset($response['next']) && $response['next']) {
                         $page++;
                         usleep(200000);
                     } else {
@@ -720,16 +720,34 @@ class AttendanceSyncService
     private function syncEmployeeForDate(Employee $employee, $token, Carbon $startDate, Carbon $endDate)
     {
         try {
-            $response = $this->makeApiRequestWithRetry(
-                $employee->emp_code,
-                $token,
-                $startDate,
-                $endDate,
-                1
-            );
+            $page = 1;
+            $allTransactions = [];
             
-            if ($response && isset($response['data']) && count($response['data']) > 0) {
-                $this->processEmployeeTransactions($employee, $response['data']);
+            do {
+                $response = $this->makeApiRequestWithRetry(
+                    $employee->emp_code,
+                    $token,
+                    $startDate,
+                    $endDate,
+                    $page
+                );
+                
+                if (!$response || !isset($response['data']) || count($response['data']) === 0) {
+                    break;
+                }
+                
+                $allTransactions = array_merge($allTransactions, $response['data']);
+                
+                if (!isset($response['next']) || !$response['next']) {
+                    break;
+                }
+                
+                $page++;
+                usleep(200000);
+            } while ($page <= 50);
+            
+            if (!empty($allTransactions)) {
+                $this->processEmployeeTransactions($employee, $allTransactions);
                 return true;
             }
             
