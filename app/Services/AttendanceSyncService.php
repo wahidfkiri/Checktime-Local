@@ -34,6 +34,11 @@ class AttendanceSyncService
      */
     public function syncAll($daysBack = 1)
     {
+        // Appelée depuis une requête web (bouton "Synchroniser") : sans ceci,
+        // php.ini max_execution_time=120 tue la boucle en plein milieu des
+        // employés à synchroniser, laissant la synchro incomplète en base.
+        set_time_limit(0);
+
         $token = CheckTimeService::getConfigToken();
         
         if (!$token) {
@@ -680,6 +685,10 @@ class AttendanceSyncService
      */
     public function syncForDate(Carbon $date)
     {
+        // Même raison que dans syncAll() : éviter la coupure par le timeout
+        // PHP côté web pendant la boucle sur les employés.
+        set_time_limit(0);
+
         $token = CheckTimeService::getConfigToken();
         
         if (!$token) {
