@@ -1332,7 +1332,7 @@ class DailyAttendanceController extends Controller
             'OVERTIME' => 'Heures supplémentaires',
             'SHORT_WORK' => 'Présent',
             'LEAVE' => 'Congé',
-            'IRREGULAR' => 'Irregular',
+            'IRREGULAR' => 'Présent',
             'MULTIPLE_PUNCHES' => 'Pointages multiples'
         ];
         
