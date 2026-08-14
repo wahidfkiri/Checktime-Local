@@ -332,106 +332,126 @@ class DailyAttendanceController extends Controller
      */
     private function getDeviceTransactionsFromApi($device, $startTime, $endTime, $token, $empCode = null)
 {
-    $page = 1;
     $limit = 100; // Maximum que l'API peut supporter
     $allTransactions = collect();
     $maxPages = 50; // Limite de sécurité
+    $maxPasses = 5;
+    $expectedCount = null;
     
     // Stocker toutes les transactions vues pour éviter les doublons
     $seenTransactions = [];
     
-    do {
-        try {
-            $apiParams = [
-                'page' => $page,
-                'limit' => $limit,
-                'terminal_sn' => $device->device_sn,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                '_t' => time() . rand(1000, 9999) // Anti-cache
-            ];
-            
-            if ($empCode && $empCode !== 'all') {
-                $apiParams['emp_code'] = $empCode;
-            }
-            
-            Log::info("API Call - Device: {$device->device_sn}, Page: {$page}");
-            
-            $response = Http::withHeaders([
-                'Authorization' => 'Token ' . $token,
-                'Accept' => 'application/json',
-                'Cache-Control' => 'no-cache'
-            ])->withOptions([
-                'verify' => false,
-                'timeout' => 30,
-            ])->get(rtrim($this->api->getBaseUrl(), '/') . '/iclock/api/transactions/', $apiParams);
+    for ($pass = 1; $pass <= $maxPasses; $pass++) {
+        $page = 1;
+        $newTransactionsInPass = 0;
 
-            
-            
-            if (!$response->successful()) {
-                Log::warning("API Error: " . $response->status());
-                break;
-            }
-            
-            $data = $response->json();
-            
-            // Vérifier la structure
-            if (!isset($data['data']) || !is_array($data['data'])) {
-                Log::warning("Invalid response structure");
-                break;
-            }
-            
-            $transactions = $data['data'];
-            $count = count($transactions);
-            
-            Log::info("Page {$page}: {$count} transactions");
-            
-            if ($count === 0) {
-                Log::info("Empty page - stopping");
-                break;
-            }
-            
-            // Filtrer les doublons et ajouter les infos du device
-            foreach ($transactions as $transaction) {
-                if (empty($transaction['emp_code']) || empty($transaction['punch_time'])) {
-                    continue;
+        do {
+            try {
+                $apiParams = [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'terminal_sn' => $device->device_sn,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    '_t' => microtime(true) . rand(1000, 9999) // Anti-cache
+                ];
+                
+                if ($empCode && $empCode !== 'all') {
+                    $apiParams['emp_code'] = $empCode;
                 }
                 
-                // Créer une clé unique
-                $key = md5($transaction['emp_code'] . $transaction['punch_time'] . $device->device_sn);
+                Log::info("API Call - Device: {$device->device_sn}, Pass: {$pass}, Page: {$page}");
                 
-                if (!isset($seenTransactions[$key])) {
-                    $seenTransactions[$key] = true;
-                    
-                    // Ajouter les infos du device
-                    $transaction['device_sn'] = $device->device_sn;
-                    $transaction['device_name'] = $device->terminal_name ?: $device->device_sn;
-                    
-                    $allTransactions->push($transaction);
+                $response = Http::withHeaders([
+                    'Authorization' => 'Token ' . $token,
+                    'Accept' => 'application/json',
+                    'Cache-Control' => 'no-cache'
+                ])->withOptions([
+                    'verify' => false,
+                    'timeout' => 30,
+                ])->get(rtrim($this->api->getBaseUrl(), '/') . '/iclock/api/transactions/', $apiParams);
+
+                if (!$response->successful()) {
+                    Log::warning("API Error: " . $response->status());
+                    break;
                 }
-            }
-            
-            // Vérifier s'il y a une page suivante
-            $hasNextPage = isset($data['next']) && !empty($data['next']);
-            
-            if (!$hasNextPage || $page >= $maxPages) {
-                Log::info("No next page or max pages reached");
+                
+                $data = $response->json();
+                
+                // Vérifier la structure
+                if (!isset($data['data']) || !is_array($data['data'])) {
+                    Log::warning("Invalid response structure");
+                    break;
+                }
+
+                if ($expectedCount === null && isset($data['count'])) {
+                    $expectedCount = (int) $data['count'];
+                }
+                
+                $transactions = $data['data'];
+                $count = count($transactions);
+                
+                Log::info("Page {$page}: {$count} transactions");
+                
+                if ($count === 0) {
+                    Log::info("Empty page - stopping");
+                    break;
+                }
+                
+                // Filtrer les doublons et ajouter les infos du device
+                foreach ($transactions as $transaction) {
+                    if (empty($transaction['emp_code']) || empty($transaction['punch_time'])) {
+                        continue;
+                    }
+                    
+                    // Créer une clé unique
+                    $key = md5($transaction['emp_code'] . $transaction['punch_time'] . $device->device_sn);
+                    
+                    if (!isset($seenTransactions[$key])) {
+                        $seenTransactions[$key] = true;
+                        $newTransactionsInPass++;
+                        
+                        // Ajouter les infos du device
+                        $transaction['device_sn'] = $device->device_sn;
+                        $transaction['device_name'] = $device->terminal_name ?: $device->device_sn;
+                        
+                        $allTransactions->push($transaction);
+                    }
+                }
+
+                if ($expectedCount !== null && $allTransactions->count() >= $expectedCount) {
+                    Log::info("Expected count reached for device {$device->device_sn}: {$allTransactions->count()}/{$expectedCount}");
+                    break 2;
+                }
+                
+                // Vérifier s'il y a une page suivante
+                $hasNextPage = isset($data['next']) && !empty($data['next']);
+                
+                if (!$hasNextPage || $page >= $maxPages) {
+                    Log::info("No next page or max pages reached");
+                    break;
+                }
+                
+                $page++;
+                
+                // Petite pause pour ne pas surcharger l'API
+                usleep(200000); // 200ms
+                
+            } catch (\Exception $e) {
+                Log::error("Error page {$page}: " . $e->getMessage());
                 break;
             }
             
-            $page++;
-            
-            // Petite pause pour ne pas surcharger l'API
-            usleep(200000); // 200ms
-            
-        } catch (\Exception $e) {
-            Log::error("Error page {$page}: " . $e->getMessage());
+        } while (true);
+
+        if ($expectedCount === null || $allTransactions->count() >= $expectedCount || $newTransactionsInPass === 0) {
             break;
         }
-        
-    } while (true);
+
+        usleep(300000); // 300ms
+    }
     
-    Log::info("Total for device {$device->device_sn}: {$allTransactions->count()} unique transactions");
+    Log::info("Total for device {$device->device_sn}: {$allTransactions->count()} unique transactions" . ($expectedCount !== null ? " / {$expectedCount} expected" : ""));
     
     return $allTransactions;
 }
