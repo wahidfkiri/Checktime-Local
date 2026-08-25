@@ -154,9 +154,54 @@ class NotificationSettingsController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Envoi échoué: ' . $e->getMessage(),
+                'message' => $this->friendlySmtpErrorMessage($e),
             ], 422);
         }
+    }
+
+    /**
+     * Traduit une erreur d'envoi SMTP (souvent illisible pour un utilisateur)
+     * en message clair indiquant quel paramètre vérifier.
+     */
+    private function friendlySmtpErrorMessage(\Throwable $e): string
+    {
+        $raw = $e->getMessage();
+        $lower = mb_strtolower($raw);
+
+        if (str_contains($lower, 'getaddrinfo') || str_contains($lower, 'nodename nor servname') || str_contains($lower, 'h�te inconnu') || str_contains($lower, 'host inconnu')) {
+            return "Serveur SMTP introuvable : vérifiez le nom d'hôte (champ « Serveur SMTP »).";
+        }
+
+        if (str_contains($lower, 'timed out') || str_contains($lower, 'timeout')) {
+            return "Délai de connexion dépassé : vérifiez le port et que le serveur est joignable (pare-feu, port bloqué...).";
+        }
+
+        if (str_contains($lower, 'connection refused') || str_contains($lower, 'expressément refusée') || str_contains($lower, 'refused')) {
+            return "Connexion refusée par le serveur : vérifiez le port et le type de chiffrement (TLS/SSL).";
+        }
+
+        if (str_contains($lower, 'certificate') || str_contains($lower, 'ssl') || str_contains($lower, 'tls')) {
+            return "Erreur de chiffrement SSL/TLS : vérifiez le port et le type de chiffrement choisi.";
+        }
+
+        if (str_contains($lower, 'auth') || str_contains($lower, ' 535') || str_contains($lower, 'invalid login') || str_contains($lower, 'username and password not accepted')) {
+            return "Authentification refusée par le serveur : vérifiez le nom d'utilisateur et le mot de passe.";
+        }
+
+        if (str_contains($lower, 'sender address rejected') || str_contains($lower, ' 554') || str_contains($lower, 'relay')) {
+            return "Adresse d'expéditeur refusée par le serveur : vérifiez le champ « Expéditeur (email) ».";
+        }
+
+        if (str_contains($lower, 'recipient') && (str_contains($lower, 'rejected') || str_contains($lower, 'invalid'))) {
+            return "Adresse du destinataire refusée par le serveur : vérifiez l'adresse email de test.";
+        }
+
+        if (str_contains($lower, 'could not be established')) {
+            return "Impossible de se connecter au serveur SMTP : vérifiez l'hôte et le port.";
+        }
+
+        // Repli générique : le message technique reste utile pour un diagnostic plus poussé.
+        return "Échec de l'envoi — vérifiez vos paramètres SMTP (hôte, port, identifiants, chiffrement). Détail : " . $raw;
     }
 
     /**
