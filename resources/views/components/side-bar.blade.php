@@ -256,14 +256,32 @@
         </li>
         @endcan
 
-        @can('menu.settings')
-        <li class="sidebar-item @if(request()->routeIs('settings.*')) active @endif">
-          <a href="{{route('settings.index')}}" class="sidebar-link">
+        @canany(['menu.settings', 'menu.report-templates'])
+        <li class="sidebar-item has-sub @if(request()->routeIs('settings.*')) active @endif">
+          <a href="#" class="sidebar-link">
             <i class="bi bi-gear"></i>
             <span>Paramètres</span>
           </a>
+          <ul class="submenu @if(request()->routeIs('settings.*')) active @endif">
+            @can('menu.settings')
+            <li class="submenu-item @if(request()->routeIs('settings.index') || request()->routeIs('settings.signataires.*')) active @endif">
+              <a href="{{route('settings.index')}}" class="submenu-link">
+                <i class="bi bi-sliders"></i>
+                <span>Paramètres généraux</span>
+              </a>
+            </li>
+            @endcan
+            @canany(['menu.settings', 'menu.report-templates'])
+            <li class="submenu-item @if(request()->routeIs('settings.report-templates.*')) active @endif">
+              <a href="{{route('settings.report-templates.index')}}" class="submenu-link">
+                <i class="bi bi-file-earmark-pdf"></i>
+                <span>Modèles d'export</span>
+              </a>
+            </li>
+            @endcanany
+          </ul>
         </li>
-        @endcan
+        @endcanany
 
         <!-- Utilisateurs & permissions (admin uniquement) -->
         @role('admin')

@@ -11,6 +11,8 @@ use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\ReportTemplateController;
 use App\Http\Controllers\WorkHourController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\AbsenceController;
@@ -118,6 +120,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::delete('/{id}', [LeaveController::class, 'destroy'])->name('destroy');
         Route::get('/datatable', [LeaveController::class, 'datatable'])->name('datatable');
         Route::put('/{id}/status', [LeaveController::class, 'updateStatus'])->name('status');
+        Route::post('/types', [LeaveTypeController::class, 'store'])->name('types.store');
     });
 
     // Profile
@@ -249,6 +252,20 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::delete('/signataires/postes/{id}', [SignataireController::class, 'destroyPoste'])->name('settings.signataires.postes.destroy');
         Route::post('/signataires/responsables', [SignataireController::class, 'storeSignataire'])->name('settings.signataires.responsables.store');
         Route::delete('/signataires/responsables/{id}', [SignataireController::class, 'destroySignataire'])->name('settings.signataires.responsables.destroy');
+    });
+
+    // Modèles d'édition PDF (colonnes à cocher) du rapport présence-ponctualité
+    // — groupe à part (pas nesté sous menu.settings) pour qu'un utilisateur
+    // ayant uniquement la permission menu.report-templates y accède, sans
+    // avoir besoin de l'accès complet à Paramètres.
+    Route::middleware('role_or_permission:admin|menu.settings|menu.report-templates')->prefix('settings/modeles-rapport')->name('settings.report-templates.')->group(function () {
+        Route::get('/', [ReportTemplateController::class, 'index'])->name('index');
+        Route::get('/list', [ReportTemplateController::class, 'list'])->name('list');
+        Route::post('/', [ReportTemplateController::class, 'store'])->name('store');
+        Route::put('/{id}', [ReportTemplateController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ReportTemplateController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/default', [ReportTemplateController::class, 'setDefault'])->name('default');
+        Route::post('/{id}/duplicate', [ReportTemplateController::class, 'duplicate'])->name('duplicate');
     });
 
     // Custom reports — lien sidebar « Rapport d'assiduité et de ponctualité »

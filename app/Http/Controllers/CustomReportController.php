@@ -8,6 +8,8 @@ use App\Models\DailyAttendance;
 use App\Models\EmployeeSchedule;
 use App\Models\Mission;
 use App\Models\Leave;
+use App\Models\ReportTemplate;
+use App\Reports\PresencePonctualiteColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -42,7 +44,13 @@ class CustomReportController extends Controller
             ->sort()
             ->values();
 
-        return view('reports.custom-report', compact('employees', 'departments'));
+        ReportTemplate::ensureDefaultFor();
+        $templates = ReportTemplate::forReport()
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+
+        return view('reports.custom-report', compact('employees', 'departments', 'templates'));
     }
 
     /**
@@ -786,21 +794,26 @@ class CustomReportController extends Controller
             }
 
             $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds);
-            $totals = $this->calculateTotals($reportData);
+
+            $template = ReportTemplate::resolveFor($request->input('template_id'));
+            $options  = $template->resolvedOptions();
 
             $data = [
-                'start_date'      => $startDate,
-                'end_date'        => $endDate,
-                'export_date'     => Carbon::now(),
-                'report_data'     => $reportData,
-                'totals'          => $totals,
-                'total_employees' => count($reportData),
-                'period_days'     => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1,
+                'start_date'       => $startDate,
+                'end_date'         => $endDate,
+                'export_date'      => Carbon::now(),
+                'report_data'      => $reportData,
+                'total_employees'  => count($reportData),
+                'period_days'      => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1,
                 'signatairePostes' => $this->getSignatairePostes(),
+                'columns'          => $template->resolvedColumns(),
+                'catalogue'        => PresencePonctualiteColumns::all(),
+                'options'          => $options,
+                'template_name'    => $template->name,
             ];
 
-            $pdf = Pdf::loadView('reports.exports.custom-report-pdf', $data);
-            $pdf->setPaper('A4', 'landscape');
+            $pdf = Pdf::loadView('reports.exports.custom-report-pdf-template', $data);
+            $pdf->setPaper('A4', $options['orientation']);
 
             $filename = 'rapport_presence_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
             return $pdf->download($filename);
@@ -809,35 +822,6 @@ class CustomReportController extends Controller
             Log::error('Erreur export PDF: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Erreur: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Calculer les totaux pour le rapport standard
-     */
-    private function calculateTotals($reportData)
-    {
-        $totals = [
-            'total_employees'          => count($reportData),
-            'total_presence_present'   => 0,
-            'total_presence_absent'    => 0,
-            'total_ponctualite_on_time' => 0,
-            'total_ponctualite_late'   => 0,
-            'avg_presence_rate'        => 0,
-            'avg_ponctualite_rate'     => 0
-        ];
-
-        if (count($reportData) > 0) {
-            foreach ($reportData as $data) {
-                $totals['total_presence_present']    += $data['presence_data']['present'];
-                $totals['total_presence_absent']     += $data['presence_data']['absent'];
-                $totals['total_ponctualite_on_time'] += $data['ponctualite_data']['on_time'];
-                $totals['total_ponctualite_late']    += $data['ponctualite_data']['late'];
-            }
-            $totals['avg_presence_rate']    = round(array_sum(array_column(array_column($reportData, 'presence_data'), 'rate')) / count($reportData), 1);
-            $totals['avg_ponctualite_rate'] = round(array_sum(array_column(array_column($reportData, 'ponctualite_data'), 'rate')) / count($reportData), 1);
-        }
-
-        return $totals;
     }
 
     /**

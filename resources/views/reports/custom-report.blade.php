@@ -23,12 +23,13 @@
                                 <div class="card bg-light">
                                     <div class="card-body">
                                         <h6 class="card-title">Filtres du rapport</h6>
-                                        <!-- Formulaire pour export PDF -->
-                                        <form id="exportPdfByDeptForm" action="{{ route('reports.export-department-pdf') }}" method="POST" style="display: none;">
+                                        <!-- Formulaire pour export PDF piloté par un modèle d'édition (colonnes à cocher) -->
+                                        <form id="exportPdfForm" action="{{ route('reports.custom.export.pdf') }}" method="POST" style="display: none;">
                                             @csrf
-                                            <input type="hidden" name="start_date" id="pdf_by_dept_start_date">
-                                            <input type="hidden" name="end_date" id="pdf_by_dept_end_date">
-                                            <input type="hidden" name="emp_code" id="pdf_by_dept_emp_code">
+                                            <input type="hidden" name="start_date" id="pdf_start_date">
+                                            <input type="hidden" name="end_date" id="pdf_end_date">
+                                            <input type="hidden" name="emp_code" id="pdf_emp_code">
+                                            <input type="hidden" name="template_id" id="pdf_template_id">
                                         </form>
                                         
                                         <div class="row g-3">
@@ -46,7 +47,7 @@
                                                            value="{{ date('Y-m-d') }}">
                                                 </div>
                                             </div>
-                                            <div class="col-12 col-sm-4 col-lg-3">
+                                            <div class="col-12 col-sm-4 col-lg-4">
                                                 <div class="form-group">
                                                     <label for="report_departments" class="form-label">Département(s)</label>
                                                     <select class="form-control" id="report_departments" multiple style="height: auto; min-height: 38px;">
@@ -59,7 +60,7 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-12 col-sm-6 col-lg-2">
+                                            <div class="col-12 col-sm-6 col-lg-4">
                                                 <div class="form-group">
                                                     <label for="report_emp_code" class="form-label">Employé</label>
                                                     <select class="form-control search_utilisateur" id="report_emp_code">
@@ -72,10 +73,30 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-12 col-sm-6 col-lg-3">
-                                                <div class="form-group text-end">
+                                        </div>
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                <div class="form-group">
+                                                    <label for="report_template" class="form-label">
+                                                        Modèle d'édition (PDF)
+                                                        <a href="{{ route('settings.report-templates.index') }}" class="ms-1 text-decoration-none" title="Configurer les modèles d'édition" target="_blank">
+                                                            <i class="bi bi-gear"></i>
+                                                        </a>
+                                                    </label>
+                                                    <select class="form-control" id="report_template">
+                                                        @foreach($templates as $template)
+                                                            <option value="{{ $template->id }}" data-edition="{{ $template->resolvedOptions()['edition'] }}" @selected($template->is_default)>
+                                                                {{ $template->name }}@if($template->is_default) (par défaut) @endif
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <small class="form-text text-muted">Colonnes utilisées par le bouton "Exporter" ci-dessous.</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-5">
+                                                <div class="form-group">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
-                                                    <div class="d-flex flex-wrap justify-content-end gap-2">
+                                                    <div class="d-flex flex-wrap gap-2">
                                                         <button type="button" class="btn btn-primary" id="generate_report">
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
@@ -86,6 +107,7 @@
                                                 </div>
                                             </div>
                                         </div>
+
                                         <div class="row mt-3">
                                             <div class="col-md-12">
                                                 <div class="alert alert-info alert-sm p-2 mb-0">
@@ -819,81 +841,65 @@ $(document).ready(function() {
         });
     }
     
-    // ========== EXPORT PDF ==========
-    
-    function exportDeptToPdf() {
+    // ========== EXPORT PDF (modèle d'édition, colonnes à cocher) ==========
+
+    var ROUTES_EXPORT = {
+        standard: "{{ route('reports.custom.export.pdf') }}",
+        department: "{{ route('reports.export-department-pdf') }}"
+    };
+
+    function exportToPdfWithTemplate() {
         if (!validateDatesForExport()) return;
-        
+
         if (isGeneratingPDF) {
             showSweetAlert('info', 'Opération en cours', 'Une génération PDF est déjà en cours. Veuillez patienter.');
             return;
         }
-        
+
         var startDate = $('#report_start_date').val();
         var endDate = $('#report_end_date').val();
-        
+        var $selectedOption = $('#report_template option:selected');
+        var templateName = $selectedOption.text().trim();
+        var edition = $selectedOption.data('edition') || 'standard';
+        var editionLabel = edition === 'department' ? 'Détail par département' : 'Résumé standard';
+
         var message = '<div class="text-start">' +
-                     '<p><strong>Confirmer l\'export du rapport par département ?</strong></p>' +
+                     '<p><strong>Confirmer l\'export du rapport ?</strong></p>' +
                      '<p><i class="bi bi-calendar me-1"></i> <strong>Période :</strong> ' + startDate + ' au ' + endDate + '</p>' +
-                     '<p class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i> Ce rapport affichera :<br>' +
-                     '- Récapitulatif par département (présence, absence, taux)<br>' +
-                     '- Détail des heures de pointage par employé et par jour</p>' +
+                     '<p><i class="bi bi-file-earmark-pdf me-1"></i> <strong>Modèle :</strong> ' + templateName + '</p>' +
+                     '<p><i class="bi bi-layout-text-window me-1"></i> <strong>Édition :</strong> ' + editionLabel + '</p>' +
                      '</div>';
-        
+
         showSweetAlert('question', 'Exporter', message, true).then((result) => {
-            if (result.isConfirmed) {
-                showPdfLoading();
-                
-                // Progression avec nombres entiers
-                var progress = 0;
-                var progressSteps = [
-                    { progress: 5, message: 'Initialisation...' },
-                    { progress: 15, message: 'Récupération des données de présence...' },
-                    { progress: 30, message: 'Analyse des pointages...' },
-                    { progress: 45, message: 'Regroupement par département...' },
-                    { progress: 60, message: 'Construction du récapitulatif...' },
-                    { progress: 75, message: 'Ajout des heures de pointage...' },
-                    { progress: 90, message: 'Génération du PDF...' },
-                    { progress: 100, message: 'Finalisation...' }
-                ];
-                var stepIndex = 0;
-                
-                var progressInterval = setInterval(function() {
-                    if (stepIndex < progressSteps.length && progress < progressSteps[stepIndex].progress) {
-                        progress = progressSteps[stepIndex].progress;
-                        updatePdfProgressBar(Math.floor(progress), progressSteps[stepIndex].message);
-                        stepIndex++;
-                    } else if (progress < 95) {
-                        progress += 1;
-                        updatePdfProgressBar(Math.floor(progress), 'Génération en cours...');
-                    }
-                }, 500);
-                
-                $('#pdf_by_dept_start_date').val(startDate);
-                $('#pdf_by_dept_end_date').val(endDate);
-                $('#pdf_by_dept_emp_code').val($('#report_emp_code').val());
-                setDepartmentInputs($('#exportPdfByDeptForm'), getSelectedDepartments());
-                $('#exportPdfByDeptForm').submit();
-                
-                setTimeout(function() {
-                    clearInterval(progressInterval);
-                    updatePdfProgressBar(100, 'PDF généré avec succès !');
-                    setTimeout(function() {
-                        hidePdfLoading();
-                    }, 1000);
-                }, 5000);
-            }
+            if (!result.isConfirmed) return;
+
+            showPdfLoading();
+            var progressInterval = simulatePdfProgress();
+
+            $('#pdf_start_date').val(startDate);
+            $('#pdf_end_date').val(endDate);
+            $('#pdf_emp_code').val($('#report_emp_code').val());
+            $('#pdf_template_id').val($('#report_template').val());
+            setDepartmentInputs($('#exportPdfForm'), getSelectedDepartments());
+            $('#exportPdfForm').attr('action', ROUTES_EXPORT[edition] || ROUTES_EXPORT.standard);
+            $('#exportPdfForm').submit();
+
+            setTimeout(function() {
+                clearInterval(progressInterval);
+                updatePdfProgressBar(100, 'PDF généré avec succès !');
+                setTimeout(function() { hidePdfLoading(); }, 1000);
+            }, 4000);
         });
     }
-    
+
     // ========== ÉVÉNEMENTS ==========
-    
+
     $('#generate_report').on('click', function() {
         generateReport();
     });
-    
+
     $('#export_dept_pdf').on('click', function() {
-        exportDeptToPdf();
+        exportToPdfWithTemplate();
     });
     
     // Génération automatique UNIQUEMENT au chargement de la page

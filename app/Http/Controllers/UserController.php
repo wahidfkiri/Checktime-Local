@@ -47,7 +47,8 @@ class UserController extends Controller
             ],
             'Administration' => [
                 'menu.devices' => 'Appareils',
-                'menu.settings' => 'Paramètres',
+                'menu.settings' => 'Paramètres (toutes les sous-pages)',
+                'menu.report-templates' => "↳ Modèles d'export",
             ],
         ];
     }

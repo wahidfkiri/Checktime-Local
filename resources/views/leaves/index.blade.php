@@ -30,7 +30,7 @@
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="employee_filter">Employé</label>
-                                    <select class="form-control" id="employee_filter">
+                                    <select class="form-control search_utilisateur" id="employee_filter">
                                         <option value="">Tous les employés</option>
                                         @foreach($employees as $employee)
                                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -116,7 +116,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="employee_id" class="form-label">Employé <span class="text-danger">*</span></label>
-                        <select class="form-control" id="employee_id" name="employee_id" required>
+                        <select class="form-control search_utilisateur" id="employee_id" name="employee_id" required>
                             <option value="">Sélectionner un employé</option>
                             @foreach($employees as $employee)
                                 <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -126,12 +126,17 @@
                     </div>
                     <div class="mb-3">
                         <label for="type_id" class="form-label">Type de congé <span class="text-danger">*</span></label>
-                        <select class="form-control" id="type_id" name="type_id" required>
-                            <option value="">Sélectionner un type</option>
-                            @foreach($leaveTypes as $type)
-                                <option value="{{ $type->id }}">{{ $type->name }}</option>
-                            @endforeach
-                        </select>
+                        <div class="input-group">
+                            <select class="form-control" id="type_id" name="type_id" required>
+                                <option value="">Sélectionner un type</option>
+                                @foreach($leaveTypes as $type)
+                                    <option value="{{ $type->id }}">{{ $type->name }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-outline-success" id="add-leave-type-button" title="Créer un nouveau type de congé">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
                         <div class="invalid-feedback" id="type-error"></div>
                     </div>
                     <div class="row">
@@ -236,7 +241,37 @@
     </div>
 </div>
 
+<!-- Modal de création d'un type de congé -->
+<div class="modal fade" id="leaveTypeModal" tabindex="-1" aria-labelledby="leaveTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="leaveTypeModalLabel">Nouveau type de congé</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="leaveTypeForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="leave_type_name" class="form-label">Nom du type <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="leave_type_name" name="name" required maxlength="100" placeholder="Ex : Congé maladie">
+                        <div class="invalid-feedback" id="name-error"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary" id="submit-leave-type">
+                        <span id="leave-type-text">Créer</span>
+                        <span id="leave-type-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/sumoselect.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/jquery.sumoselect.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
@@ -248,6 +283,9 @@ $(document).ready(function() {
     let leaveToDelete = null;
     let table;
     let isSubmitting = false; // Variable pour empêcher les soumissions multiples
+
+    // Filtre employé avec recherche (même comportement que /admin/daily-attendance)
+    $('.search_utilisateur').SumoSelect({search: true, searchText: 'Sélectionner un employé...'});
 
     // Initialiser DataTable avec AJAX
     function initializeDataTable() {
@@ -410,6 +448,33 @@ $(document).ready(function() {
         openLeaveModal();
     });
 
+    // Ouvrir le mini-modal de création de type de congé
+    $('#add-leave-type-button').on('click', function() {
+        resetForm('#leaveTypeForm');
+        $('#leaveTypeModal').modal('show');
+    });
+
+    // Soumission du formulaire de type de congé
+    $('#leaveTypeForm').off('submit').on('submit', function(e) {
+        e.preventDefault();
+
+        submitForm({
+            form: '#leaveTypeForm',
+            url: "{{ route('leaves.types.store') }}",
+            method: 'POST',
+            successCallback: function(response) {
+                $('#leaveTypeModal').modal('hide');
+
+                // Ajouter le nouveau type aux deux listes (filtre + formulaire) et le sélectionner
+                $('<option></option>').val(response.data.id).text(response.data.name).appendTo('#type_id');
+                $('<option></option>').val(response.data.id).text(response.data.name).appendTo('#type_filter');
+                $('#type_id').val(response.data.id);
+
+                showSuccess(response.message || 'Type de congé créé avec succès');
+            }
+        });
+    });
+
     // Ouvrir modal de création/édition
     function openLeaveModal(isEdit = false) {
         resetForm('#leaveForm');
@@ -433,6 +498,7 @@ $(document).ready(function() {
                     $('#leaveModalLabel').text('Modifier le congé');
                     $('#leave_id').val(response.data.id);
                     $('#employee_id').val(response.data.employee_id);
+                    if ($('#employee_id')[0].sumo) { $('#employee_id')[0].sumo.reload(); }
                     $('#type_id').val(response.data.type_id);
                     $('#start_date').val(response.data.start_date);
                     $('#end_date').val(response.data.end_date);
@@ -472,6 +538,7 @@ $(document).ready(function() {
     // Réinitialiser les filtres
     $('#reset_filters').on('click', function() {
         $('#employee_filter').val('');
+        if ($('#employee_filter')[0].sumo) { $('#employee_filter')[0].sumo.reload(); }
         $('#type_filter').val('');
         $('#status_filter').val('');
         applyFilters();
@@ -677,6 +744,9 @@ $(document).ready(function() {
     // Fonctions utilitaires
     function resetForm(formSelector) {
         $(formSelector)[0].reset();
+        $(formSelector).find('.search_utilisateur').each(function() {
+            if (this.sumo) { this.sumo.reload(); }
+        });
         $(formSelector).find('.is-invalid').removeClass('is-invalid');
         $(formSelector).find('.invalid-feedback').text('');
     }
