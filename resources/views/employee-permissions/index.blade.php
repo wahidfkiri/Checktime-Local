@@ -125,22 +125,45 @@
                 @csrf
                 <div class="modal-body">
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="employee_id" class="form-label">Employé <span class="text-danger">*</span></label>
-                            <select class="form-control" id="employee_id" name="employee_id" required>
-                                <option value="">Sélectionner un employé</option>
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
-                                @endforeach
-                            </select>
-                            <div class="invalid-feedback" id="employee_id-error"></div>
+                        <div class="col-md-12">
+                            <label class="form-label">Employé(s) <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-2 mb-2">
+                                <select class="form-control" id="employee_id">
+                                    <option value="">Sélectionner un employé</option>
+                                    @foreach($employees as $employee)
+                                        <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" class="btn btn-outline-primary" id="addEmployeeBtn">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+
+                            <!-- Liste des employés sélectionnés -->
+                            <div id="selectedEmployeesContainer" class="d-none">
+                                <label class="form-label">Employés sélectionnés :</label>
+                                <div id="selectedEmployeesList" class="border rounded p-2 mb-2" style="max-height: 150px; overflow-y: auto;">
+                                    <!-- Les employés sélectionnés apparaîtront ici -->
+                                </div>
+                            </div>
+
+                            <!-- Option pour tous les employés -->
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select_all_employees">
+                                <label class="form-check-label" for="select_all_employees">
+                                    Sélectionner tous les employés
+                                </label>
+                            </div>
+                            <div class="invalid-feedback d-block" id="employee_id-error"></div>
                         </div>
-                        <div class="col-md-3">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
                             <label for="date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="date_debut" name="date_debut" required>
                             <div class="invalid-feedback" id="date_debut-error"></div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label for="date_fin" class="form-label">Date fin <span class="text-danger">*</span></label>
                             <input type="date" class="form-control" id="date_fin" name="date_fin" required>
                             <div class="invalid-feedback" id="date_fin-error"></div>
@@ -305,6 +328,73 @@ $(document).ready(function() {
     let permissionToReject = null;
     let permissionToDelete = null;
     let table;
+    let selectedEmployees = [];
+
+    // ========== SÉLECTION MULTIPLE D'EMPLOYÉS (création de permission) ==========
+
+    function updateSelectedEmployeesList() {
+        let listHtml = '';
+
+        selectedEmployees.forEach((id, index) => {
+            let employeeText = $(`#employee_id option[value="${id}"]`).text();
+            listHtml += `
+                <div class="selected-employee-item d-flex justify-content-between align-items-center mb-1 p-1 bg-light rounded">
+                    <span>${employeeText}</span>
+                    <button type="button" class="btn btn-sm btn-danger remove-employee-btn" data-index="${index}">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            `;
+        });
+
+        $('#selectedEmployeesList').html(listHtml);
+        $('#selectedEmployeesContainer').toggleClass('d-none', selectedEmployees.length === 0);
+    }
+
+    $('#addEmployeeBtn').on('click', function() {
+        const employeeId = $('#employee_id').val();
+        if (employeeId && !selectedEmployees.includes(employeeId)) {
+            selectedEmployees.push(employeeId);
+            updateSelectedEmployeesList();
+            $('#employee_id').val('');
+        }
+    });
+
+    $(document).on('click', '.remove-employee-btn', function(e) {
+        e.preventDefault();
+        const index = $(this).data('index');
+        if (index !== undefined && selectedEmployees[index] !== undefined) {
+            selectedEmployees.splice(index, 1);
+            updateSelectedEmployeesList();
+        }
+    });
+
+    $('#select_all_employees').on('change', function() {
+        if ($(this).is(':checked')) {
+            selectedEmployees = [];
+            $('#employee_id option').each(function() {
+                if ($(this).val()) {
+                    selectedEmployees.push($(this).val());
+                }
+            });
+            updateSelectedEmployeesList();
+            $('#employee_id').prop('disabled', true);
+            $('#addEmployeeBtn').prop('disabled', true);
+        } else {
+            selectedEmployees = [];
+            updateSelectedEmployeesList();
+            $('#employee_id').prop('disabled', false);
+            $('#addEmployeeBtn').prop('disabled', false);
+        }
+    });
+
+    function resetEmployeeSelection() {
+        selectedEmployees = [];
+        updateSelectedEmployeesList();
+        $('#select_all_employees').prop('checked', false);
+        $('#employee_id').val('').prop('disabled', false);
+        $('#addEmployeeBtn').prop('disabled', false);
+    }
     
     // Initialiser DataTable
     function initializeDataTable() {
@@ -467,40 +557,61 @@ $('#export-button').on('click', function() {
     // Gestion de la création de permission
     $('#createPermissionForm').on('submit', function(e) {
         e.preventDefault();
-        
+
+        // Vérifier si on utilise tous les employés ou une sélection
+        const employeeIds = $('#select_all_employees').is(':checked')
+            ? 'all'
+            : (selectedEmployees.length > 0 ? selectedEmployees : ($('#employee_id').val() ? [$('#employee_id').val()] : []));
+
+        if (!employeeIds || (Array.isArray(employeeIds) && employeeIds.length === 0)) {
+            $('#employee_id-error').text('Veuillez sélectionner au moins un employé');
+            return;
+        }
+
         const submitBtn = $('#submit-create-permission');
         const spinner = $('#create-permission-spinner');
         const text = $('#create-permission-text');
-        
+
         submitBtn.prop('disabled', true);
         spinner.removeClass('d-none');
         text.text('Création...');
-        
+
         // Réinitialiser les erreurs
         $('.invalid-feedback').text('');
         $('.form-control').removeClass('is-invalid');
-        
+
+        const formData = $(this).serializeArray().reduce(function(obj, item) {
+            obj[item.name] = item.value;
+            return obj;
+        }, {});
+        formData.employee_ids = employeeIds;
+
         $.ajax({
             url: "{{ route('authorizations.employee-permissions.store') }}",
             type: 'POST',
-            data: $(this).serialize(),
+            data: formData,
             success: function(response) {
                 if (response.success) {
                     $('#createPermissionModal').modal('hide');
                     $('#createPermissionForm')[0].reset();
+                    resetEmployeeSelection();
                     table.ajax.reload();
-                    showSweetAlert('success', 'Succès', 'Permission créée avec succès');
+                    showSweetAlert('success', 'Succès', response.message || 'Permission créée avec succès');
                 } else {
                     showSweetAlert('error', 'Erreur', response.message);
                 }
             },
             error: function(xhr) {
                 if (xhr.status === 422) {
-                    const errors = xhr.responseJSON.errors;
+                    const errors = xhr.responseJSON.errors || {};
                     Object.keys(errors).forEach(function(key) {
-                        $(`#${key}-error`).text(errors[key][0]);
-                        $(`#${key}`).addClass('is-invalid');
+                        const fieldKey = key === 'employee_ids' ? 'employee_id' : key;
+                        $(`#${fieldKey}-error`).text(errors[key][0]);
+                        $(`#${fieldKey}`).addClass('is-invalid');
                     });
+                    if (!Object.keys(errors).length && xhr.responseJSON?.message) {
+                        $('#employee_id-error').text(xhr.responseJSON.message);
+                    }
                     showSweetAlert('error', 'Erreur de validation', 'Veuillez corriger les erreurs du formulaire');
                 } else {
                     showSweetAlert('error', 'Erreur', 'Une erreur est survenue');
@@ -803,6 +914,7 @@ $('#export-button').on('click', function() {
         $('#createPermissionForm')[0].reset();
         $('.invalid-feedback').text('');
         $('.form-control').removeClass('is-invalid');
+        resetEmployeeSelection();
     });
 });
 </script>

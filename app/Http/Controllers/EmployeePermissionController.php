@@ -112,7 +112,7 @@ class EmployeePermissionController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'employee_id' => 'required|exists:employees,id',
+            'employee_ids' => 'required',
             'date_debut' => 'required|date',
             'date_fin' => 'required|date|after_or_equal:date_debut',
             'start_time' => 'nullable|date_format:H:i',
@@ -121,30 +121,51 @@ class EmployeePermissionController extends Controller
             'duration_minutes' => 'nullable|integer|min:1|max:1440',
         ]);
 
+        // "all" = tous les employés, sinon une sélection (un ou plusieurs ids).
+        $employeeIds = $request->employee_ids === 'all'
+            ? Employee::pluck('id')->toArray()
+            : array_filter((array) $request->employee_ids);
+
+        $employeeIds = Employee::whereIn('id', $employeeIds)->pluck('id')->toArray();
+
+        if (empty($employeeIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Veuillez sélectionner au moins un employé valide',
+            ], 422);
+        }
+
         try {
             DB::beginTransaction();
 
-            $permission = EmployeePermission::create([
-                'employee_id' => $request->employee_id,
-                'date_debut' => $request->date_debut,
-                'date_fin' => $request->date_fin,
-                // `date` conservé (= début) pour la rétro-compatibilité.
-                'date' => $request->date_debut,
-                'start_time' => $request->start_time,
-                'end_time' => $request->end_time,
-                'raison' => $request->raison,
-                'duration_minutes' => $request->duration_minutes ??
-                    ($request->start_time && $request->end_time ?
-                        Carbon::parse($request->start_time)->diffInMinutes(Carbon::parse($request->end_time)) : null),
-                'status' => 'pending',
-            ]);
+            $durationMinutes = $request->duration_minutes ??
+                ($request->start_time && $request->end_time ?
+                    Carbon::parse($request->start_time)->diffInMinutes(Carbon::parse($request->end_time)) : null);
+
+            $created = [];
+            foreach ($employeeIds as $employeeId) {
+                $created[] = EmployeePermission::create([
+                    'employee_id' => $employeeId,
+                    'date_debut' => $request->date_debut,
+                    'date_fin' => $request->date_fin,
+                    // `date` conservé (= début) pour la rétro-compatibilité.
+                    'date' => $request->date_debut,
+                    'start_time' => $request->start_time,
+                    'end_time' => $request->end_time,
+                    'raison' => $request->raison,
+                    'duration_minutes' => $durationMinutes,
+                    'status' => 'pending',
+                ]);
+            }
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Permission créée avec succès',
-                'data' => $permission
+                'message' => count($created) > 1
+                    ? count($created) . ' permissions créées avec succès'
+                    : 'Permission créée avec succès',
+                'data' => $created,
             ]);
 
         } catch (\Exception $e) {
