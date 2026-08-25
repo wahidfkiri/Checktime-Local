@@ -482,42 +482,45 @@ class InstallerController extends Controller
     /**
      * Update the .env file with installation values.
      */
-    protected function updateEnvFile(array $appInfo, array $endpoint, array $smtp): void
-    {
-        $envPath = base_path('.env');
-        $envContent = File::get($envPath);
+    /**
+ * Update the .env file with installation values.
+ */
+protected function updateEnvFile(array $appInfo, array $endpoint, array $smtp): void
+{
+    $envPath = base_path('.env');
+    $envContent = File::get($envPath);
 
-        $hasSmtp = !empty($smtp['mail_host']);
+    $hasSmtp = !empty($smtp['mail_host']);
 
-        $replacements = [
-            'APP_NAME' => '"' . $appInfo['app_name'] . '"',
-            'APP_TIMEZONE' => $appInfo['timezone'],
-            'APP_LOCALE' => $appInfo['locale'],
+    $replacements = [
+        'APP_NAME' => '"' . $appInfo['app_name'] . '"',
+        'APP_TIMEZONE' => $appInfo['timezone'],
+        'APP_LOCALE' => $appInfo['locale'],
 
-            'CHECKTIME_BASE_URL' => $endpoint['api_url'],
-            'CHECKTIME_TOKEN' => $endpoint['api_token'],
+        'CHECKTIME_BASE_URL' => $endpoint['api_url'],
+        'CHECKTIME_TOKEN' => $endpoint['api_token'],
 
-            'MAIL_MAILER' => $hasSmtp ? 'smtp' : 'log',
-            'MAIL_HOST' => $smtp['mail_host'] ?? '',
-            'MAIL_PORT' => $smtp['mail_port'] ?? '',
-            'MAIL_USERNAME' => $smtp['mail_username'] ?? '',
-            'MAIL_PASSWORD' => $smtp['mail_password'] ?? '',
-            'MAIL_ENCRYPTION' => ($smtp['mail_encryption'] ?? '') ?: '',
-            'MAIL_FROM_ADDRESS' => !empty($smtp['mail_from_address']) ? ('"' . $smtp['mail_from_address'] . '"') : '""',
-            'MAIL_FROM_NAME' => !empty($smtp['mail_from_name']) ? ('"' . $smtp['mail_from_name'] . '"') : '"' . ($appInfo['app_name'] ?? 'CheckTime') . '"',
-        ];
+        'MAIL_MAILER' => $hasSmtp ? 'smtp' : 'log',
+        'MAIL_HOST' => $smtp['mail_host'] ?? '',
+        'MAIL_PORT' => $smtp['mail_port'] ?? '',
+        'MAIL_USERNAME' => $smtp['mail_username'] ?? '',
+        'MAIL_PASSWORD' => $smtp['mail_password'] ?? '',
+        'MAIL_ENCRYPTION' => ($smtp['mail_encryption'] ?? '') ?: '',
+        'MAIL_FROM_ADDRESS' => ($smtp['mail_from_address'] ?? '') ?: '',
+        'MAIL_FROM_NAME' => ($smtp['mail_from_name'] ?? '') ?: '',
+    ];
 
-        foreach ($replacements as $key => $value) {
-            $pattern = '/^' . $key . '=.*$/m';
-            if (preg_match($pattern, $envContent)) {
-                $envContent = preg_replace($pattern, $key . '=' . $value, $envContent);
-            } else {
-                $envContent .= "\n" . $key . '=' . $value;
-            }
+    foreach ($replacements as $key => $value) {
+        $pattern = '/^' . $key . '=.*$/m';
+        if (preg_match($pattern, $envContent)) {
+            $envContent = preg_replace($pattern, $key . '=' . $value, $envContent);
+        } else {
+            $envContent .= "\n" . $key . '=' . $value;
         }
-
-        File::put($envPath, $envContent);
     }
+
+    File::put($envPath, $envContent);
+}
 
     /**
      * Save settings to the database.
