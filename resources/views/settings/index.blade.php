@@ -163,6 +163,101 @@
                     </div>
                 </div>
                 
+                <!-- Section SMTP (envoi des emails) -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h4 class="card-title mb-0"><i class="bi bi-envelope-gear me-1"></i> Configuration SMTP (envoi des emails)</h4>
+                                @if(!empty($mail['mail_host']))
+                                    <span class="badge bg-success">Configuré</span>
+                                @else
+                                    <span class="badge bg-secondary">Non configuré</span>
+                                @endif
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted">
+                                    Ces paramètres servent à l'envoi des rapports par email (RH, employés). Renseignez-les
+                                    si les champs sont vides, puis testez l'envoi avant d'activer les notifications ci-dessus.
+                                </p>
+                                <form id="smtp-form">
+                                    <div class="row">
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Serveur SMTP (host) <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" name="mail_host"
+                                                   value="{{ $mail['mail_host'] ?? '' }}" placeholder="smtp.gmail.com" required>
+                                            <div class="invalid-feedback" data-error-for="mail_host"></div>
+                                        </div>
+                                        <div class="form-group col-md-3">
+                                            <label class="form-label">Port <span class="text-danger">*</span></label>
+                                            <input type="number" class="form-control" name="mail_port"
+                                                   value="{{ $mail['mail_port'] ?? 587 }}" placeholder="587" required>
+                                            <div class="invalid-feedback" data-error-for="mail_port"></div>
+                                        </div>
+                                        <div class="form-group col-md-3">
+                                            <label class="form-label">Chiffrement</label>
+                                            <select class="form-select" name="mail_encryption">
+                                                <option value="" {{ empty($mail['mail_encryption']) ? 'selected' : '' }}>Aucun</option>
+                                                <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>TLS</option>
+                                                <option value="ssl" {{ ($mail['mail_encryption'] ?? '') === 'ssl' ? 'selected' : '' }}>SSL</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Utilisateur</label>
+                                            <input type="text" class="form-control" name="mail_username"
+                                                   value="{{ $mail['mail_username'] ?? '' }}" placeholder="user@domaine.com" autocomplete="off">
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Mot de passe</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" name="mail_password"
+                                                       placeholder="{{ !empty($mail['mail_password']) ? '•••••••• (laisser vide pour ne pas changer)' : 'Mot de passe SMTP' }}"
+                                                       autocomplete="new-password">
+                                                <button class="btn btn-outline-secondary toggle-smtp-password" type="button">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Expéditeur (email) <span class="text-danger">*</span></label>
+                                            <input type="email" class="form-control" name="mail_from_address"
+                                                   value="{{ $mail['mail_from_address'] ?? '' }}" placeholder="no-reply@domaine.com" required>
+                                            <div class="invalid-feedback" data-error-for="mail_from_address"></div>
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Expéditeur (nom)</label>
+                                            <input type="text" class="form-control" name="mail_from_name"
+                                                   value="{{ $mail['mail_from_name'] ?? '' }}" placeholder="CheckTime">
+                                        </div>
+                                    </div>
+
+                                    <hr>
+
+                                    <div class="row align-items-end">
+                                        <div class="form-group col-md-6">
+                                            <label class="form-label">Envoyer un email de test à</label>
+                                            <input type="email" class="form-control" id="smtp-test-email"
+                                                   value="{{ Auth::user()->email }}" placeholder="destinataire@domaine.com">
+                                        </div>
+                                        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                                            <button type="button" class="btn btn-outline-primary" id="btn-test-smtp">
+                                                <i class="bi bi-send me-1"></i> Tester l'envoi
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-save me-1"></i> Enregistrer SMTP
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section Clé d'accès (API biométrique) -->
                 <div class="row mt-3" style="display:none">
                     <div class="col-md-12">
@@ -797,6 +892,120 @@ $(document).ready(function() {
     }
     
     checkCronStatus();
+});
+</script>
+
+<!-- Gestion du SMTP -->
+<script>
+$(document).ready(function() {
+    const smtpCsrf = $('meta[name="csrf-token"]').attr('content');
+    const smtpRoutes = {
+        save: "{{ route('profile.notifications.smtp') }}",
+        test: "{{ route('profile.notifications.smtp.test') }}",
+    };
+
+    function smtpAjax(url, data) {
+        return $.ajax({
+            url: url, method: 'POST', dataType: 'json',
+            contentType: 'application/json',
+            headers: { 'X-CSRF-TOKEN': smtpCsrf, 'Accept': 'application/json' },
+            data: JSON.stringify(data)
+        });
+    }
+
+    function smtpPayload() {
+        return {
+            mail_host:         $('#smtp-form [name=mail_host]').val(),
+            mail_port:         $('#smtp-form [name=mail_port]').val(),
+            mail_encryption:   $('#smtp-form [name=mail_encryption]').val(),
+            mail_username:     $('#smtp-form [name=mail_username]').val(),
+            mail_password:     $('#smtp-form [name=mail_password]').val(),
+            mail_from_address: $('#smtp-form [name=mail_from_address]').val(),
+            mail_from_name:    $('#smtp-form [name=mail_from_name]').val(),
+        };
+    }
+
+    function smtpClearErrors() {
+        $('#smtp-form .is-invalid').removeClass('is-invalid');
+        $('#smtp-form [data-error-for]').text('');
+    }
+
+    function smtpShowErrors(errors) {
+        $.each(errors || {}, function(field, messages) {
+            $('#smtp-form [name=' + field + ']').addClass('is-invalid');
+            $('#smtp-form [data-error-for="' + field + '"]').text(messages[0]);
+        });
+    }
+
+    // ---- Enregistrer SMTP ----
+    $('#smtp-form').on('submit', function(e) {
+        e.preventDefault();
+        const btn = $(this).find('button[type=submit]');
+        smtpClearErrors();
+        btn.prop('disabled', true);
+        smtpAjax(smtpRoutes.save, smtpPayload())
+            .done(function(r) {
+                showSweetAlertSmtp('success', 'Succès', r.message);
+                $('.card-header:has(.bi-envelope-gear) .badge')
+                    .removeClass('bg-secondary').addClass('bg-success').text('Configuré');
+            })
+            .fail(function(x) {
+                if (x.status === 422) {
+                    smtpShowErrors(x.responseJSON?.errors);
+                }
+                showSweetAlertSmtp('error', 'Erreur', x.responseJSON?.message || 'Erreur lors de l\'enregistrement.');
+            })
+            .always(function() { btn.prop('disabled', false); });
+    });
+
+    // ---- Tester SMTP ----
+    $('#btn-test-smtp').on('click', function() {
+        const btn = $(this);
+        const payload = smtpPayload();
+        payload.test_email = $('#smtp-test-email').val();
+
+        if (!payload.mail_host || !payload.mail_port || !payload.mail_from_address) {
+            showSweetAlertSmtp('error', 'Champs requis', 'Renseignez au minimum le serveur, le port et l\'expéditeur avant de tester.');
+            return;
+        }
+        if (!payload.test_email) {
+            showSweetAlertSmtp('error', 'Erreur', 'Indiquez une adresse email de test.');
+            return;
+        }
+
+        smtpClearErrors();
+        const originalHtml = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Envoi...');
+
+        smtpAjax(smtpRoutes.test, payload)
+            .done(function(r) {
+                showSweetAlertSmtp('success', 'Test réussi', r.message);
+            })
+            .fail(function(x) {
+                if (x.status === 422 && x.responseJSON?.errors) {
+                    smtpShowErrors(x.responseJSON.errors);
+                }
+                showSweetAlertSmtp('error', 'Échec du test', x.responseJSON?.message || 'Échec de l\'envoi de test.');
+            })
+            .always(function() { btn.prop('disabled', false).html(originalHtml); });
+    });
+
+    // ---- Afficher/masquer le mot de passe ----
+    $('.toggle-smtp-password').on('click', function() {
+        const input = $(this).closest('.input-group').find('input');
+        const icon = $(this).find('i');
+        if (input.attr('type') === 'password') {
+            input.attr('type', 'text');
+            icon.removeClass('bi-eye').addClass('bi-eye-slash');
+        } else {
+            input.attr('type', 'password');
+            icon.removeClass('bi-eye-slash').addClass('bi-eye');
+        }
+    });
+
+    function showSweetAlertSmtp(icon, title, text) {
+        Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 4000 : undefined, showConfirmButton: icon !== 'success' });
+    }
 });
 </script>
 

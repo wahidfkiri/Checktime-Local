@@ -20,8 +20,9 @@ class SettingsController extends Controller
         // (voir updateAccessKey ci-dessous) : on indique seulement si elle est
         // configurée, pour ne pas exposer le secret dans le HTML de la page.
         $hasAccessKey = !empty(Setting::getGroup('company')['api_token'] ?? null);
+        $mail = Setting::mailConfig();
 
-        return view('settings.index', compact('settings', 'hasAccessKey'));
+        return view('settings.index', compact('settings', 'hasAccessKey', 'mail'));
     }
     
     /**
