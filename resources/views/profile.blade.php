@@ -287,7 +287,7 @@
                                             <label class="form-label">Chiffrement</label>
                                             <select class="form-select" name="mail_encryption">
                                                 <option value="" {{ empty($mail['mail_encryption']) ? 'selected' : '' }}>Aucun</option>
-                                                <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>TLS</option>
+                                                <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>STARTTLS</option>
                                                 <option value="ssl" {{ ($mail['mail_encryption'] ?? '') === 'ssl' ? 'selected' : '' }}>SSL</option>
                                             </select>
                                         </div>
