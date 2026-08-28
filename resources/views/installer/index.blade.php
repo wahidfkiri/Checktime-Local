@@ -298,7 +298,8 @@
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Chiffrement</label>
                                 <select class="form-select" name="mail_encryption" id="mail_encryption">
-                                    <option value="tls" selected>STARTTLS</option>
+                                    <option value="tls" selected>TLS</option>
+                                    <option value="starttls">STARTTLS</option>
                                     <option value="ssl">SSL</option>
                                     <option value="">Aucun</option>
                                 </select>

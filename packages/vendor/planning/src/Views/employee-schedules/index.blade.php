@@ -496,9 +496,9 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
-                data: 'employee_name', 
-                name: 'employee.full_name'
+            {
+                data: 'employee_name',
+                name: 'employee_name'
             },
             { 
                 data: 'date_range',

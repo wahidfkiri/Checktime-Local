@@ -191,6 +191,11 @@ class PresencePonctualiteColumns
                 : 'standard',
             'show_totals' => array_key_exists('show_totals', $options) ? (bool) $options['show_totals'] : true,
             'show_signatures' => array_key_exists('show_signatures', $options) ? (bool) $options['show_signatures'] : true,
+            // Par défaut, le rapport ne porte que sur les jours ouvrés
+            // (lundi-vendredi) — voir la légende du PDF. Cette option permet
+            // d'inclure aussi les samedis/dimanches dans le calcul et
+            // l'affichage, pour les organisations qui travaillent le week-end.
+            'show_weekends' => array_key_exists('show_weekends', $options) ? (bool) $options['show_weekends'] : false,
         ];
     }
 }

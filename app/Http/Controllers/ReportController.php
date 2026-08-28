@@ -375,10 +375,18 @@ class ReportController extends Controller
             try {
                 $scheduleStart = Carbon::createFromFormat('H:i:s', $schedule['start_time']);
                 $actualArrival = Carbon::createFromFormat('H:i:s', $arrivalTime);
-                
+
+                // Marge de tolérance configurable : en deçà, pas de retard.
+                $toleranceMinutes = Setting::lateToleranceMinutes();
+
                 if ($actualArrival > $scheduleStart) {
-                    $lateMinutes = $actualArrival->diffInMinutes($scheduleStart);
-                    $isLate = true;
+                    $diffMinutes = $actualArrival->diffInMinutes($scheduleStart);
+                    if ($diffMinutes > $toleranceMinutes) {
+                        $lateMinutes = $diffMinutes;
+                        $isLate = true;
+                    } else {
+                        $lateMinutes = 0;
+                    }
                 } else {
                     $lateMinutes = 0;
                 }

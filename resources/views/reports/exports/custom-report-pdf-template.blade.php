@@ -231,8 +231,12 @@
         </p>
         <p><strong>Notes :</strong>
         1. Les employés sont classés par ordre décroissant de la somme des taux de présence et ponctualité.<br>
+        @if($options['show_weekends'] ?? false)
+        2. Les statistiques portent sur tous les jours de la période, week-ends inclus.</p>
+        @else
         2. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
         3. Les weekends et jours fériés ne sont pas inclus dans le calcul.</p>
+        @endif
     </div>
 
     <div class="footer">

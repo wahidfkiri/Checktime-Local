@@ -189,6 +189,16 @@
                             <div class="invalid-feedback" id="raison-error"></div>
                         </div>
                     </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Statut <span class="text-danger">*</span></label>
+                            <select class="form-control" id="status" name="status" required>
+                                <option value="pending">En attente</option>
+                                <option value="approved">Approuvé</option>
+                            </select>
+                            <div class="invalid-feedback" id="status-error"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
@@ -254,6 +264,16 @@
                             <label for="edit_raison" class="form-label">Raison <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="edit_raison" name="raison" rows="3" required maxlength="1000"></textarea>
                             <div class="invalid-feedback" id="edit_raison-error"></div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_status" class="form-label">Statut <span class="text-danger">*</span></label>
+                            <select class="form-control" id="edit_status" name="status" required>
+                                <option value="pending">En attente</option>
+                                <option value="approved">Approuvé</option>
+                            </select>
+                            <div class="invalid-feedback" id="edit_status-error"></div>
                         </div>
                     </div>
                 </div>
@@ -648,6 +668,7 @@ $('#export-button').on('click', function() {
                     $('#edit_end_time').val(permission.end_time);
                     $('#edit_duration_minutes').val(permission.duration_minutes);
                     $('#edit_raison').val(permission.raison);
+                    $('#edit_status').val(permission.status === 'approved' ? 'approved' : 'pending');
                     
                     $('#editPermissionModal').modal('show');
                 }

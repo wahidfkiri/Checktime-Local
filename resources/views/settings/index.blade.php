@@ -119,7 +119,40 @@
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Section Ponctualité / Tolérance de retard -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">⏱️ Ponctualité</h4>
+                                <p class="card-subtitle">Marge de tolérance appliquée au calcul des retards</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="row align-items-end">
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-2">
+                                            <label for="late_tolerance_minutes" class="form-label">Tolérance de retard (minutes)</label>
+                                            <input type="number" class="form-control" id="late_tolerance_minutes"
+                                                   min="0" max="1440" step="1"
+                                                   value="{{ $lateToleranceMinutes ?? 0 }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <div class="form-text">
+                                            Un employé arrivé dans cette marge après son heure de début planifiée
+                                            n'est pas marqué en retard. Ex. : avec 10 min, une arrivée à 08h09 pour
+                                            un début à 08h00 reste « à l'heure ». Mettez 0 pour désactiver la tolérance.
+                                            <br>S'applique aux rapports <strong>Absences &amp; Retards</strong> et
+                                            <strong>Présence &amp; Ponctualité</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Statistiques -->
                 <div class="row mt-3">
                     <div class="col-md-12">
@@ -198,7 +231,8 @@
                                             <label class="form-label">Chiffrement</label>
                                             <select class="form-select" name="mail_encryption">
                                                 <option value="" {{ empty($mail['mail_encryption']) ? 'selected' : '' }}>Aucun</option>
-                                                <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>STARTTLS</option>
+                                                <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>TLS</option>
+                                                <option value="starttls" {{ ($mail['mail_encryption'] ?? '') === 'starttls' ? 'selected' : '' }}>STARTTLS</option>
                                                 <option value="ssl" {{ ($mail['mail_encryption'] ?? '') === 'ssl' ? 'selected' : '' }}>SSL</option>
                                             </select>
                                         </div>
@@ -587,7 +621,8 @@ $(document).ready(function() {
             email_is_active: $('#email_is_active').prop('checked'),
             email_employees_is_active: $('#email_employees_is_active').prop('checked'),
             sms_is_active: $('#sms_is_active').prop('checked'),
-            sms_credit: $('#sms_credit').val() || 0
+            sms_credit: $('#sms_credit').val() || 0,
+            late_tolerance_minutes: $('#late_tolerance_minutes').val() || 0
         };
         
         $.ajax({

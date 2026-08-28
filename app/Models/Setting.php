@@ -42,6 +42,25 @@ class Setting extends Model
     }
 
     /**
+     * Tolérance de retard (en minutes) configurée dans les paramètres.
+     *
+     * Un employé arrivé dans cette marge après l'heure de début planifiée
+     * n'est PAS marqué en retard. Valeur mise en cache le temps de la requête
+     * car appelée dans les boucles de génération des rapports.
+     */
+    public static function lateToleranceMinutes(): int
+    {
+        static $cached = null;
+
+        if ($cached === null) {
+            $value = self::where('key', 'late_tolerance_minutes')->value('value');
+            $cached = max(0, (int) $value);
+        }
+
+        return $cached;
+    }
+
+    /**
      * Récupère la configuration SMTP stockée en base (groupe "mail"),
      * avec repli sur la config applicative (.env) pour préremplir le formulaire.
      */

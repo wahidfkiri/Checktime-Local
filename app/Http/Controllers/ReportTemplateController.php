@@ -168,6 +168,7 @@ class ReportTemplateController extends Controller
             'options.edition' => 'nullable|in:standard,department',
             'options.show_totals' => 'nullable|boolean',
             'options.show_signatures' => 'nullable|boolean',
+            'options.show_weekends' => 'nullable|boolean',
         ], [
             'name.required' => 'Le nom du modèle est obligatoire.',
             'name.unique' => 'Un modèle porte déjà ce nom.',

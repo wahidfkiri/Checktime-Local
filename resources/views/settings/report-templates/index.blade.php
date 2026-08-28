@@ -109,16 +109,25 @@
                                     </div>
 
                                     <div class="row g-3 mb-3">
-                                        <div class="col-md-6 d-flex align-items-end">
+                                        <div class="col-md-4 d-flex align-items-end">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="option_show_totals" checked>
                                                 <label class="form-check-label" for="option_show_totals">Ligne de totaux</label>
                                             </div>
                                         </div>
-                                        <div class="col-md-6 d-flex align-items-end">
+                                        <div class="col-md-4 d-flex align-items-end">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="option_show_signatures" checked>
                                                 <label class="form-check-label" for="option_show_signatures">Signature</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 d-flex align-items-end">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="option_show_weekends">
+                                                <label class="form-check-label" for="option_show_weekends">
+                                                    Inclure les week-ends
+                                                    <i class="bi bi-info-circle text-muted" title="Par défaut, le rapport ne porte que sur les jours ouvrés (lundi-vendredi). Cochez pour aussi compter et afficher les samedis/dimanches."></i>
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
@@ -267,6 +276,7 @@ $(document).ready(function() {
         $('#option_layout').val('single');
         $('#option_show_totals').prop('checked', true);
         $('#option_show_signatures').prop('checked', true);
+        $('#option_show_weekends').prop('checked', false);
         $('#template_is_default').prop('checked', false);
         cocherColonnes(@json(\App\Reports\PresencePonctualiteColumns::defaultKeys()));
         $('#editor-title').text('Nouveau modèle');
@@ -284,6 +294,7 @@ $(document).ready(function() {
         $('#option_layout').val(template.options.layout || 'single');
         $('#option_show_totals').prop('checked', !!template.options.show_totals);
         $('#option_show_signatures').prop('checked', !!template.options.show_signatures);
+        $('#option_show_weekends').prop('checked', !!template.options.show_weekends);
         $('#template_is_default').prop('checked', !!template.is_default);
         cocherColonnes(template.columns);
         $('#editor-title').text('Modifier : ' + template.name);
@@ -338,6 +349,7 @@ $(document).ready(function() {
                 layout: $('#option_layout').val(),
                 show_totals: $('#option_show_totals').is(':checked') ? 1 : 0,
                 show_signatures: $('#option_show_signatures').is(':checked') ? 1 : 0,
+                show_weekends: $('#option_show_weekends').is(':checked') ? 1 : 0,
             },
             is_default: $('#template_is_default').is(':checked') ? 1 : 0,
         };

@@ -119,6 +119,7 @@ class EmployeePermissionController extends Controller
             'end_time' => 'nullable|date_format:H:i|after_or_equal:start_time',
             'raison' => 'required|string|min:10|max:1000',
             'duration_minutes' => 'nullable|integer|min:1|max:1440',
+            'status' => 'nullable|in:pending,approved',
         ]);
 
         // "all" = tous les employés, sinon une sélection (un ou plusieurs ids).
@@ -142,6 +143,10 @@ class EmployeePermissionController extends Controller
                 ($request->start_time && $request->end_time ?
                     Carbon::parse($request->start_time)->diffInMinutes(Carbon::parse($request->end_time)) : null);
 
+            // Statut choisi à la création : "en attente" (défaut) ou "approuvé".
+            $status = $request->status === 'approved' ? 'approved' : 'pending';
+            $isApproved = $status === 'approved';
+
             $created = [];
             foreach ($employeeIds as $employeeId) {
                 $created[] = EmployeePermission::create([
@@ -154,7 +159,9 @@ class EmployeePermissionController extends Controller
                     'end_time' => $request->end_time,
                     'raison' => $request->raison,
                     'duration_minutes' => $durationMinutes,
-                    'status' => 'pending',
+                    'status' => $status,
+                    'approved_by' => $isApproved ? auth()->id() : null,
+                    'approved_at' => $isApproved ? now() : null,
                 ]);
             }
 
@@ -212,10 +219,15 @@ class EmployeePermissionController extends Controller
             'end_time' => 'nullable|date_format:H:i|after_or_equal:start_time',
             'raison' => 'required|string|min:10|max:1000',
             'duration_minutes' => 'nullable|integer|min:1|max:1440',
+            'status' => 'nullable|in:pending,approved',
         ]);
 
         try {
             DB::beginTransaction();
+
+            // Statut choisi à la modification : "en attente" (défaut) ou "approuvé".
+            $status = $request->status === 'approved' ? 'approved' : 'pending';
+            $isApproved = $status === 'approved';
 
             $employeePermission->update([
                 'employee_id' => $request->employee_id,
@@ -229,9 +241,9 @@ class EmployeePermissionController extends Controller
                 'duration_minutes' => $request->duration_minutes ??
                     ($request->start_time && $request->end_time ?
                         Carbon::parse($request->start_time)->diffInMinutes(Carbon::parse($request->end_time)) : null),
-                'status' => 'pending',
-                'approved_by' => null,
-                'approved_at' => null,
+                'status' => $status,
+                'approved_by' => $isApproved ? auth()->id() : null,
+                'approved_at' => $isApproved ? now() : null,
                 'rejection_reason' => null,
             ]);
 

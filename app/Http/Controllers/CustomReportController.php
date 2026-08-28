@@ -9,6 +9,7 @@ use App\Models\EmployeeSchedule;
 use App\Models\Mission;
 use App\Models\Leave;
 use App\Models\ReportTemplate;
+use App\Models\Setting;
 use App\Reports\PresencePonctualiteColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -151,7 +152,7 @@ class CustomReportController extends Controller
             ->get();
     }
 
-    private function getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds = ['all'])
+    private function getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds = ['all'], $includeWeekends = false)
     {
         $employeesQuery = Employee::whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
@@ -169,8 +170,11 @@ class CustomReportController extends Controller
             return [];
         }
 
-        // Calculer les jours ouvrés (lundi à vendredi)
-        $workingDays = $this->countWorkingDays($startDate, $endDate);
+        // Calculer les jours ouvrés (lundi à vendredi), ou tous les jours
+        // calendaires si le modèle choisi inclut les week-ends.
+        $workingDays = $includeWeekends
+            ? Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1
+            : $this->countWorkingDays($startDate, $endDate);
 
         // Récupérer toutes les présences pour la période
         $allAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -211,11 +215,19 @@ class CustomReportController extends Controller
             $employeeMissions    = $allMissions->get($employee->id, collect());
             $employeeLeaves      = $leaves->get($employee->id, collect());
 
+            // La requête de missions/congés remonte tout enregistrement qui
+            // chevauche la période (y compris ceux qui commencent avant ou
+            // finissent après) — il faut donc borner l'itération jour par jour
+            // à [$startDate, $endDate], sinon des jours hors période sont
+            // comptés dans la présence (et l'absence peut devenir négative).
+            $periodStart = Carbon::parse($startDate)->startOfDay();
+            $periodEnd   = Carbon::parse($endDate)->startOfDay();
+
             // --- Dates de mission ---
             $missionDates = [];
             foreach ($employeeMissions as $mission) {
-                $missionStart = Carbon::parse($mission->start_date);
-                $missionEnd   = Carbon::parse($mission->end_date);
+                $missionStart = Carbon::parse($mission->start_date)->max($periodStart);
+                $missionEnd   = Carbon::parse($mission->end_date)->min($periodEnd);
                 $current      = $missionStart->copy();
                 while ($current <= $missionEnd) {
                     $missionDates[$current->format('Y-m-d')] = [
@@ -229,8 +241,8 @@ class CustomReportController extends Controller
             // --- Dates de congé ---
             $leaveDates = [];
             foreach ($employeeLeaves as $leave) {
-                $leaveStart = Carbon::parse($leave->start_date);
-                $leaveEnd   = Carbon::parse($leave->end_date);
+                $leaveStart = Carbon::parse($leave->start_date)->max($periodStart);
+                $leaveEnd   = Carbon::parse($leave->end_date)->min($periodEnd);
                 $current    = $leaveStart->copy();
                 $typeName   = $leave->type ? $leave->type->name : 'Congé';
                 while ($current <= $leaveEnd) {
@@ -251,6 +263,15 @@ class CustomReportController extends Controller
             foreach ($employeeAttendances as $attendance) {
                 $status = strtoupper($attendance->status);
                 $dateKey = Carbon::parse($attendance->attendance_date)->format('Y-m-d');
+
+                // Le rapport ne porte que sur les jours ouvrés (lundi-vendredi,
+                // voir légende du PDF) : un pointage un week-end ne doit pas
+                // gonfler le total de présence au-delà des jours ouvrés,
+                // sinon l'absence (jours ouvrés - présence) devient négative.
+                // Sauf si le modèle choisi inclut explicitement les week-ends.
+                if (!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5) {
+                    continue;
+                }
 
                 if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])) {
                     continue;
@@ -274,11 +295,13 @@ class CustomReportController extends Controller
             }
 
             foreach ($missionDates as $dateStr => $mission) {
-                $totalPresent++;
+                if ($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) {
+                    $totalPresent++;
+                }
             }
 
             foreach ($leaveDates as $dateStr => $leave) {
-                if (!isset($missionDates[$dateStr])) {
+                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) && !isset($missionDates[$dateStr])) {
                     $totalPresent++;
                 }
             }
@@ -337,7 +360,7 @@ class CustomReportController extends Controller
             while ($currentDate <= $endDateObj) {
                 $dateStr = $currentDate->format('Y-m-d');
                 $dayOfWeek = $currentDate->dayOfWeekIso;
-                if ($dayOfWeek >= 1 && $dayOfWeek <= 5
+                if (($includeWeekends || ($dayOfWeek >= 1 && $dayOfWeek <= 5))
                     && !in_array($dateStr, $recordedDates)
                     && !isset($missionDates[$dateStr])
                     && !isset($leaveDates[$dateStr])
@@ -391,7 +414,15 @@ class CustomReportController extends Controller
                 $departmentIds = ['all'];
             }
 
-            $workingDays = $this->countWorkingDays($startDate, $endDate);
+            $template = ReportTemplate::resolveFor($request->input('template_id'));
+            $options  = $template->resolvedOptions();
+            $includeWeekends = $options['show_weekends'];
+
+            $workingDays = $includeWeekends
+                ? Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1
+                : $this->countWorkingDays($startDate, $endDate);
+            $periodStart = Carbon::parse($startDate)->startOfDay();
+            $periodEnd   = Carbon::parse($endDate)->startOfDay();
 
             $attendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
                 ->get();
@@ -463,10 +494,13 @@ class CustomReportController extends Controller
                 $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
                 $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
 
+                // Bornée à [$periodStart, $periodEnd] : la requête remonte aussi
+                // les missions/congés qui débordent de la période (voir plus
+                // haut), il ne faut pas compter leurs jours hors période.
                 $missionDates = [];
                 foreach ($employeeMissions as $mission) {
-                    $missionStart = Carbon::parse($mission->start_date);
-                    $missionEnd   = Carbon::parse($mission->end_date);
+                    $missionStart = Carbon::parse($mission->start_date)->max($periodStart);
+                    $missionEnd   = Carbon::parse($mission->end_date)->min($periodEnd);
                     $current      = $missionStart->copy();
                     while ($current <= $missionEnd) {
                         $missionDates[$current->format('Y-m-d')] = [
@@ -479,8 +513,8 @@ class CustomReportController extends Controller
 
                 $leaveDates = [];
                 foreach ($employeeLeaves as $leave) {
-                    $leaveStart = Carbon::parse($leave->start_date);
-                    $leaveEnd   = Carbon::parse($leave->end_date);
+                    $leaveStart = Carbon::parse($leave->start_date)->max($periodStart);
+                    $leaveEnd   = Carbon::parse($leave->end_date)->min($periodEnd);
                     $current    = $leaveStart->copy();
                     $typeName   = $leave->type ? $leave->type->name : 'Congé';
                     while ($current <= $leaveEnd) {
@@ -584,6 +618,13 @@ class CustomReportController extends Controller
                 foreach ($employeeAttendances as $att) {
                     $status = strtoupper($att->status);
                     $dateKey = Carbon::parse($att->attendance_date)->format('Y-m-d');
+                    // Idem que dans getPresencePonctualiteData() : ne pas compter les
+                    // pointages du week-end dans la présence, sinon l'absence
+                    // (jours ouvrés - présence) peut devenir négative. Sauf si le
+                    // modèle choisi inclut explicitement les week-ends.
+                    if (!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5) {
+                        continue;
+                    }
                     if ($status !== 'ABSENT' && !isset($missionDates[$dateKey]) && !isset($leaveDates[$dateKey])) {
                         $totalPresent++;
                         $lateData = $this->calculateLateFromPlanning($employee, $att, $dateKey);
@@ -596,12 +637,12 @@ class CustomReportController extends Controller
                 }
 
                 foreach ($missionDates as $dateStr => $mission) {
-                    if (Carbon::parse($dateStr)->dayOfWeekIso <= 5) {
+                    if ($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) {
                         $totalMission++;
                     }
                 }
                 foreach ($leaveDates as $dateStr => $leave) {
-                    if (Carbon::parse($dateStr)->dayOfWeekIso <= 5 && !isset($missionDates[$dateStr])) {
+                    if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) && !isset($missionDates[$dateStr])) {
                         $totalLeave++;
                     }
                 }
@@ -661,11 +702,16 @@ class CustomReportController extends Controller
             $currentDate = Carbon::parse($startDate);
             $endDateObj  = Carbon::parse($endDate);
             while ($currentDate <= $endDateObj) {
-                $daysList[] = [
-                    'date'     => $currentDate->copy(),
-                    'date_str' => $currentDate->format('Y-m-d'),
-                    'day_name' => $this->getDayNameFrench($currentDate->dayOfWeekIso),
-                ];
+                // N'afficher les colonnes samedi/dimanche que si l'option
+                // "Inclure les week-ends" du modèle est activée. On parcourt
+                // toute la période choisie et on saute uniquement le week-end.
+                if ($includeWeekends || $currentDate->dayOfWeekIso <= 5) {
+                    $daysList[] = [
+                        'date'     => $currentDate->copy(),
+                        'date_str' => $currentDate->format('Y-m-d'),
+                        'day_name' => $this->getDayNameFrench($currentDate->dayOfWeekIso),
+                    ];
+                }
                 $currentDate->addDay();
             }
 
@@ -752,6 +798,7 @@ class CustomReportController extends Controller
                 'period_days'       => $workingDays,
                 'days_list'         => $daysList,
                 'signatairePostes'  => $this->getSignatairePostes(),
+                'options'           => $options,
             ];
 
             $pdf = Pdf::loadView('reports.exports.custom-report-pdf-by-dept', $data);
@@ -793,10 +840,10 @@ class CustomReportController extends Controller
                 $departmentIds = ['all'];
             }
 
-            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds);
-
             $template = ReportTemplate::resolveFor($request->input('template_id'));
             $options  = $template->resolvedOptions();
+
+            $reportData = $this->getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds, $options['show_weekends']);
 
             $data = [
                 'start_date'       => $startDate,
@@ -852,9 +899,15 @@ class CustomReportController extends Controller
             $plannedStart = Carbon::createFromFormat('Y-m-d H:i:s', $dateKey . ' ' . $plannedStartTime);
             $checkIn = Carbon::createFromFormat('Y-m-d H:i:s', $dateKey . ' ' . $checkInTime);
 
+            // Marge de tolérance configurable : en deçà, pas de retard.
+            $toleranceMinutes = Setting::lateToleranceMinutes();
+
             if ($checkIn->gt($plannedStart)) {
-                $result['is_late'] = true;
-                $result['late_minutes'] = $checkIn->diffInMinutes($plannedStart);
+                $diffMinutes = $checkIn->diffInMinutes($plannedStart);
+                if ($diffMinutes > $toleranceMinutes) {
+                    $result['is_late'] = true;
+                    $result['late_minutes'] = $diffMinutes;
+                }
             }
         } catch (\Exception $e) {
             Log::warning('Erreur calcul retard custom report', [

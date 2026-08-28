@@ -55,6 +55,18 @@ class EmployeeScheduleController extends Controller
                     ->addColumn('employee_name', function($row) {
                         return $row->employee->full_name ?? 'N/A';
                     })
+                    // Tri sur une colonne calculée (nom complet non stocké en base) :
+                    // trier via une sous-requête plutôt que de laisser Yajra faire une
+                    // jointure automatique sur 'employee.xxx', qui écrase 'employee_id'
+                    // (colonnes 'id' en doublon entre les deux tables avec SELECT *) et
+                    // casse la relation eager-loadée (tous les noms deviennent "N/A").
+                    ->orderColumn('employee_name', function ($query, $order) {
+                        $query->orderBy(
+                            Employee::select('first_name')
+                                ->whereColumn('employees.id', 'employee_schedules.employee_id'),
+                            $order
+                        );
+                    })
                     ->addColumn('matricule', function($row) {
                         return $row->employee->emp_code ?? 'N/A';
                     })

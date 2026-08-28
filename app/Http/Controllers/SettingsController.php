@@ -21,8 +21,9 @@ class SettingsController extends Controller
         // configurée, pour ne pas exposer le secret dans le HTML de la page.
         $hasAccessKey = !empty(Setting::getGroup('company')['api_token'] ?? null);
         $mail = Setting::mailConfig();
+        $lateToleranceMinutes = Setting::lateToleranceMinutes();
 
-        return view('settings.index', compact('settings', 'hasAccessKey', 'mail'));
+        return view('settings.index', compact('settings', 'hasAccessKey', 'mail', 'lateToleranceMinutes'));
     }
     
     /**
@@ -33,8 +34,9 @@ class SettingsController extends Controller
         try {
             $validator = \Validator::make($request->all(), [
                 'email' => 'nullable|email',
+                'late_tolerance_minutes' => 'nullable|integer|min:0|max:1440',
             ]);
-            
+
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -42,7 +44,7 @@ class SettingsController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-            
+
             $settings = Setting::updateOrCreate(
                 ['id' => Setting::value('id') ?? 0],
                 [
@@ -52,7 +54,11 @@ class SettingsController extends Controller
                     'sms_is_active' => $request->boolean('sms_is_active')
                 ]
             );
-            
+
+            // Tolérance de retard (minutes) — store clé/valeur, lu par les rapports.
+            // Après le singleton pour ne pas cibler cette ligne sur une base vierge.
+            Setting::set('late_tolerance_minutes', (int) $request->input('late_tolerance_minutes', 0), 'attendance');
+
             Log::info('Paramètres mis à jour', $settings->toArray());
             
             return response()->json([

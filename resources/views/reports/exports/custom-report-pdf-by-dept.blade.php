@@ -266,7 +266,7 @@
             <div class="title">RAPPORT DE PRÉSENCE DU PERSONNEL</div>
             <div class="period-info">
                 Période : {{ \Carbon\Carbon::parse($start_date)->format('d/m/Y') }} au {{ \Carbon\Carbon::parse($end_date)->format('d/m/Y') }}
-                ({{ $period_days }} jours ouvrés)
+                ({{ $period_days }} {{ ($options['show_weekends'] ?? false) ? 'jours' : 'jours ouvrés' }})
             </div>
             <div class="client-info">
                 <strong>Départements :</strong> {{ $total_departments }} | 
@@ -651,8 +651,12 @@
             • <span style="color: #1a5276; background-color:#dce8f7; padding:1px 3px;">Mission</span> : Jour de mission |
             • <span style="color: #1e8449; background-color:#d5f5e3; padding:1px 3px;">Congé</span> : Jour de congé approuvé
         </p>
-        <p><strong>Notes :</strong> 
+        <p><strong>Notes :</strong>
+            @if($options['show_weekends'] ?? false)
+            1. Les statistiques portent sur tous les jours de la période, week-ends inclus.<br>
+            @else
             1. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
+            @endif
             2. Les heures affichées sont les heures d'arrivée et de départ enregistrées.<br>
             3. Mission et Congé comptent comme présents dans le calcul du taux de présence.
         </p>

@@ -29,7 +29,7 @@ class NotificationSettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'mail_host'         => 'required|string|max:255',
             'mail_port'         => 'required|integer|min:1|max:65535',
-            'mail_encryption'   => 'nullable|in:tls,ssl',
+            'mail_encryption'   => 'nullable|in:tls,ssl,starttls',
             'mail_username'     => 'nullable|string|max:255',
             'mail_password'     => 'nullable|string|max:255',
             'mail_from_address' => 'required|email|max:255',
@@ -100,7 +100,7 @@ class NotificationSettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'mail_host'         => 'required|string',
             'mail_port'         => 'required|integer',
-            'mail_encryption'   => 'nullable|in:tls,ssl',
+            'mail_encryption'   => 'nullable|in:tls,ssl,starttls',
             'mail_username'     => 'nullable|string',
             'mail_password'     => 'nullable|string',
             'mail_from_address' => 'required|email',
@@ -133,7 +133,7 @@ class NotificationSettingsController extends Controller
                     'port'       => (int) $request->input('mail_port'),
                     'username'   => $request->input('mail_username'),
                     'password'   => $password,
-                    'encryption' => $request->input('mail_encryption') ?: null,
+                    'encryption' => $this->resolveEncryptionForTransport($request->input('mail_encryption')),
                     'timeout'    => 15,
                 ]),
                 'mail.default' => 'smtp',
@@ -428,12 +428,31 @@ class NotificationSettingsController extends Controller
             'mail.mailers.smtp.port'           => (int) ($mail['mail_port'] ?: 587),
             'mail.mailers.smtp.username'       => $mail['mail_username'] ?: null,
             'mail.mailers.smtp.password'       => $mail['mail_password'] ?: null,
-            'mail.mailers.smtp.encryption'     => $mail['mail_encryption'] ?: null,
+            'mail.mailers.smtp.encryption'     => $this->resolveEncryptionForTransport($mail['mail_encryption']),
             'mail.from.address'                => $mail['mail_from_address'] ?: null,
             'mail.from.name'                   => $mail['mail_from_name'] ?: config('app.name', 'CheckTime'),
         ]);
 
         Mail::mailer('smtp');
+    }
+
+    /**
+     * Traduit la valeur de chiffrement choisie par l'utilisateur vers celle
+     * attendue par le transport SMTP de Laravel/Symfony Mailer.
+     *
+     * Le transport ne connaît que 'tls' (négociation STARTTLS, ou TLS
+     * implicite si le port est 465) et 'ssl'. « STARTTLS » est donc une
+     * option distincte côté interface (choix plus explicite pour
+     * l'utilisateur) mais se traduit vers 'tls' à ce niveau, car c'est
+     * exactement ce que fait ce transport pour STARTTLS.
+     */
+    private function resolveEncryptionForTransport(?string $raw): ?string
+    {
+        if ($raw === 'starttls') {
+            return 'tls';
+        }
+
+        return $raw ?: null;
     }
 
     /**
@@ -456,7 +475,12 @@ class NotificationSettingsController extends Controller
                 'MAIL_MAILER'       => 'smtp',
                 'MAIL_HOST'         => $fields['mail_host'],
                 'MAIL_PORT'         => $fields['mail_port'],
-                'MAIL_ENCRYPTION'   => $fields['mail_encryption'],
+                // Toujours une valeur comprise nativement par le transport
+                // (voir resolveEncryptionForTransport) : le .env sert de repli
+                // au tout premier démarrage, avant que la table settings ne
+                // soit lue — « STARTTLS » (choix utilisateur) reste préservé
+                // tel quel dans la table settings, pas ici.
+                'MAIL_ENCRYPTION'   => $this->resolveEncryptionForTransport($fields['mail_encryption']),
                 'MAIL_USERNAME'     => $fields['mail_username'],
                 'MAIL_FROM_ADDRESS' => $fields['mail_from_address'],
                 'MAIL_FROM_NAME'    => $fields['mail_from_name'],

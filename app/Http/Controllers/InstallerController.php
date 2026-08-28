@@ -155,7 +155,7 @@ class InstallerController extends Controller
             'mail_port' => 'nullable|integer|min:1|max:65535',
             'mail_username' => 'nullable|string|max:255',
             'mail_password' => 'nullable|string|max:255',
-            'mail_encryption' => 'nullable|in:tls,ssl,null',
+            'mail_encryption' => 'nullable|in:tls,starttls,ssl,null',
             'mail_from_address' => 'nullable|email|max:255',
             'mail_from_name' => 'nullable|string|max:255',
         ]);
@@ -247,7 +247,9 @@ class InstallerController extends Controller
                     'port' => (int) $port,
                     'username' => $username,
                     'password' => $password,
-                    'encryption' => $encryption ?: null,
+                    // Le transport SMTP ne connaît que 'tls'/'ssl' : « STARTTLS »
+                    // (choix distinct côté interface) s'y traduit en 'tls'.
+                    'encryption' => $encryption === 'starttls' ? 'tls' : ($encryption ?: null),
                     'timeout' => 10,
                 ]),
                 'mail.from' => [
@@ -505,7 +507,10 @@ protected function updateEnvFile(array $appInfo, array $endpoint, array $smtp): 
         'MAIL_PORT' => $smtp['mail_port'] ?? '',
         'MAIL_USERNAME' => $smtp['mail_username'] ?? '',
         'MAIL_PASSWORD' => $smtp['mail_password'] ?? '',
-        'MAIL_ENCRYPTION' => ($smtp['mail_encryption'] ?? '') ?: '',
+        // Toujours une valeur comprise nativement par le transport SMTP :
+        // « STARTTLS » (choix utilisateur) se traduit en 'tls' ici, car
+        // c'est ce que fait ce transport pour du STARTTLS.
+        'MAIL_ENCRYPTION' => (($smtp['mail_encryption'] ?? '') === 'starttls') ? 'tls' : (($smtp['mail_encryption'] ?? '') ?: ''),
         'MAIL_FROM_ADDRESS' => ($smtp['mail_from_address'] ?? '') ?: '',
         'MAIL_FROM_NAME' => ($smtp['mail_from_name'] ?? '') ?: '',
     ];

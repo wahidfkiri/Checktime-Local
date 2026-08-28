@@ -18,7 +18,10 @@ class EmployeePermission extends Model
         'end_time',
         'raison',
         'status',
-        'duration_minutes'
+        'duration_minutes',
+        'approved_by',
+        'approved_at',
+        'rejection_reason'
     ];
 
     protected $casts = [
