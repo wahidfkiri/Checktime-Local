@@ -274,6 +274,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::post('/rapport/presence-ponctualite/generate', [CustomReportController::class, 'generateCustomReport'])->name('reports.custom.generate');
         Route::post('/rapport/presence-ponctualite/export-pdf', [CustomReportController::class, 'exportCustomPdf'])->name('reports.custom.export.pdf');
         Route::post('/rapport/presence-ponctualite/export-dept-pdf', [CustomReportController::class, 'exportCustomPdfByDept'])->name('reports.export-department-pdf');
+        Route::post('/rapport/presence-ponctualite/export-excel', [CustomReportController::class, 'exportCustomExcel'])->name('reports.custom.export.excel');
     });
 
     // Missions

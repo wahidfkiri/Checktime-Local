@@ -31,6 +31,15 @@
                                             <input type="hidden" name="emp_code" id="pdf_emp_code">
                                             <input type="hidden" name="template_id" id="pdf_template_id">
                                         </form>
+
+                                        <!-- Formulaire pour export Excel (.xlsx) -->
+                                        <form id="exportExcelForm" action="{{ route('reports.custom.export.excel') }}" method="POST" style="display: none;">
+                                            @csrf
+                                            <input type="hidden" name="start_date" id="excel_start_date">
+                                            <input type="hidden" name="end_date" id="excel_end_date">
+                                            <input type="hidden" name="emp_code" id="excel_emp_code">
+                                            <input type="hidden" name="template_id" id="excel_template_id">
+                                        </form>
                                         
                                         <div class="row g-3">
                                             <div class="col-6 col-sm-4 col-lg-2">
@@ -101,7 +110,10 @@
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
                                                         <button type="button" class="btn btn-danger" id="export_dept_pdf">
-                                                            <i class="bi bi-file-pdf me-1"></i> Exporter
+                                                            <i class="bi bi-file-pdf me-1"></i> Exporter PDF
+                                                        </button>
+                                                        <button type="button" class="btn btn-success" id="export_excel">
+                                                            <i class="bi bi-file-earmark-excel me-1"></i> Exporter Excel
                                                         </button>
                                                     </div>
                                                 </div>
@@ -892,6 +904,22 @@ $(document).ready(function() {
         });
     }
 
+    // ========== EXPORT EXCEL (.xlsx) ==========
+
+    function exportToExcel() {
+        if (!validateDatesForExport()) return;
+
+        var startDate = $('#report_start_date').val();
+        var endDate = $('#report_end_date').val();
+
+        $('#excel_start_date').val(startDate);
+        $('#excel_end_date').val(endDate);
+        $('#excel_emp_code').val($('#report_emp_code').val());
+        $('#excel_template_id').val($('#report_template').val());
+        setDepartmentInputs($('#exportExcelForm'), getSelectedDepartments());
+        $('#exportExcelForm').submit();
+    }
+
     // ========== ÉVÉNEMENTS ==========
 
     $('#generate_report').on('click', function() {
@@ -900,6 +928,10 @@ $(document).ready(function() {
 
     $('#export_dept_pdf').on('click', function() {
         exportToPdfWithTemplate();
+    });
+
+    $('#export_excel').on('click', function() {
+        exportToExcel();
     });
     
     // Génération automatique UNIQUEMENT au chargement de la page

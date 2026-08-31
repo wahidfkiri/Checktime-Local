@@ -872,6 +872,108 @@ class CustomReportController extends Controller
     }
 
     /**
+     * Exporter le rapport présence & ponctualité en Excel (.xlsx).
+     *
+     * Reprend les mêmes filtres que la génération / l'export PDF et écrit
+     * les données résumées (une ligne par employé) dans un vrai fichier xlsx.
+     */
+    public function exportCustomExcel(Request $request)
+    {
+        try {
+            $validator = \Validator::make($request->all(), [
+                'start_date' => 'required|date',
+                'end_date'   => 'required|date|after_or_equal:start_date',
+                'emp_code'   => 'nullable|string',
+                'department_ids' => 'nullable|array',
+                'department_ids.*' => 'nullable|string'
+            ]);
+
+            if ($validator->fails()) {
+                return redirect()->back()->withErrors($validator)->withInput();
+            }
+
+            $startDate = $request->input('start_date');
+            $endDate   = $request->input('end_date');
+            $empCode   = $request->input('emp_code', 'all');
+            $departmentIds = $request->input('department_ids', ['all']);
+
+            if (in_array('all', (array) $departmentIds)) {
+                $departmentIds = ['all'];
+            }
+
+            // Même option week-ends que le modèle sélectionné (cohérence avec le PDF).
+            $template = ReportTemplate::resolveFor($request->input('template_id'));
+            $options  = $template->resolvedOptions();
+
+            $reportData = $this->getPresencePonctualiteData(
+                $startDate,
+                $endDate,
+                $empCode,
+                $departmentIds,
+                $options['show_weekends'] ?? false
+            );
+
+            $xlsx = new \App\Support\SimpleXlsxWriter('Présence & Ponctualité');
+            $xlsx->setColumnWidths([6, 14, 28, 22, 10, 10, 16, 12, 10, 18, 45]);
+
+            // Ligne de titre (période)
+            $xlsx->addRow([
+                'Rapport Présence & Ponctualité — du ' . Carbon::parse($startDate)->format('d/m/Y')
+                    . ' au ' . Carbon::parse($endDate)->format('d/m/Y'),
+            ], true);
+            $xlsx->addRow([]); // ligne vide
+
+            // En-têtes
+            $xlsx->addRow([
+                'N°', 'Code', 'Nom & Prénom', 'Département',
+                'Présent', 'Absent', 'Taux présence (%)',
+                'À l\'heure', 'Retard', 'Taux ponctualité (%)',
+                'Observations',
+            ], true);
+
+            $totalPresent = 0;
+            $totalAbsent  = 0;
+            $totalOnTime  = 0;
+            $totalLate    = 0;
+
+            foreach ($reportData as $row) {
+                $totalPresent += (int) ($row['presence_data']['present'] ?? 0);
+                $totalAbsent  += (int) ($row['presence_data']['absent'] ?? 0);
+                $totalOnTime  += (int) ($row['ponctualite_data']['on_time'] ?? 0);
+                $totalLate    += (int) ($row['ponctualite_data']['late'] ?? 0);
+
+                $xlsx->addRow([
+                    (int) ($row['order_number'] ?? 0),
+                    (string) ($row['employee_code'] ?? ''),
+                    (string) ($row['employee_name'] ?? ''),
+                    (string) ($row['department_name'] ?? ''),
+                    (int) ($row['presence_data']['present'] ?? 0),
+                    (int) ($row['presence_data']['absent'] ?? 0),
+                    (float) ($row['presence_data']['rate'] ?? 0),
+                    (int) ($row['ponctualite_data']['on_time'] ?? 0),
+                    (int) ($row['ponctualite_data']['late'] ?? 0),
+                    (float) ($row['ponctualite_data']['rate'] ?? 0),
+                    (string) ($row['observation'] ?? ''),
+                ]);
+            }
+
+            // Ligne des totaux
+            $xlsx->addRow([
+                '', '', 'TOTAUX', '',
+                $totalPresent, $totalAbsent, '',
+                $totalOnTime, $totalLate, '', '',
+            ], true);
+
+            $filename = 'rapport_presence_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.xlsx';
+            return $xlsx->download($filename);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur export Excel: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Erreur: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Calculer le retard en comparant check-in avec l'heure de début du planning
      */
     private function calculateLateFromPlanning($employee, $attendance, string $dateKey): array
