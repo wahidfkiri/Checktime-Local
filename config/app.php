@@ -191,6 +191,7 @@ return [
          Vendor\Planning\PlanningServiceProvider::class,
          Vendor\Attendance\AttendanceServiceProvider::class,
          Vendor\Report\ReportServiceProvider::class,
+         Vendor\BackupData\BackupDataServiceProvider::class,
 
         /*
          * Application Service Providers...

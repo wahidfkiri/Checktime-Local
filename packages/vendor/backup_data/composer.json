@@ -1,0 +1,21 @@
+{
+    "name": "vendor/backup-data",
+    "description": "A Laravel package to export the global database into a .zip (SQL + CSV) with export history",
+    "type": "library",
+    "autoload": {
+      "psr-4": {
+        "Vendor\\BackupData\\": "src/"
+      }
+    },
+    "require": {
+      "php": "^8.0",
+      "illuminate/support": "^9.0|^10.0"
+    },
+    "extra": {
+      "laravel": {
+        "providers": [
+          "Vendor\\BackupData\\BackupDataServiceProvider"
+        ]
+      }
+    }
+  }

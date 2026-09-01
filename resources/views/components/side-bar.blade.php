@@ -291,6 +291,12 @@
             <span>Utilisateurs</span>
           </a>
         </li>
+        <li class="sidebar-item @if(request()->routeIs('backup-data.*')) active @endif">
+          <a href="{{route('backup-data.index')}}" class="sidebar-link">
+            <i class="bi bi-database-down"></i>
+            <span>Sauvegarde des données</span>
+          </a>
+        </li>
         @endrole
 
       </ul>
