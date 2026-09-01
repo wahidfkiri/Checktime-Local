@@ -52,10 +52,9 @@
                                 </p>
                             </div>
                             <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                                <form action="{{ route('backup-data.export') }}" method="POST"
-                                      onsubmit="return confirmExport(this);">
+                                <form action="{{ route('backup-data.export') }}" method="POST" id="exportForm">
                                     @csrf
-                                    <button type="submit" class="btn btn-primary" id="btn-export">
+                                    <button type="button" class="btn btn-primary" id="btn-open-export">
                                         <i class="bi bi-download me-1"></i> Exporter la base
                                     </button>
                                 </form>
@@ -139,17 +138,125 @@
     </div>
 </div>
 
+<!-- Modal de confirmation d'export -->
+<div class="modal fade" id="exportConfirmModal" tabindex="-1" aria-labelledby="exportConfirmLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportConfirmLabel">
+                    <i class="bi bi-database-down me-1"></i> Confirmer l'export
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Voulez-vous générer une <strong>sauvegarde complète</strong> de la base de données ?</p>
+                <p class="text-muted mb-0 small">
+                    Un fichier <strong>.zip</strong> sera créé (<code>database.sql</code> + dossier <code>csv/</code>).
+                    Selon la taille de la base, l'opération peut durer un moment.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-export">
+                    <i class="bi bi-download me-1"></i> Confirmer l'export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de progression (non fermable) -->
+<div class="modal fade" id="exportProgressModal" tabindex="-1" aria-labelledby="exportProgressLabel"
+     data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Chargement…</span>
+                </div>
+                <h5 class="mb-3">Génération de la sauvegarde…</h5>
+                <div class="progress" style="height: 22px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         id="export-progress-bar" role="progressbar"
+                         style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <p class="text-muted small mt-3 mb-0" id="export-progress-text">Initialisation…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    function confirmExport(form) {
-        if (!confirm('Générer une sauvegarde complète de la base de données ?')) {
-            return false;
+    (function () {
+        var confirmModalEl  = document.getElementById('exportConfirmModal');
+        var progressModalEl = document.getElementById('exportProgressModal');
+
+        // Ouverture/fermeture compatibles Bootstrap 5 natif ou plugin jQuery.
+        function showModal(el) {
+            if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+            else if (window.jQuery && jQuery.fn.modal) { jQuery(el).modal('show'); }
         }
-        var btn = form.querySelector('#btn-export');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Génération en cours...';
+        function hideModal(el) {
+            if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).hide(); }
+            else if (window.jQuery && jQuery.fn.modal) { jQuery(el).modal('hide'); }
         }
-        return true;
-    }
+
+        var bar  = document.getElementById('export-progress-bar');
+        var text = document.getElementById('export-progress-text');
+
+        var steps = [
+            { p: 10,  m: 'Lecture des tables…' },
+            { p: 30,  m: 'Export de la structure (SQL)…' },
+            { p: 55,  m: 'Export des données…' },
+            { p: 75,  m: 'Génération des fichiers CSV…' },
+            { p: 90,  m: 'Compression de l\'archive .zip…' }
+        ];
+        var timer = null;
+
+        function setProgress(percent, message) {
+            var v = Math.min(Math.round(percent), 100);
+            bar.style.width = v + '%';
+            bar.setAttribute('aria-valuenow', v);
+            bar.textContent = v + '%';
+            if (message) { text.textContent = message; }
+        }
+
+        function startSimulatedProgress() {
+            var i = 0;
+            setProgress(3, 'Initialisation…');
+            timer = setInterval(function () {
+                if (i < steps.length) {
+                    setProgress(steps[i].p, steps[i].m);
+                    i++;
+                } else {
+                    // Palier : on approche 95% sans jamais atteindre 100%
+                    // (100% n'arrive qu'au retour serveur = rechargement de page).
+                    var current = parseInt(bar.getAttribute('aria-valuenow'), 10) || 90;
+                    if (current < 95) { setProgress(current + 1, 'Finalisation…'); }
+                }
+            }, 800);
+        }
+
+        // Ouvrir la confirmation
+        document.getElementById('btn-open-export').addEventListener('click', function () {
+            showModal(confirmModalEl);
+        });
+
+        // Confirmer -> progression + soumission du formulaire (POST plein page)
+        document.getElementById('btn-confirm-export').addEventListener('click', function () {
+            hideModal(confirmModalEl);
+            showModal(progressModalEl);
+            startSimulatedProgress();
+            // Laisse le temps à la modal de s'afficher avant de bloquer sur la requête
+            setTimeout(function () {
+                document.getElementById('exportForm').submit();
+            }, 300);
+        });
+
+        // Sécurité : stopper l'animation si l'utilisateur quitte la page
+        window.addEventListener('pagehide', function () {
+            if (timer) { clearInterval(timer); }
+        });
+    })();
 </script>
 @endsection

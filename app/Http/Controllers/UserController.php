@@ -49,6 +49,7 @@ class UserController extends Controller
                 'menu.devices' => 'Appareils',
                 'menu.settings' => 'Paramètres (toutes les sous-pages)',
                 'menu.report-templates' => "↳ Modèles d'export",
+                'menu.backup-data' => "↳ Sauvegarde des données",
             ],
         ];
     }

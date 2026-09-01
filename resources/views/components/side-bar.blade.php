@@ -256,13 +256,13 @@
         </li>
         @endcan
 
-        @canany(['menu.settings', 'menu.report-templates'])
-        <li class="sidebar-item has-sub @if(request()->routeIs('settings.*')) active @endif">
+        @canany(['menu.settings', 'menu.report-templates', 'menu.backup-data'])
+        <li class="sidebar-item has-sub @if(request()->routeIs('settings.*') || request()->routeIs('backup-data.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-gear"></i>
             <span>Paramètres</span>
           </a>
-          <ul class="submenu @if(request()->routeIs('settings.*')) active @endif">
+          <ul class="submenu @if(request()->routeIs('settings.*') || request()->routeIs('backup-data.*')) active @endif">
             @can('menu.settings')
             <li class="submenu-item @if(request()->routeIs('settings.index') || request()->routeIs('settings.signataires.*')) active @endif">
               <a href="{{route('settings.index')}}" class="submenu-link">
@@ -279,6 +279,14 @@
               </a>
             </li>
             @endcanany
+            @canany(['menu.settings', 'menu.backup-data'])
+            <li class="submenu-item @if(request()->routeIs('backup-data.*')) active @endif">
+              <a href="{{route('backup-data.index')}}" class="submenu-link">
+                <i class="bi bi-database-down"></i>
+                <span>Sauvegarde des données</span>
+              </a>
+            </li>
+            @endcanany
           </ul>
         </li>
         @endcanany
@@ -289,12 +297,6 @@
           <a href="{{route('users.index')}}" class="sidebar-link">
             <i class="bi bi-person-gear"></i>
             <span>Utilisateurs</span>
-          </a>
-        </li>
-        <li class="sidebar-item @if(request()->routeIs('backup-data.*')) active @endif">
-          <a href="{{route('backup-data.index')}}" class="sidebar-link">
-            <i class="bi bi-database-down"></i>
-            <span>Sauvegarde des données</span>
           </a>
         </li>
         @endrole
