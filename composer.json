@@ -34,7 +34,8 @@
             "Vendor\\Planning\\": "packages/vendor/planning/src",
             "Vendor\\Attendance\\": "packages/vendor/attendance/src",
             "Vendor\\Report\\": "packages/vendor/report/src",
-            "Vendor\\BackupData\\": "packages/vendor/backup_data/src"
+            "Vendor\\BackupData\\": "packages/vendor/backup_data/src",
+            "Vendor\\Journalisation\\": "packages/vendor/journalisation/src"
 
         }
     },

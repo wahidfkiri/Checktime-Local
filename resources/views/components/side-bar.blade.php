@@ -301,6 +301,16 @@
         </li>
         @endrole
 
+        {{-- Journal des activités — super-admin / admin uniquement --}}
+        @hasanyrole('admin|super-admin')
+        <li class="sidebar-item @if(request()->routeIs('journalisation.*')) active @endif">
+          <a href="{{route('journalisation.index')}}" class="sidebar-link">
+            <i class="bi bi-journal-text"></i>
+            <span>Journal des activités</span>
+          </a>
+        </li>
+        @endhasanyrole
+
       </ul>
     </div>
   </div>

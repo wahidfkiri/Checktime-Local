@@ -1,0 +1,21 @@
+{
+    "name": "vendor/journalisation",
+    "description": "A Laravel package to journal user activities (login, logout, CRUD, export) with admin viewing and Excel/PDF export",
+    "type": "library",
+    "autoload": {
+      "psr-4": {
+        "Vendor\\Journalisation\\": "src/"
+      }
+    },
+    "require": {
+      "php": "^8.0",
+      "illuminate/support": "^9.0|^10.0"
+    },
+    "extra": {
+      "laravel": {
+        "providers": [
+          "Vendor\\Journalisation\\JournalisationServiceProvider"
+        ]
+      }
+    }
+  }

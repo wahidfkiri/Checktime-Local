@@ -192,6 +192,7 @@ return [
          Vendor\Attendance\AttendanceServiceProvider::class,
          Vendor\Report\ReportServiceProvider::class,
          Vendor\BackupData\BackupDataServiceProvider::class,
+         Vendor\Journalisation\JournalisationServiceProvider::class,
 
         /*
          * Application Service Providers...
