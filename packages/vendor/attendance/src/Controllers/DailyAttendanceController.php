@@ -135,21 +135,28 @@ class DailyAttendanceController extends Controller
             ->sort()
             ->values();
         
-        // Récupérer les statistiques des retards
+        // Récupérer les statistiques des retards (tolérance appliquée : vrais retards)
         $today = Carbon::today()->format('Y-m-d');
+        $tolerance = $this->lateToleranceMinutes();
+        $applyTolerance = function ($query) use ($tolerance) {
+            $query->where('is_late', true);
+            if ($tolerance > 0) {
+                $query->where('late_minutes', '>', $tolerance);
+            }
+            return $query;
+        };
         $retardStats = [
-            'today' => DailyAttendance::whereRaw('1 = 1')
-                ->where('attendance_date', $today)
-                ->where('is_late', true)
-                ->count(),
-            'week' => DailyAttendance::whereRaw('1 = 1')
-                ->whereBetween('attendance_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
-                ->where('is_late', true)
-                ->count(),
-            'month' => DailyAttendance::whereRaw('1 = 1')
-                ->whereBetween('attendance_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
-                ->where('is_late', true)
-                ->count()
+            'today' => $applyTolerance(
+                DailyAttendance::whereRaw('1 = 1')->where('attendance_date', $today)
+            )->count(),
+            'week' => $applyTolerance(
+                DailyAttendance::whereRaw('1 = 1')
+                    ->whereBetween('attendance_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
+            )->count(),
+            'month' => $applyTolerance(
+                DailyAttendance::whereRaw('1 = 1')
+                    ->whereBetween('attendance_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
+            )->count(),
         ];
         
         return view('attendance::retard', compact('devices', 'employees', 'client', 'departments', 'retardStats'));
@@ -308,26 +315,33 @@ class DailyAttendanceController extends Controller
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee');
-            
+
+            // Tolérance de retard (Paramètres) : seuls les vrais retards
+            // (au-delà de la marge) sont retournés.
+            $tolerance = $this->lateToleranceMinutes();
+            if ($tolerance > 0) {
+                $query->where('late_minutes', '>', $tolerance);
+            }
+
             // Appliquer les filtres
             if ($empCode && $empCode !== 'all' && $empCode !== '') {
                 $query->where('emp_code', $empCode);
             }
-            
+
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
                 $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
-                
+
                 if (!empty($filteredEmployees)) {
                     $query->whereIn('employee_id', $filteredEmployees);
                 } else {
                     $query->whereRaw('1 = 0');
                 }
             }
-            
+
             // Filtrer par minutes de retard
             // if ($minLateMinutes) {
             //     $query->where('late_minutes', '>=', $minLateMinutes);
@@ -372,6 +386,19 @@ class DailyAttendanceController extends Controller
         } catch (\Exception $e) {
             Log::error('Erreur récupération données retards: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Marge de tolérance de retard (minutes) configurée dans les Paramètres.
+     * En deçà de cette marge, un pointage n'est pas considéré comme un retard.
+     */
+    private function lateToleranceMinutes(): int
+    {
+        try {
+            return (int) \App\Models\Setting::lateToleranceMinutes();
+        } catch (\Throwable $e) {
+            return 0;
         }
     }
 
@@ -617,7 +644,38 @@ class DailyAttendanceController extends Controller
         if ($attendance->is_early_leave) {
             $observations[] = "Départ anticipé";
         }
-        
+
+        return !empty($observations) ? implode(' | ', $observations) : '-';
+    }
+
+    /**
+     * Observation générique d'un pointage (présence / absence / retard),
+     * dérivée du statut et des indicateurs (retard, départ anticipé, notes…).
+     */
+    private function generateAttendanceObservation($attendance): string
+    {
+        $observations = [];
+        $status = strtoupper($attendance->status ?? '');
+
+        if ($status === 'ABSENT') {
+            $observations[] = 'Absence';
+        }
+        if (($attendance->late_minutes ?? 0) > 0) {
+            $observations[] = 'Retard de ' . $this->formatMinutesToHours($attendance->late_minutes);
+        }
+        if (!empty($attendance->is_early_leave)) {
+            $observations[] = 'Départ anticipé';
+        }
+        if ($status === 'HALF_DAY') {
+            $observations[] = 'Demi-journée';
+        }
+        if (!empty($attendance->is_overtime) || $status === 'OVERTIME') {
+            $observations[] = 'Heures supplémentaires';
+        }
+        if (!empty($attendance->notes)) {
+            $observations[] = $attendance->notes;
+        }
+
         return !empty($observations) ? implode(' | ', $observations) : '-';
     }
 
@@ -1989,29 +2047,35 @@ class DailyAttendanceController extends Controller
                 ->orderBy('attendance_date', 'desc')
                 // ->orderBy('late_minutes', 'desc')
                 ->orderBy('emp_code');
-            
+
+            // Tolérance de retard (Paramètres) : ne garder que les vrais retards.
+            $tolerance = $this->lateToleranceMinutes();
+            if ($tolerance > 0) {
+                $query->where('late_minutes', '>', $tolerance);
+            }
+
             // Appliquer les filtres
             if ($empCode && $empCode !== 'all' && $empCode !== '') {
                 $query->where('emp_code', $empCode);
             }
-            
+
             if ($department && $department !== '' && $department !== 'all') {
                 $allEmployees = Employee::whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
-                
+
                 if (!empty($filteredEmployees)) {
                     $query->whereIn('employee_id', $filteredEmployees);
                 } else {
                     $query->whereRaw('1 = 0');
                 }
             }
-            
+
             // if ($minLateMinutes) {
             //     $query->where('late_minutes', '>=', $minLateMinutes);
             // }
-            
+
             $attendances = $query->get();
             
             if ($attendances->isEmpty()) {
@@ -2228,6 +2292,197 @@ class DailyAttendanceController extends Controller
         }
     }
 
+    // ============================================================
+    //  EXPORTS EXCEL (.xlsx) — présences / absences / retards
+    // ============================================================
+
+    /**
+     * Bornes de dates communes aux exports (30 derniers jours par défaut).
+     */
+    private function resolveExportDates(Request $request): array
+    {
+        $startDate = $request->input('start_date') ?: Carbon::today()->subDays(30)->format('Y-m-d');
+        $endDate   = $request->input('end_date') ?: Carbon::today()->format('Y-m-d');
+        return [$startDate, $endDate];
+    }
+
+    /**
+     * Applique les filtres employé / département communs à une requête.
+     */
+    private function applyCommonFilters($query, Request $request)
+    {
+        $empCode    = $request->input('emp_code');
+        $department = $request->input('department');
+
+        if ($empCode && $empCode !== 'all' && $empCode !== '') {
+            $query->where('emp_code', $empCode);
+        }
+
+        if ($department && $department !== '' && $department !== 'all') {
+            $ids = Employee::whereRaw('1 = 1')->get()
+                ->filter(fn ($emp) => $emp->dept_name === $department)
+                ->pluck('id')->toArray();
+            $query->whereIn('employee_id', !empty($ids) ? $ids : [-1]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Export Excel des présences.
+     */
+    public function exportPresenceExcel(Request $request)
+    {
+        [$startDate, $endDate] = $this->resolveExportDates($request);
+
+        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
+            ->with('employee')
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('emp_code');
+
+        $this->applyCommonFilters($query, $request);
+
+        $status = $request->input('status');
+        if ($status && !in_array($status, ['', 'all'], true)) {
+            if ($status === 'late')        $query->where('is_late', true);
+            elseif ($status === 'early_leave') $query->where('is_early_leave', true);
+            elseif ($status === 'overtime')    $query->where('is_overtime', true);
+            elseif ($status === 'half_day')    $query->where('status', 'HALF_DAY');
+        }
+
+        $rows = $query->get();
+
+        $xlsx = new \App\Support\SimpleXlsxWriter('Présences');
+        $xlsx->setColumnWidths([12, 12, 26, 20, 10, 10, 10, 16, 8, 24, 32]);
+        $xlsx->addRow(['Rapport des présences — du ' . Carbon::parse($startDate)->format('d/m/Y')
+            . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
+        $xlsx->addRow([]);
+        $xlsx->addRow(['Date', 'Code', 'Nom & Prénom', 'Département', 'Arrivée', 'Départ',
+            'Heures', 'Statut', 'Retard', 'Observation', 'Notes'], true);
+
+        foreach ($rows as $a) {
+            $xlsx->addRow([
+                Carbon::parse($a->attendance_date)->format('d/m/Y'),
+                (string) $a->emp_code,
+                $this->employeeFullName($a),
+                (string) ($a->employee->dept_name ?? 'Non défini'),
+                $a->check_in ? Carbon::parse($a->check_in)->format('H:i') : '--:--',
+                $a->check_out ? Carbon::parse($a->check_out)->format('H:i') : '--:--',
+                (string) ($a->work_hours ?? ''),
+                (string) $this->getStatusLabel($a->status),
+                $a->is_late ? 'Oui' : 'Non',
+                (string) $this->generateAttendanceObservation($a),
+                (string) ($a->notes ?: '-'),
+            ]);
+        }
+
+        return $xlsx->download('rapport_presences_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Export Excel des absences.
+     */
+    public function exportAbsenceExcel(Request $request)
+    {
+        [$startDate, $endDate] = $this->resolveExportDates($request);
+
+        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            ->where('status', 'ABSENT')
+            ->with('employee')
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('emp_code');
+
+        $this->applyCommonFilters($query, $request);
+
+        $rows = $query->get();
+
+        $xlsx = new \App\Support\SimpleXlsxWriter('Absences');
+        $xlsx->setColumnWidths([12, 14, 12, 26, 20, 14, 30]);
+        $xlsx->addRow(['Rapport des absences — du ' . Carbon::parse($startDate)->format('d/m/Y')
+            . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
+        $xlsx->addRow([]);
+        $xlsx->addRow(['Date', 'Jour', 'Code', 'Nom & Prénom', 'Département', 'Statut', 'Notes'], true);
+
+        foreach ($rows as $a) {
+            $xlsx->addRow([
+                Carbon::parse($a->attendance_date)->format('d/m/Y'),
+                (string) $this->getFrenchDayName($a->attendance_date),
+                (string) $a->emp_code,
+                $this->employeeFullName($a),
+                (string) ($a->employee->dept_name ?? 'Non défini'),
+                (string) $this->getStatusLabel($a->status),
+                (string) ($a->notes ?: '-'),
+            ]);
+        }
+
+        return $xlsx->download('rapport_absences_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Export Excel des retards (avec application de la tolérance).
+     */
+    public function exportRetardExcel(Request $request)
+    {
+        [$startDate, $endDate] = $this->resolveExportDates($request);
+
+        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            ->where('is_late', true)
+            ->with('employee')
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('emp_code');
+
+        // Tolérance : ne garder que les vrais retards.
+        $tolerance = $this->lateToleranceMinutes();
+        if ($tolerance > 0) {
+            $query->where('late_minutes', '>', $tolerance);
+        }
+
+        $this->applyCommonFilters($query, $request);
+
+        $rows = $query->get();
+
+        $xlsx = new \App\Support\SimpleXlsxWriter('Retards');
+        $xlsx->setColumnWidths([12, 12, 12, 26, 20, 10, 14, 14, 14, 30]);
+        $xlsx->addRow(['Rapport des retards — du ' . Carbon::parse($startDate)->format('d/m/Y')
+            . ' au ' . Carbon::parse($endDate)->format('d/m/Y')
+            . ($tolerance > 0 ? '  (tolérance : ' . $tolerance . ' min)' : '')], true);
+        $xlsx->addRow([]);
+        $xlsx->addRow(['Date', 'Jour', 'Code', 'Nom & Prénom', 'Département', 'Arrivée',
+            'Retard (min)', 'Retard', 'Statut', 'Notes'], true);
+
+        foreach ($rows as $a) {
+            $lateMinutes = (int) ($a->late_minutes ?? 0);
+            $xlsx->addRow([
+                Carbon::parse($a->attendance_date)->format('d/m/Y'),
+                (string) $this->getFrenchDayName($a->attendance_date),
+                (string) $a->emp_code,
+                $this->employeeFullName($a),
+                (string) ($a->employee->dept_name ?? 'Non défini'),
+                $a->check_in ? Carbon::parse($a->check_in)->format('H:i') : '--:--',
+                $lateMinutes,
+                (string) $this->formatMinutesToHours($lateMinutes),
+                (string) $this->getStatusLabel($a->status),
+                (string) ($a->notes ?: '-'),
+            ]);
+        }
+
+        return $xlsx->download('rapport_retards_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Nom complet d'un employé lié à un pointage.
+     */
+    private function employeeFullName($attendance): string
+    {
+        if (!$attendance->employee) {
+            return 'Employé ' . $attendance->emp_code;
+        }
+        $name = trim(($attendance->employee->first_name ?? '')
+            . ' ' . ($attendance->employee->last_name ?? ''));
+        return $name !== '' ? $name : ('Employé ' . $attendance->emp_code);
+    }
+
     /**
      * Télécharger un fichier temporaire
      */
@@ -2261,10 +2516,10 @@ class DailyAttendanceController extends Controller
             // Heure théorique d'arrivée (par défaut 09:00)
             $theoreticalStartTime = '09:00';
             $actualCheckIn = $attendance->check_in ? Carbon::parse($attendance->check_in)->format('H:i') : '--:--';
-            
+
             // Calcul du retard en minutes
-            // $lateMinutes = $attendance->late_minutes ?? 0;
-            
+            $lateMinutes = $attendance->late_minutes ?? 0;
+
             return [
                 'date' => Carbon::parse($attendance->attendance_date)->format('d/m/Y'),
                 'day_name' => $this->getFrenchDayName($attendance->attendance_date),
@@ -2273,10 +2528,11 @@ class DailyAttendanceController extends Controller
                 'dept_name' => $attendance->employee->dept_name ?? 'Non défini',
                 'check_in' => $actualCheckIn,
                 'theoretical_start' => $theoreticalStartTime,
-                // 'late_minutes' => $lateMinutes,
+                'late_minutes' => $lateMinutes,
                 'late_hours' => $this->formatMinutesToHours($lateMinutes),
                 'status' => $attendance->status,
-                'notes' => $attendance->notes ?: '-'
+                'notes' => $attendance->notes ?: '-',
+                'observation' => $this->generateRetardObservation($attendance)
             ];
         })->toArray();
     }
@@ -2309,7 +2565,8 @@ class DailyAttendanceController extends Controller
                 'status' => $this->getStatusLabel($attendance->status),
                 'is_late' => $attendance->is_late ? 'Oui' : 'Non',
                 // 'late_minutes' => $attendance->late_minutes ?? 0,
-                'notes' => $attendance->notes ?: '-'
+                'notes' => $attendance->notes ?: '-',
+                'observation' => $this->generateAttendanceObservation($attendance)
             ];
         })->toArray();
     }

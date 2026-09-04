@@ -30,6 +30,7 @@ class EmployeePermission extends Model
         'date_fin' => 'date',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
+        'approved_at' => 'datetime',
     ];
 
     /**

@@ -154,9 +154,12 @@
                             </div>
                         </div>
 
-                        <!-- Bouton export PDF -->
-                        <div class="row mb-3 d-none">
+                        <!-- Boutons export -->
+                        <div class="row mb-3">
                             <div class="col-md-12 text-end">
+                                <button type="button" id="exportExcelBtn" class="btn btn-success">
+                                    <i class="fas fa-file-excel me-1"></i> Exporter Excel
+                                </button>
                                 <button type="button" id="exportPdfBtn" class="btn btn-danger">
                                     <i class="fas fa-file-pdf me-1"></i> Exporter PDF
                                 </button>
@@ -691,14 +694,40 @@ $(document).ready(function() {
         });
     });
     
+    // ========== EXPORT EXCEL ==========
+
+    $('#exportExcelBtn').click(function() {
+        var startDate = $('#filter_start_date').val();
+        var endDate = $('#filter_end_date').val();
+        var empCode = $('#filter_emp_code').val();
+        var department = $('#filter_department').val();
+
+        if (!startDate || !endDate) {
+            showSweetAlert('error', 'Erreur', 'Veuillez sélectionner une période valide pour l\'export.');
+            return;
+        }
+        if (new Date(startDate) > new Date(endDate)) {
+            showSweetAlert('error', 'Erreur', 'La date de début ne peut pas être après la date de fin.');
+            return;
+        }
+
+        var params = $.param({
+            start_date: startDate,
+            end_date: endDate,
+            emp_code: empCode === 'all' ? '' : (empCode || ''),
+            department: department === 'all' ? '' : (department || '')
+        });
+        window.location.href = "{{ route('admin.daily-attendance.retard.export-excel') }}?" + params;
+    });
+
     // ========== EXPORT PDF ==========
-    
+
     $('#exportPdfBtn').click(function() {
         var startDate = $('#filter_start_date').val();
         var endDate = $('#filter_end_date').val();
         var empCode = $('#filter_emp_code').val();
         var department = $('#filter_department').val();
-        
+
         // Validation des dates
         if (!startDate || !endDate) {
             showSweetAlert('error', 'Erreur', 'Veuillez sélectionner une période valide pour l\'export.');

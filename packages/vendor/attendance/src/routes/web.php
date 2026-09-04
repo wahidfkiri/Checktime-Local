@@ -36,6 +36,7 @@ Route::prefix('admin/daily-attendance')->group(function () {
         Route::get('presences', [DailyAttendanceController::class, 'presenceList'])->name('admin.daily-attendance.presence');
         Route::get('presences/data', [DailyAttendanceController::class, 'getPresenceData'])->name('admin.daily-attendance.presence.data');
         Route::post('presences/export-pdf', [DailyAttendanceController::class, 'exportPresencePdf'])->name('admin.daily-attendance.presences.export-pdf');
+        Route::get('presences/export-excel', [DailyAttendanceController::class, 'exportPresenceExcel'])->name('admin.daily-attendance.presences.export-excel');
     });
 
     // Liste des absences
@@ -43,6 +44,7 @@ Route::prefix('admin/daily-attendance')->group(function () {
         Route::get('absences', [DailyAttendanceController::class, 'absenceList'])->name('admin.daily-attendance.absence');
         Route::get('absences/data', [DailyAttendanceController::class, 'getAbsenceData'])->name('admin.daily-attendance.absence.data');
         Route::post('absence/export-pdf', [DailyAttendanceController::class, 'exportAbsencePdf'])->name('admin.daily-attendance.absence.export-pdf');
+        Route::get('absences/export-excel', [DailyAttendanceController::class, 'exportAbsenceExcel'])->name('admin.daily-attendance.absence.export-excel');
     });
 
     // Liste des retards
@@ -50,6 +52,7 @@ Route::prefix('admin/daily-attendance')->group(function () {
         Route::get('retards', [DailyAttendanceController::class, 'retardList'])->name('admin.daily-attendance.retards');
         Route::get('/retards/data', [DailyAttendanceController::class, 'getRetardData'])->name('admin.daily-attendance.retard.data');
         Route::post('/retards/export-pdf', [DailyAttendanceController::class, 'exportRetardPdf'])->name('admin.daily-attendance.retard.export-pdf');
+        Route::get('/retards/export-excel', [DailyAttendanceController::class, 'exportRetardExcel'])->name('admin.daily-attendance.retard.export-excel');
         Route::post('/retards/justify', [DailyAttendanceController::class, 'justifyRetard'])->name('admin.daily-attendance.justify-retard');
     });
 });
