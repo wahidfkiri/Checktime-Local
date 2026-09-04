@@ -89,6 +89,7 @@
                 <th>Théorique</th>
                 <th>Retard</th>
                 <th>Statut</th>
+                <th>Observation</th>
                 <th>Notes</th>
             </tr>
         </thead>
@@ -104,6 +105,7 @@
                 <td>{{ $a['theoretical_start'] }}</td>
                 <td>{{ $a['late_hours'] }}</td>
                 <td><span class="status-badge status-late">{{ $a['status'] }}</span></td>
+                <td>{{ $a['observation'] ?? '-' }}</td>
                 <td>{{ $a['notes'] }}</td>
             </tr>
             @endforeach

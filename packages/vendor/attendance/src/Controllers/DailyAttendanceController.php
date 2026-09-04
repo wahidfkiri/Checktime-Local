@@ -2398,11 +2398,11 @@ class DailyAttendanceController extends Controller
         $rows = $query->get();
 
         $xlsx = new \App\Support\SimpleXlsxWriter('Absences');
-        $xlsx->setColumnWidths([12, 14, 12, 26, 20, 14, 30]);
+        $xlsx->setColumnWidths([12, 14, 12, 26, 20, 14, 24, 32]);
         $xlsx->addRow(['Rapport des absences — du ' . Carbon::parse($startDate)->format('d/m/Y')
             . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
         $xlsx->addRow([]);
-        $xlsx->addRow(['Date', 'Jour', 'Code', 'Nom & Prénom', 'Département', 'Statut', 'Notes'], true);
+        $xlsx->addRow(['Date', 'Jour', 'Code', 'Nom & Prénom', 'Département', 'Statut', 'Observation', 'Notes'], true);
 
         foreach ($rows as $a) {
             $xlsx->addRow([
@@ -2412,6 +2412,7 @@ class DailyAttendanceController extends Controller
                 $this->employeeFullName($a),
                 (string) ($a->employee->dept_name ?? 'Non défini'),
                 (string) $this->getStatusLabel($a->status),
+                (string) $this->generateAttendanceObservation($a),
                 (string) ($a->notes ?: '-'),
             ]);
         }
@@ -2443,13 +2444,13 @@ class DailyAttendanceController extends Controller
         $rows = $query->get();
 
         $xlsx = new \App\Support\SimpleXlsxWriter('Retards');
-        $xlsx->setColumnWidths([12, 12, 12, 26, 20, 10, 14, 14, 14, 30]);
+        $xlsx->setColumnWidths([12, 12, 12, 26, 20, 10, 14, 14, 14, 24, 30]);
         $xlsx->addRow(['Rapport des retards — du ' . Carbon::parse($startDate)->format('d/m/Y')
             . ' au ' . Carbon::parse($endDate)->format('d/m/Y')
             . ($tolerance > 0 ? '  (tolérance : ' . $tolerance . ' min)' : '')], true);
         $xlsx->addRow([]);
         $xlsx->addRow(['Date', 'Jour', 'Code', 'Nom & Prénom', 'Département', 'Arrivée',
-            'Retard (min)', 'Retard', 'Statut', 'Notes'], true);
+            'Retard (min)', 'Retard', 'Statut', 'Observation', 'Notes'], true);
 
         foreach ($rows as $a) {
             $lateMinutes = (int) ($a->late_minutes ?? 0);
@@ -2463,6 +2464,7 @@ class DailyAttendanceController extends Controller
                 $lateMinutes,
                 (string) $this->formatMinutesToHours($lateMinutes),
                 (string) $this->getStatusLabel($a->status),
+                (string) $this->generateRetardObservation($a),
                 (string) ($a->notes ?: '-'),
             ]);
         }

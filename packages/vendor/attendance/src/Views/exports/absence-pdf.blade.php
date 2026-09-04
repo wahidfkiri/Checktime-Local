@@ -91,6 +91,7 @@
                 <th>Heures</th>
                 <th>Statut</th>
                 <th>Retard</th>
+                <th>Observation</th>
                 <th>Notes</th>
             </tr>
         </thead>
@@ -106,6 +107,7 @@
                 <td>{{ $a['work_hours'] }}</td>
                 <td><span class="status-badge status-absent">{{ $a['status'] }}</span></td>
                 <td>{{ $a['is_late'] }}</td>
+                <td>{{ $a['observation'] ?? '-' }}</td>
                 <td>{{ $a['notes'] }}</td>
             </tr>
             @endforeach

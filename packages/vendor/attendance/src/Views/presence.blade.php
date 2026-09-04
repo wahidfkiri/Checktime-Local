@@ -106,19 +106,7 @@
                                                 <div class="form-group text-start">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
                                                     <div class="btn-group" role="group">
-                                                        <button type="button" class="btn btn-primary" id="apply_filters">
-                                                            <i class="bi bi-funnel me-1"></i> Appliquer
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-primary ms-2" id="today_button">
-                                                            <i class="bi bi-calendar-check me-1"></i> Aujourd'hui
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-secondary ms-2" id="last_week_button">
-                                                            <i class="bi bi-calendar-week me-1"></i> 7 derniers jours
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-info ms-2" id="this_month_button">
-                                                            <i class="bi bi-calendar-month me-1"></i> Ce mois
-                                                        </button>
-                                                        <button type="button" id="syncDataBtn" class="btn btn-success ms-2">
+                                                        <button type="button" id="syncDataBtn" class="btn btn-success">
                                                             <i class="fas fa-sync-alt me-1"></i> Synchroniser
                                                         </button>
                                                     </div>
@@ -411,7 +399,7 @@ $(document).ready(function() {
                                 });
 
                                 // Recharger le tableau des présences avec les filtres actuels
-                                $('#apply_filters').click();
+                                applyPresenceFilters(false);
                             }, 500);
                         } else {
                             clearInterval(progressInterval);
@@ -441,10 +429,7 @@ $(document).ready(function() {
     // Progression pour la génération des données
     function showDataProgress(title, details = '') {
         isGeneratingReport = true;
-        $('#apply_filters').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Traitement...');
-        $('#today_button').prop('disabled', true);
-        $('#last_week_button').prop('disabled', true);
-        $('#this_month_button').prop('disabled', true);
+        $('#syncDataBtn, #exportExcelBtn, #exportPdfBtn').prop('disabled', true);
         
         $('#data-progress-title').text(title || 'Génération du rapport en cours...');
         $('#data-progress-details').html('<i class="bi bi-info-circle me-1"></i> ' + details);
@@ -461,10 +446,7 @@ $(document).ready(function() {
     
     function hideDataProgress() {
         isGeneratingReport = false;
-        $('#apply_filters').prop('disabled', false).html('<i class="bi bi-funnel me-1"></i> Appliquer');
-        $('#today_button').prop('disabled', false);
-        $('#last_week_button').prop('disabled', false);
-        $('#this_month_button').prop('disabled', false);
+        $('#syncDataBtn, #exportExcelBtn, #exportPdfBtn').prop('disabled', false);
         $('#data-progress-container').addClass('d-none');
         $('#presences-table').show();
     }
@@ -809,22 +791,23 @@ $(document).ready(function() {
     
     // ========== GESTION DES FILTRES ==========
     
-    // Appliquer les filtres avec barre de progression
-    $('#apply_filters').on('click', function() {
+    // Applique les filtres (barre de progression) — déclenché par un changement
+    // de filtre ou après une synchronisation, il n'y a plus de bouton "Appliquer".
+    function applyPresenceFilters(showToast) {
         var startDate = $('#filter_start_date').val();
         var endDate = $('#filter_end_date').val();
-        
+
         // Validation des dates
         if (!startDate || !endDate) {
             showSweetAlert('error', 'Erreur', 'Veuillez sélectionner une période valide.');
             return;
         }
-        
+
         if (new Date(startDate) > new Date(endDate)) {
             showSweetAlert('error', 'Erreur', 'La date de début ne peut pas être après la date de fin.');
             return;
         }
-        
+
         var daysDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
         var details = 'Analyse de ' + daysDiff + ' jours (du ' + startDate + ' au ' + endDate + ')';
         
@@ -850,34 +833,25 @@ $(document).ready(function() {
             
             setTimeout(function() {
                 hideDataProgress();
-                showSweetAlert('success', 'Succès', 'Données chargées avec succès.', 2000);
+                if (showToast) {
+                    showSweetAlert('success', 'Succès', 'Données chargées avec succès.', 2000);
+                }
             }, 800);
         });
-    });
-    
-    // Bouton Aujourd'hui
-    $('#today_button').on('click', function() {
-        $('#filter_start_date').val(todayDate);
-        $('#filter_end_date').val(todayDate);
-        $('#apply_filters').click(); // Déclencher la même fonction que le bouton Appliquer
-    });
-    
-    // Bouton 7 derniers jours
-    $('#last_week_button').on('click', function() {
-        var lastWeek = getDateDaysAgo(7);
-        $('#filter_start_date').val(lastWeek);
-        $('#filter_end_date').val(todayDate);
-        $('#apply_filters').click(); // Déclencher la même fonction que le bouton Appliquer
-    });
-    
-    // Bouton Ce mois
-    $('#this_month_button').on('click', function() {
-        var firstDay = getFirstDayOfMonth();
-        $('#filter_start_date').val(firstDay);
-        $('#filter_end_date').val(todayDate);
-        $('#apply_filters').click(); // Déclencher la même fonction que le bouton Appliquer
-    });
-    
+    }
+
+    // Le tableau se recharge dès qu'un filtre change (petit délai pour laisser
+    // le temps de modifier les deux dates avant de relancer la requête).
+    var filterChangeTimer = null;
+    $('#filter_start_date, #filter_end_date, #filter_department, #filter_emp_code, #filter_status')
+        .on('change', function() {
+            clearTimeout(filterChangeTimer);
+            filterChangeTimer = setTimeout(function() {
+                applyPresenceFilters(false);
+            }, 400);
+        });
+
+
     // ========== EXPORT EXCEL ==========
 
     $('#exportExcelBtn').click(function() {

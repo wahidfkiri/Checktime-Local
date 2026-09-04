@@ -454,7 +454,7 @@ class ReportController extends Controller
             'schedule_data' => $schedule ? json_encode($schedule) : null,
         ];
     }
-    
+
     /**
      * Récupérer le planning d'un employé pour une date spécifique (supporte 3 types)
      */

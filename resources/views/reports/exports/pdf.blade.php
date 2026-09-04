@@ -302,7 +302,7 @@
                             <th style="width: 8%;">Départ anticipé</th>
                             <th style="width: 8%;">Heures travaillées</th>
                             <th style="width: 10%;">Statut</th>
-                            <th style="width: 19%;">Remarques</th>
+                            <th style="width: 19%;">Observation</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -372,6 +372,8 @@
                             if ($record['is_on_leave']) $remarks[] = 'En congé';
                             if ($record['has_permission']) $remarks[] = 'Permission';
                             if ($record['schedule_type'] == 'Non planifié') $remarks[] = 'Non planifié';
+                            if (($record['late_minutes'] ?? 0) > 0) $remarks[] = 'Retard ' . $record['late_minutes'] . ' min';
+                            if (($record['early_leave_minutes'] ?? 0) > 0) $remarks[] = 'Départ anticipé ' . $record['early_leave_minutes'] . ' min';
                             if (!empty($record['all_punches'])) {
                                 $remarks[] = count($record['all_punches']) . ' pointage(s)';
                             }

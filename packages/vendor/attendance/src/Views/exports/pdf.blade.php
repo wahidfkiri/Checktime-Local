@@ -280,6 +280,7 @@
                 <th class="column-hours">Durée</th>
                 <th class="column-status">Statut</th>
                 <th class="column-matched">Enregistré</th>
+                <th class="column-observation">Observation</th>
             </tr>
         </thead>
         <tbody>
@@ -335,6 +336,7 @@
                 <td class="text-center">
                     {{ $attendance['is_late'] ?? 'Non' }}
                 </td>
+                <td>{{ $attendance['observation'] ?? '-' }}</td>
             </tr>
             @endforeach
             
