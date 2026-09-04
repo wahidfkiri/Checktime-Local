@@ -38,6 +38,9 @@ class ActivityLog extends Model
         'update'       => 'Modification',
         'delete'       => 'Suppression',
         'export'       => 'Export / Téléchargement',
+        'sync'         => 'Synchronisation',
+        'import'       => 'Import',
+        'backup'       => 'Sauvegarde',
     ];
 
     public function getActionLabelAttribute(): string
@@ -58,6 +61,9 @@ class ActivityLog extends Model
             'update'       => 'warning',
             'delete'       => 'danger',
             'export'       => 'info',
+            'sync'         => 'primary',
+            'import'       => 'primary',
+            'backup'       => 'dark',
         ][$this->action] ?? 'dark';
     }
 

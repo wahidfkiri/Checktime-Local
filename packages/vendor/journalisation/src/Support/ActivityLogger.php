@@ -19,6 +19,28 @@ class ActivityLogger
     private static ?bool $tableExists = null;
 
     /**
+     * Quand true, les observers de modèles ne journalisent plus.
+     *
+     * Utilisé pendant les synchronisations / imports : ces opérations créent ou
+     * modifient des centaines de lignes, on veut une seule entrée « Synchronisation »
+     * plutôt qu'une entrée par employé.
+     */
+    private static bool $modelLogsSuppressed = false;
+
+    /**
+     * Active / désactive la journalisation automatique des modèles.
+     */
+    public static function suppressModelLogs(bool $suppress = true): void
+    {
+        self::$modelLogsSuppressed = $suppress;
+    }
+
+    public static function modelLogsSuppressed(): bool
+    {
+        return self::$modelLogsSuppressed;
+    }
+
+    /**
      * @param  string       $action       login|logout|create|update|delete|export|…
      * @param  string|null  $description  Texte lisible.
      * @param  Model|null   $subject      Modèle concerné (optionnel).
@@ -46,7 +68,7 @@ class ActivityLogger
                 'action'       => $action,
                 'description'  => $description,
                 'subject_type' => $subject ? get_class($subject) : null,
-                'subject_id'   => $subject->getKey() ?? null,
+                'subject_id'   => $subject?->getKey(),
                 'method'       => $request?->method(),
                 'url'          => $request ? $request->fullUrl() : null,
                 'route'        => optional($request?->route())->getName(),

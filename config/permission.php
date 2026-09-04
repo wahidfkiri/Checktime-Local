@@ -119,7 +119,9 @@ return [
      *
      * To enable, set to true, and then create listeners to watch these events.
      */
-    'events_enabled' => false,
+    // Activé pour que le module Journalisation trace les changements de rôles
+    // et de permissions des utilisateurs (cf. JournalisationServiceProvider).
+    'events_enabled' => true,
 
     /*
      * Teams Feature.

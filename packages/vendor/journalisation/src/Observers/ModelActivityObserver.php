@@ -72,11 +72,13 @@ class ModelActivityObserver
     }
 
     /**
-     * Ne pas journaliser depuis la console (migrations, seeders, tinker, jobs).
+     * Ne pas journaliser depuis la console (migrations, seeders, tinker, jobs),
+     * ni pendant une synchronisation / un import (une seule entrée globale suffit,
+     * cf. LogRequestActivity).
      */
     private function shouldSkip(): bool
     {
-        return app()->runningInConsole();
+        return app()->runningInConsole() || ActivityLogger::modelLogsSuppressed();
     }
 
     /**
