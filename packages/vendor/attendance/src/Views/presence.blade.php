@@ -101,23 +101,14 @@
                                                 </div>
                                             </div>
                                             
-                                            <!-- Boutons -->
-                                            <div class="col-md-4">
-                                                <div class="form-group text-start">
-                                                    <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
-                                                    <div class="btn-group" role="group">
-                                                        <button type="button" id="syncDataBtn" class="btn btn-success">
-                                                            <i class="fas fa-sync-alt me-1"></i> Synchroniser
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Boutons export -->
-                                            <div class="col-md-4">
+                                            <!-- Boutons : synchronisation + exports -->
+                                            <div class="col-md-9">
                                                 <div class="form-group text-end">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
-                                                    <button type="button" id="exportExcelBtn" class="btn btn-success">
+                                                    <button type="button" id="syncDataBtn" class="btn btn-success me-2">
+                                                        <i class="fas fa-sync-alt me-1"></i> Synchroniser
+                                                    </button>
+                                                    <button type="button" id="exportExcelBtn" class="btn btn-success me-2">
                                                         <i class="fas fa-file-excel me-1"></i> Exporter Excel
                                                     </button>
                                                     <button type="button" id="exportPdfBtn" class="btn btn-danger">
