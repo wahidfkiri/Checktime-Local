@@ -38,13 +38,13 @@ class JournalisationController extends Controller
         $logs = $this->filteredQuery($request)->orderByDesc('created_at')->get();
 
         $xlsx = new SimpleXlsxWriter('Journal des activités');
-        $xlsx->setColumnWidths([20, 26, 18, 45, 22, 16, 30]);
+        $xlsx->setColumnWidths([20, 26, 18, 60, 16, 30]);
 
         $xlsx->addRow(['Journal des activités — exporté le ' . now()->format('d/m/Y H:i')], true);
         $xlsx->addRow([]);
         $xlsx->addRow([
             'Date & heure', 'Utilisateur', 'Action', 'Description',
-            'Objet', 'Adresse IP', 'Route',
+            'Adresse IP', 'Route',
         ], true);
 
         foreach ($logs as $log) {
@@ -53,7 +53,6 @@ class JournalisationController extends Controller
                 (string) ($log->user_name ?? '—'),
                 (string) $log->action_label,
                 (string) ($log->description ?? ''),
-                (string) ($log->subject_short ? $log->subject_short . ' #' . $log->subject_id : ''),
                 (string) ($log->ip_address ?? ''),
                 (string) ($log->route ?? ''),
             ]);

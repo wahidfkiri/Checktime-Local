@@ -90,7 +90,6 @@
                                         <th>Utilisateur</th>
                                         <th>Action</th>
                                         <th>Description</th>
-                                        <th>Objet</th>
                                         <th>IP</th>
                                         <th>Route</th>
                                     </tr>
@@ -102,13 +101,12 @@
                                             <td>{{ $log->user_name ?? '—' }}</td>
                                             <td><span class="badge bg-{{ $log->action_color }}">{{ $log->action_label }}</span></td>
                                             <td class="small">{{ $log->description }}</td>
-                                            <td class="small">{{ $log->subject_short ? $log->subject_short . ' #' . $log->subject_id : '—' }}</td>
                                             <td class="small font-monospace">{{ $log->ip_address }}</td>
                                             <td class="small text-muted">{{ $log->route }}</td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">
+                                            <td colspan="6" class="text-center text-muted py-4">
                                                 <i class="bi bi-inbox me-1"></i> Aucune activité enregistrée pour ces critères.
                                             </td>
                                         </tr>
