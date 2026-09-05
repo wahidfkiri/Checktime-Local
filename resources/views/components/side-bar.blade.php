@@ -61,13 +61,13 @@
         @endcanany
 
         <!-- Gestion des Plannings -->
-@canany(['menu.work-hours', 'menu.employee-schedules', 'menu.schedules', 'menu.holidays'])
-<li class="sidebar-item has-sub @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('employee-schedules.*') || request()->routeIs('holidays.*')) active @endif">
+@canany(['menu.work-hours', 'menu.employee-schedules', 'menu.schedules'])
+<li class="sidebar-item has-sub @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('employee-schedules.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-calendar-week-fill"></i>
         <span>Gestion des <br>Plannings</span>
     </a>
-    <ul class="submenu @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('schedules.*') || request()->routeIs('rotations.*') || request()->routeIs('holidays.*')) active @endif">
+    <ul class="submenu @if(request()->routeIs('schedules.*') || request()->routeIs('work-hours.*') || request()->routeIs('schedules.*') || request()->routeIs('rotations.*')) active @endif">
         <!-- Types d'horaires -->
         @can('menu.work-hours')
         <li class="submenu-item @if(request()->routeIs('work-hours.*')) active @endif">
@@ -103,26 +103,18 @@
             </a>
         </li>
         @endcan
-        @can('menu.holidays')
-        <li class="submenu-item @if(request()->routeIs('holidays.*')) active @endif">
-            <a href="{{ route('holidays.index') }}" class="submenu-link">
-                <i class="bi bi-calendar-event"></i>
-                <span>Jours Fériés</span>
-            </a>
-        </li>
-        @endcan
     </ul>
 </li>
 @endcanany
 
         <!-- Gestion des autorisations -->
-        @canany(['menu.employee-permissions', 'menu.missions', 'menu.leaves'])
-        <li class="sidebar-item has-sub @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*')) active @endif">
+        @canany(['menu.employee-permissions', 'menu.missions', 'menu.leaves', 'menu.holidays'])
+        <li class="sidebar-item has-sub @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*') || request()->routeIs('holidays.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-clipboard-check-fill"></i>
             <span>Gestion des<br> autorisations</span>
           </a>
-          <ul class="submenu @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*')) active @endif">
+          <ul class="submenu @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*') || request()->routeIs('holidays.*')) active @endif">
             <!-- Absences -->
             <!-- <li class="submenu-item @if(request()->routeIs('absences.*')) active @endif">
               <a href="{{route('authorizations.absences.index')}}">
@@ -161,6 +153,14 @@
               <a href="{{route('leaves.index')}}" class="submenu-link">
                 <i class="bi bi-calendar-check"></i>
                 <span>Congés</span>
+              </a>
+            </li>
+            @endcan
+            @can('menu.holidays')
+            <li class="submenu-item @if(request()->routeIs('holidays.*')) active @endif">
+              <a href="{{ route('holidays.index') }}" class="submenu-link">
+                <i class="bi bi-calendar-event"></i>
+                <span>Jours Fériés</span>
               </a>
             </li>
             @endcan

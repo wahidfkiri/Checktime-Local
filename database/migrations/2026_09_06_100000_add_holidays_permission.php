@@ -9,7 +9,7 @@ return new class extends Migration
     public static function permissions(): array
     {
         return [
-            'menu.holidays' => 'Plannings — Jours Fériés',
+            'menu.holidays' => 'Autorisations — Jours Fériés',
         ];
     }
 
