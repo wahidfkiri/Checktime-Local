@@ -32,7 +32,7 @@
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label for="employee_filter">Employé</label>
-                                    <select class="form-control" id="employee_filter">
+                                    <select class="form-control search_utilisateur" id="employee_filter">
                                         <option value="">Tous les employés</option>
                                         @foreach($employees as $employee)
                                             <option value="{{ $employee->id }}">
@@ -128,7 +128,7 @@
                         <div class="col-md-12">
                             <label class="form-label">Employé(s) <span class="text-danger">*</span></label>
                             <div class="d-flex gap-2 mb-2">
-                                <select class="form-control" id="employee_id">
+                                <select class="form-control search_utilisateur" id="employee_id">
                                     <option value="">Sélectionner un employé</option>
                                     @foreach($employees as $employee)
                                         <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -228,7 +228,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="edit_employee_id" class="form-label">Employé <span class="text-danger">*</span></label>
-                            <select class="form-control" id="edit_employee_id" name="employee_id" required>
+                            <select class="form-control search_utilisateur" id="edit_employee_id" name="employee_id" required>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
@@ -341,7 +341,9 @@
     </div>
 </div>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/sumoselect.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/jquery.sumoselect.min.js"></script>
 <script>
 $(document).ready(function() {
     // Variables globales
@@ -349,6 +351,9 @@ $(document).ready(function() {
     let permissionToDelete = null;
     let table;
     let selectedEmployees = [];
+
+    // Champ employé avec recherche (comme /leaves)
+    $('.search_utilisateur').SumoSelect({search: true, searchText: 'Rechercher...'});
 
     // ========== SÉLECTION MULTIPLE D'EMPLOYÉS (création de permission) ==========
 
@@ -377,6 +382,7 @@ $(document).ready(function() {
             selectedEmployees.push(employeeId);
             updateSelectedEmployeesList();
             $('#employee_id').val('');
+            if ($('#employee_id')[0] && $('#employee_id')[0].sumo) { $('#employee_id')[0].sumo.reload(); }
         }
     });
 
@@ -399,11 +405,13 @@ $(document).ready(function() {
             });
             updateSelectedEmployeesList();
             $('#employee_id').prop('disabled', true);
+            if ($('#employee_id')[0] && $('#employee_id')[0].sumo) { $('#employee_id')[0].sumo.reload(); }
             $('#addEmployeeBtn').prop('disabled', true);
         } else {
             selectedEmployees = [];
             updateSelectedEmployeesList();
             $('#employee_id').prop('disabled', false);
+            if ($('#employee_id')[0] && $('#employee_id')[0].sumo) { $('#employee_id')[0].sumo.reload(); }
             $('#addEmployeeBtn').prop('disabled', false);
         }
     });
@@ -413,6 +421,7 @@ $(document).ready(function() {
         updateSelectedEmployeesList();
         $('#select_all_employees').prop('checked', false);
         $('#employee_id').val('').prop('disabled', false);
+        if ($('#employee_id')[0] && $('#employee_id')[0].sumo) { $('#employee_id')[0].sumo.reload(); }
         $('#addEmployeeBtn').prop('disabled', false);
     }
     
@@ -503,6 +512,7 @@ $(document).ready(function() {
     // Réinitialiser les filtres
     $('#reset_filters').on('click', function() {
         $('#employee_filter').val('');
+        if ($('#employee_filter')[0] && $('#employee_filter')[0].sumo) { $('#employee_filter')[0].sumo.reload(); }
         $('#status_filter').val('');
         $('#date_filter').val('');
         table.ajax.reload();
@@ -662,6 +672,7 @@ $('#export-button').on('click', function() {
 
                     $('#edit_permission_id').val(permission.id);
                     $('#edit_employee_id').val(permission.employee_id);
+                    if ($('#edit_employee_id')[0] && $('#edit_employee_id')[0].sumo) { $('#edit_employee_id')[0].sumo.reload(); }
                     $('#edit_date_debut').val(formatForDateInput(permission.date_debut || permission.date));
                     $('#edit_date_fin').val(formatForDateInput(permission.date_fin || permission.date_debut || permission.date));
                     $('#edit_start_time').val(permission.start_time);
