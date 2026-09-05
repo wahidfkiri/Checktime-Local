@@ -278,6 +278,17 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::post('/rapport/presence-ponctualite/export-excel', [CustomReportController::class, 'exportCustomExcel'])->name('reports.custom.export.excel');
     });
 
+    // Tableau de Suivi de la Ponctualité — grille employés × jours ouvrés
+    Route::middleware('role_or_permission:admin|menu.reports|menu.reports-suivi-ponctualite')
+        ->prefix('rapport/suivi-ponctualite')
+        ->name('reports.suivi-ponctualite.')
+        ->group(function () {
+            Route::get('/', [CustomReportController::class, 'suiviPonctualite'])->name('index');
+            Route::get('/generate', [CustomReportController::class, 'generateSuiviPonctualite'])->name('generate');
+            Route::get('/export-pdf', [CustomReportController::class, 'exportSuiviPonctualitePdf'])->name('export.pdf');
+            Route::get('/export-excel', [CustomReportController::class, 'exportSuiviPonctualiteExcel'])->name('export.excel');
+        });
+
     // Missions
     Route::middleware('role_or_permission:admin|menu.missions')->prefix('missions')->name('missions.')->group(function () {
         Route::get('/', [MissionController::class, 'index'])->name('index');

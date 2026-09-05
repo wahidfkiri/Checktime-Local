@@ -69,13 +69,6 @@ class NotificationSettingsController extends Controller
             // Appliquer immédiatement pour la requête courante.
             $this->applyMailConfig();
 
-            // Répercuter dans le .env (source de vérité au démarrage de l'appli,
-            // utile par ex. pour un worker de file d'attente déjà lancé, ou pour
-            // qui inspecte la config serveur). La table settings reste la source
-            // effective à l'exécution (voir AppServiceProvider) : un échec ici
-            // n'empêche donc pas l'enregistrement de fonctionner.
-            $this->syncMailEnvFile($fields);
-
             Log::info('Configuration SMTP mise à jour depuis le profil.');
 
             return response()->json([
@@ -453,76 +446,5 @@ class NotificationSettingsController extends Controller
         }
 
         return $raw ?: null;
-    }
-
-    /**
-     * Répercute la configuration SMTP (table settings) dans le fichier .env,
-     * pour que MAIL_* y reflète toujours la configuration active.
-     *
-     * @param array{mail_host:string,mail_port:string,mail_encryption:string,mail_username:string,mail_from_address:string,mail_from_name:string,mail_password?:string} $fields
-     */
-    private function syncMailEnvFile(array $fields): void
-    {
-        $envPath = base_path('.env');
-
-        if (!is_file($envPath) || !is_writable($envPath)) {
-            Log::warning('Synchronisation SMTP → .env ignorée : fichier .env introuvable ou non modifiable.');
-            return;
-        }
-
-        try {
-            $values = [
-                'MAIL_MAILER'       => 'smtp',
-                'MAIL_HOST'         => $fields['mail_host'],
-                'MAIL_PORT'         => $fields['mail_port'],
-                // Toujours une valeur comprise nativement par le transport
-                // (voir resolveEncryptionForTransport) : le .env sert de repli
-                // au tout premier démarrage, avant que la table settings ne
-                // soit lue — « STARTTLS » (choix utilisateur) reste préservé
-                // tel quel dans la table settings, pas ici.
-                'MAIL_ENCRYPTION'   => $this->resolveEncryptionForTransport($fields['mail_encryption']),
-                'MAIL_USERNAME'     => $fields['mail_username'],
-                'MAIL_FROM_ADDRESS' => $fields['mail_from_address'],
-                'MAIL_FROM_NAME'    => $fields['mail_from_name'],
-            ];
-
-            // Le mot de passe n'a été fourni que s'il a été changé (voir smtp()) :
-            // on ne touche à MAIL_PASSWORD dans le .env que dans ce cas, pour ne
-            // jamais l'écraser par une valeur vide.
-            if (array_key_exists('mail_password', $fields)) {
-                $values['MAIL_PASSWORD'] = $fields['mail_password'];
-            }
-
-            $content = file_get_contents($envPath);
-
-            foreach ($values as $key => $value) {
-                $content = $this->setEnvLine($content, $key, (string) $value);
-            }
-
-            file_put_contents($envPath, $content);
-        } catch (\Throwable $e) {
-            // Ne fait jamais échouer l'enregistrement SMTP : la table settings
-            // (source effective à l'exécution) est déjà à jour à ce stade.
-            Log::warning('Synchronisation SMTP → .env échouée : ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Remplace (ou ajoute) une ligne KEY=... dans le contenu d'un fichier .env,
-     * en protégeant toujours la valeur entre guillemets (sûr même si elle
-     * contient des espaces, #, $, ou des guillemets).
-     */
-    private function setEnvLine(string $content, string $key, string $value): string
-    {
-        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
-        $line = $key . '="' . $escaped . '"';
-
-        $pattern = '/^' . preg_quote($key, '/') . '=.*$/m';
-
-        if (preg_match($pattern, $content)) {
-            return preg_replace($pattern, $line, $content);
-        }
-
-        return rtrim($content) . "\n" . $line . "\n";
     }
 }

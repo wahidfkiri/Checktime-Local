@@ -50,6 +50,7 @@ class UserController extends Controller
                 'menu.settings' => 'Paramètres (toutes les sous-pages)',
                 'menu.report-templates' => "↳ Modèles d'export",
                 'menu.backup-data' => "↳ Sauvegarde des données",
+                'menu.journalisation' => "Journal des activités",
             ],
         ];
     }

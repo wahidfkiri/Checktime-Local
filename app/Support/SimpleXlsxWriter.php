@@ -24,6 +24,7 @@ class SimpleXlsxWriter
     private array $rows = [];
     private array $columnWidths = [];
     private string $sheetName;
+    private bool $landscape = false;
 
     public function __construct(string $sheetName = 'Feuille1')
     {
@@ -35,6 +36,15 @@ class SimpleXlsxWriter
     public function setColumnWidths(array $widths): self
     {
         $this->columnWidths = $widths;
+        return $this;
+    }
+
+    /**
+     * Impression en paysage (utile pour les tableaux à nombreuses colonnes).
+     */
+    public function setLandscape(bool $landscape = true): self
+    {
+        $this->landscape = $landscape;
         return $this;
     }
 
@@ -171,10 +181,18 @@ class SimpleXlsxWriter
         }
         $sheetData .= '</sheetData>';
 
+        // pageMargins / pageSetup doivent suivre sheetData (ordre imposé par le schéma).
+        $pageSetup = $this->landscape
+            ? '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+                . '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0" paperSize="9"/>'
+            : '';
+
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . ($this->landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '')
             . $cols
             . $sheetData
+            . $pageSetup
             . '</worksheet>';
     }
 

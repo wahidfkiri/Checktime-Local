@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +22,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        // Le thème de l'app est Bootstrap 5 : aligne les vues de pagination
+        // Laravel (par défaut en Tailwind) sur Bootstrap 5.
+        Paginator::useBootstrapFive();
+
         try {
             if (Schema::hasTable('settings')) {
                 $logoPath = \App\Models\Setting::where('key', 'app_logo')->value('value');

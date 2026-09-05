@@ -219,7 +219,7 @@
 @endcanany
 
 <!-- Rapports des Présences -->
-@canany(['menu.reports', 'menu.reports-absences-delays', 'menu.reports-custom-presence'])
+@canany(['menu.reports', 'menu.reports-absences-delays', 'menu.reports-custom-presence', 'menu.reports-suivi-ponctualite'])
 <li class="sidebar-item has-sub @if(request()->routeIs('reports.*')) active @endif">
     <a href="#" class="sidebar-link">
         <i class="bi bi-bar-chart-fill"></i>
@@ -239,6 +239,14 @@
             <a href="{{ route('reports.custom.presence') }}" class="submenu-link">
                 <i class="bi bi-funnel"></i>
                 <span>Rapport d'assiduité et de ponctualité</span>
+            </a>
+        </li>
+        @endcanany
+        @canany(['menu.reports', 'menu.reports-suivi-ponctualite'])
+        <li class="submenu-item @if(request()->routeIs('reports.suivi-ponctualite.*')) active @endif">
+            <a href="{{ route('reports.suivi-ponctualite.index') }}" class="submenu-link">
+                <i class="bi bi-calendar3"></i>
+                <span>Tableau de Suivi <br>de la Ponctualité</span>
             </a>
         </li>
         @endcanany
@@ -301,15 +309,15 @@
         </li>
         @endrole
 
-        {{-- Journal des activités — super-admin / admin uniquement --}}
-        @hasanyrole('admin|super-admin')
+        {{-- Journal des activités — super-admin / admin, ou permission dédiée --}}
+        @if(auth()->check() && (auth()->user()->hasAnyRole(['admin','super-admin']) || auth()->user()->can('menu.journalisation')))
         <li class="sidebar-item @if(request()->routeIs('journalisation.*')) active @endif">
           <a href="{{route('journalisation.index')}}" class="sidebar-link">
             <i class="bi bi-journal-text"></i>
             <span>Journal des activités</span>
           </a>
         </li>
-        @endhasanyrole
+        @endif
 
       </ul>
     </div>
