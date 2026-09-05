@@ -143,13 +143,16 @@ class NotificationSettingsController extends Controller
                 function ($message) use ($testEmail, $fromAddress, $fromName) {
                     $message->from($fromAddress, $fromName)
                             ->to($testEmail)
-                            ->subject('Test SMTP - CheckTime');
+                            ->subject('Test SMTP - CheckTime')
+                            // Vérifie aussi le transfert MIME des pièces jointes
+                            // utilisé par les rapports PDF automatiques.
+                            ->attachData('', 'test-smtp.txt', ['mime' => 'text/plain']);
                 }
             );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Message accepté par le serveur SMTP pour ' . $testEmail . '. Vérifiez la boîte de réception et les indésirables ; cette confirmation ne garantit pas la remise finale par le serveur destinataire.',
+                'message' => 'Message avec la pièce jointe test-smtp.txt accepté par le serveur SMTP pour ' . $testEmail . '. Vérifiez la boîte de réception et les indésirables ; cette confirmation ne garantit pas la remise finale par le serveur destinataire.',
             ]);
         } catch (\Throwable $e) {
             Log::error('Erreur test SMTP: ' . $e->getMessage());

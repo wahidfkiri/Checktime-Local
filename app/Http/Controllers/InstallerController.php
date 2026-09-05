@@ -267,7 +267,8 @@ class InstallerController extends Controller
                 'Ceci est un email de test depuis CheckTime. Si vous recevez ce message, votre configuration SMTP est correcte.',
                 function ($message) use ($fromAddress, $fromName) {
                     $message->to($fromAddress, $fromName)
-                            ->subject('Test de configuration SMTP - CheckTime');
+                            ->subject('Test de configuration SMTP - CheckTime')
+                            ->attachData('', 'test-smtp.txt', ['mime' => 'text/plain']);
                 }
             );
 
