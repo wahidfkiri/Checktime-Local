@@ -54,9 +54,12 @@ class NotificationSettingsController extends Controller
                 'mail_from_name'    => $request->input('mail_from_name', config('app.name', 'CheckTime')),
             ];
 
-            // Le mot de passe n'est mis à jour que s'il est fourni (évite de l'effacer).
+            // Le mot de passe est conservé hors base, dans MAIL_PASSWORD_FILE.
+            // Une valeur vide conserve le secret déjà en place.
             if ($request->filled('mail_password')) {
-                $fields['mail_password'] = $request->input('mail_password');
+                \App\Support\MailPassword::store($request->input('mail_password'));
+                // Efface un éventuel ancien secret stocké en base.
+                Setting::where('key', 'mail_password')->update(['value' => '']);
             }
 
             foreach ($fields as $key => $value) {
@@ -69,7 +72,9 @@ class NotificationSettingsController extends Controller
             // Appliquer immédiatement pour la requête courante.
             $this->applyMailConfig();
 
-            Log::info('Configuration SMTP mise à jour depuis le profil.');
+            Log::info('Configuration SMTP mise à jour depuis le profil.', [
+                'password_file_updated' => $request->filled('mail_password'),
+            ]);
 
             return response()->json([
                 'success' => true,

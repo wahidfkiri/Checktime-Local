@@ -252,7 +252,8 @@
                                                 <button class="btn btn-outline-secondary toggle-smtp-password" type="button">
                                                     <i class="bi bi-eye"></i>
                                                 </button>
-                                            </div>
+                                                </div>
+                                                <small class="text-muted">Si renseigné, le mot de passe est enregistré dans le fichier serveur sécurisé MAIL.txt.</small>
                                         </div>
                                     </div>
                                     <div class="row mt-2">

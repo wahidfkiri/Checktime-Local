@@ -130,8 +130,10 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
 
     // Paramètres de notification (onglet du profil)
     Route::prefix('profile/notifications')->name('profile.notifications.')->group(function () {
-        Route::post('/smtp', [NotificationSettingsController::class, 'smtp'])->name('smtp');
-        Route::post('/smtp/test', [NotificationSettingsController::class, 'testSmtp'])->name('smtp.test');
+        Route::middleware('role_or_permission:admin|menu.settings')->group(function () {
+            Route::post('/smtp', [NotificationSettingsController::class, 'smtp'])->name('smtp');
+            Route::post('/smtp/test', [NotificationSettingsController::class, 'testSmtp'])->name('smtp.test');
+        });
         Route::post('/sms', [NotificationSettingsController::class, 'sms'])->name('sms');
         Route::post('/sms/test', [NotificationSettingsController::class, 'testSms'])->name('sms.test');
         Route::post('/jobs', [NotificationSettingsController::class, 'updateJobs'])->name('jobs');
