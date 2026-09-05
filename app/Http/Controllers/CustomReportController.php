@@ -1202,7 +1202,10 @@ class CustomReportController extends Controller
         foreach ($report['rows'] as $row) {
             $cellules = [$row['employee_name']];
             foreach ($report['days'] as $day) {
-                $cellules[] = $row['cells'][$day['date']]['text'] ?? '';
+                $cell = $row['cells'][$day['date']] ?? null;
+                $cellules[] = $cell
+                    ? $cell['text'] . (($cell['detail'] ?? '') !== '' ? ' (' . $cell['detail'] . ')' : '')
+                    : '';
             }
             $cellules[] = $row['total_retards'];
             $cellules[] = $row['total_minutes'];
@@ -1342,40 +1345,42 @@ class CustomReportController extends Controller
 
                 // Justifications d'abord : congé > mission > autorisation.
                 if (isset($leaveDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'en congé', 'type' => 'leave'];
+                    $cells[$dateKey] = ['text' => 'en congé', 'detail' => '', 'type' => 'leave'];
                     continue;
                 }
                 if (isset($missionDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'en mission', 'type' => 'mission'];
+                    $cells[$dateKey] = ['text' => 'en mission', 'detail' => '', 'type' => 'mission'];
                     continue;
                 }
                 if (isset($permissionDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'autorisation', 'type' => 'permission'];
+                    $cells[$dateKey] = ['text' => 'autorisation', 'detail' => '', 'type' => 'permission'];
                     continue;
                 }
 
                 if (!$attendance || strtoupper($attendance->status) === 'ABSENT') {
-                    $cells[$dateKey] = ['text' => 'absent', 'type' => 'absent'];
+                    $cells[$dateKey] = ['text' => 'absent', 'detail' => '', 'type' => 'absent'];
                     continue;
                 }
 
+                // Employé présent : la cellule porte les horaires d'arrivée et de
+                // départ, l'anomalie éventuelle (retard, sortie) passe en second.
                 $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateKey);
-                $textes   = [];
+                $details  = [];
 
                 if ($lateData['is_late']) {
                     $nbRetards++;
                     $minutesTotal += (int) $lateData['late_minutes'];
-                    $textes[] = (int) $lateData['late_minutes'];
+                    $details[] = (int) $lateData['late_minutes'] . ' mn';
                 }
 
                 if (strtoupper($attendance->status) === 'EARLY_LEAVE' || !empty($attendance->is_early_leave)) {
-                    $textes[] = 'sortie';
+                    $details[] = 'sortie';
                 }
 
                 $cells[$dateKey] = [
-                    // Journée normale : cellule vide, comme sur le formulaire papier.
-                    'text' => implode(' / ', $textes),
-                    'type' => $lateData['is_late'] ? 'late' : (empty($textes) ? 'ok' : 'early'),
+                    'text'   => $this->plageHoraire($attendance),
+                    'detail' => implode(' / ', $details),
+                    'type'   => $lateData['is_late'] ? 'late' : (empty($details) ? 'ok' : 'early'),
                 ];
             }
 
@@ -1406,6 +1411,26 @@ class CustomReportController extends Controller
                 . ' ' . $moisDebut . ' au ' . $periodEnd->locale('fr')->dayName . ' ' . $periodEnd->format('d')
                 . ' ' . $moisFin . ' ' . $periodEnd->format('Y'),
         ];
+    }
+
+    /**
+     * Horaires d'arrivée et de départ d'un pointage, au format « 08:30 , 17:00 ».
+     *
+     * Un horaire manquant est rendu par « --:-- » pour que la cellule reste lisible.
+     */
+    private function plageHoraire($attendance): string
+    {
+        $format = function ($valeur) {
+            if (!$valeur) {
+                return '--:--';
+            }
+
+            return $valeur instanceof Carbon
+                ? $valeur->format('H:i')
+                : Carbon::parse($valeur)->format('H:i');
+        };
+
+        return $format($attendance->check_in) . ' , ' . $format($attendance->check_out);
     }
 
     /**

@@ -29,11 +29,13 @@
 
         thead th { background-color: #e8e8e8; font-size: 7.5px; }
 
-        .col-nom { text-align: left; width: 18%; font-weight: bold; font-size: 7.5px; padding-left: 3px; }
+        .col-nom { text-align: left; width: 13%; font-weight: bold; font-size: 7px; padding-left: 3px; }
 
         /* Contenu des cellules : très étroit, on réduit encore la police. */
-        tbody td { font-size: 6.5px; }
-        tbody td.col-nom { font-size: 7.5px; }
+        tbody td { font-size: 5.5px; line-height: 1.15; padding: 1px 0; }
+        tbody td.col-nom { font-size: 7px; }
+        tbody td .detail { font-size: 5px; color: #8a4b00; }
+        .cell-ok { background-color: #ffffff; }
 
         .cell-late { background-color: #fff3cd; font-weight: bold; }
         .cell-early { background-color: #ffe5d0; }
@@ -90,8 +92,13 @@
                 <tr>
                     <td class="col-nom">{{ $row['employee_name'] }}</td>
                     @foreach($report['days'] as $day)
-                        @php $cell = $row['cells'][$day['date']] ?? ['text' => '', 'type' => 'ok']; @endphp
-                        <td class="{{ $cell['type'] === 'ok' ? '' : 'cell-' . $cell['type'] }}">{{ $cell['text'] }}</td>
+                        @php $cell = $row['cells'][$day['date']] ?? ['text' => '', 'detail' => '', 'type' => 'ok']; @endphp
+                        <td class="cell-{{ $cell['type'] }}">
+                            {{ $cell['text'] }}
+                            @if(!empty($cell['detail']))
+                                <div class="detail">{{ $cell['detail'] }}</div>
+                            @endif
+                        </td>
                     @endforeach
                     <td class="total">{{ $row['total_retards'] }}</td>
                     <td class="total">{{ $row['total_minutes'] }}</td>
@@ -115,13 +122,14 @@
 
     <div class="legende">
         <strong>Légende :</strong>
-        <span class="cell-late">25</span> retard en minutes
+        <span class="cell-ok">08:30 , 17:00</span> arrivée et départ
+        <span class="cell-late">25 mn</span> retard
         <span class="cell-early">sortie</span> sortie anticipée
         <span class="cell-absent">absent</span> absence non justifiée
         <span class="cell-mission">en mission</span>
         <span class="cell-leave">en congé</span>
         <span class="cell-permission">autorisation</span>
-        — une cellule vide correspond à une journée sans anomalie.
+        — pour une journée travaillée, la cellule donne l'arrivée et le départ, l'anomalie figurant en dessous.
     </div>
 
     @if($signatairePostes->count() > 0)

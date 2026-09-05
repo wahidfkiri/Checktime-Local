@@ -80,7 +80,8 @@
                                 <div class="alert alert-info alert-sm p-2 mb-0 mt-3">
                                     <i class="bi bi-info-circle me-1"></i>
                                     Seuls les jours ouvrés (lundi à vendredi) sont affichés. La période ne peut pas
-                                    dépasser un mois. Une cellule vide signifie une journée sans anomalie.
+                                    dépasser un mois. Pour une journée travaillée, la cellule indique l'heure
+                                    d'arrivée et l'heure de départ, et en dessous l'anomalie éventuelle.
                                 </div>
                             </div>
                         </div>
@@ -107,7 +108,8 @@
                             </div>
 
                             <div class="mt-3 small">
-                                <span class="legende cell-late">25</span> retard en minutes
+                                <span class="legende cell-ok">08:30 , 17:00</span> arrivée et départ
+                                <span class="legende cell-late">25 mn</span> retard
                                 <span class="legende cell-early">sortie</span> sortie anticipée
                                 <span class="legende cell-absent">absent</span> absence non justifiée
                                 <span class="legende cell-mission">en mission</span>
@@ -125,7 +127,9 @@
 <style>
     .suivi-table { font-size: 11px; }
     .suivi-table th,
-    .suivi-table td { text-align: center; vertical-align: middle; white-space: nowrap; }
+    .suivi-table td { text-align: center; vertical-align: middle; }
+    .suivi-table td { min-width: 62px; line-height: 1.25; }
+    .suivi-table .cell-detail { display: block; font-size: 9px; color: #a15c00; }
     .suivi-table th.col-nom,
     .suivi-table td.col-nom { text-align: left; white-space: normal; min-width: 200px; font-weight: 600; }
     .suivi-table thead th { background-color: #f2f2f2; }
@@ -136,6 +140,7 @@
     .cell-mission { background-color: #d1ecf1; }
     .cell-leave { background-color: #d4edda; }
     .cell-permission { background-color: #e2e3e5; }
+    .cell-ok { background-color: #ffffff; }
     .cell-total { background-color: #f2f2f2; font-weight: 700; }
 
     .legende {
@@ -201,9 +206,13 @@ $(document).ready(function () {
             corps += '<tr><td class="col-nom">' + row.employee_name + '</td>';
 
             report.days.forEach(function (day) {
-                var cell = row.cells[day.date] || { text: '', type: 'ok' };
-                var classe = cell.type === 'ok' ? '' : ' class="cell-' + cell.type + '"';
-                corps += '<td' + classe + '>' + (cell.text || '') + '</td>';
+                var cell = row.cells[day.date] || { text: '', detail: '', type: 'ok' };
+                var classe = ' class="cell-' + cell.type + '"';
+                var contenu = cell.text || '';
+                if (cell.detail) {
+                    contenu += '<br><small class="cell-detail">' + cell.detail + '</small>';
+                }
+                corps += '<td' + classe + '>' + contenu + '</td>';
             });
 
             corps += '<td class="cell-total">' + row.total_retards + '</td>'

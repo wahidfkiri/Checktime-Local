@@ -92,6 +92,8 @@ class SendWeeklyAttendanceReports extends Command
 
         $this->info("✅  Emails activés");
 
+        $client = Setting::company();
+
         // ── Données pour la semaine ─────────────────────────────────
         $allAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])->get();
 
@@ -362,6 +364,8 @@ class SendWeeklyAttendanceReports extends Command
                     'days_list'     => $daysList,
                     'working_days'  => $workingDays,
                     'export_date'   => Carbon::now(),
+                    'client'        => $client,
+                    'client_name'   => $client->name,
                 ];
 
                 Mail::to($employee->email)->send(new WeeklyAttendanceReport($emailData));
