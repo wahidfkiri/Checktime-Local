@@ -33,6 +33,7 @@ use App\Http\Controllers\MissionController;
 use App\Http\Controllers\NotificationSettingsController;
 use App\Http\Controllers\InstallerController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\HolidayController;
 use App\Http\Middleware\InstallerMiddleware;
 
 /*
@@ -297,6 +298,16 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::get('/{id}', [MissionController::class, 'show'])->name('show');
         Route::put('/{id}', [MissionController::class, 'update'])->name('update');
         Route::delete('/{id}', [MissionController::class, 'destroy'])->name('destroy');
+    });
+
+    // Jours Fériés
+    Route::middleware('role_or_permission:admin|menu.holidays')->prefix('holidays')->name('holidays.')->group(function () {
+        Route::get('/', [HolidayController::class, 'index'])->name('index');
+        Route::get('/datatable', [HolidayController::class, 'datatable'])->name('datatable');
+        Route::post('/', [HolidayController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [HolidayController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [HolidayController::class, 'update'])->name('update');
+        Route::delete('/{id}', [HolidayController::class, 'destroy'])->name('destroy');
     });
 
     // Utilisateurs & permissions — réservé au rôle admin (pas de délégation

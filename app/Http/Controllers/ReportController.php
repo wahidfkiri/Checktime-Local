@@ -611,11 +611,13 @@ class ReportController extends Controller
     }
     
     /**
-     * Vérifier si c'est un jour férié
+     * Vérifier si c'est un jour férié chômé (non travaillé)
      */
     private function isHoliday($date)
     {
-        // À implémenter selon votre table des jours fériés
+        if (class_exists('App\\Models\\Holiday')) {
+            return \App\Models\Holiday::isNonWorkingHoliday($date);
+        }
         return false;
     }
     

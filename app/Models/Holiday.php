@@ -50,4 +50,30 @@ class Holiday extends Model
                     })
                     ->exists();
     }
+
+    public static function isNonWorkingHoliday($date): bool
+    {
+        return static::where('is_working_day', false)
+                    ->where(function($q) use ($date) {
+                        $q->where('holiday_date', $date)
+                          ->orWhere(function($q2) use ($date) {
+                              $q2->where('is_recurring', true)
+                                 ->whereMonth('holiday_date', date('m', strtotime($date)))
+                                 ->whereDay('holiday_date', date('d', strtotime($date)));
+                          });
+                    })
+                    ->exists();
+    }
+
+    public static function getHolidayForDate($date)
+    {
+        return static::where(function($q) use ($date) {
+                        $q->where('holiday_date', $date)
+                          ->orWhere(function($q2) use ($date) {
+                              $q2->where('is_recurring', true)
+                                 ->whereMonth('holiday_date', date('m', strtotime($date)))
+                                 ->whereDay('holiday_date', date('d', strtotime($date)));
+                          });
+                    })->first();
+    }
 }

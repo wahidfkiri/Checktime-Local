@@ -79,7 +79,7 @@
 
                                 <div class="alert alert-info alert-sm p-2 mb-0 mt-3">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Seuls les jours ouvrés (lundi à vendredi) sont affichés. La période ne peut pas
+                                    Seuls les jours ouvrés (lundi à vendredi, hors jours fériés chômés) sont affichés. La période ne peut pas
                                     dépasser un mois. Pour une journée travaillée, la cellule indique l'heure
                                     d'arrivée et l'heure de départ, et en dessous l'anomalie éventuelle.
                                 </div>

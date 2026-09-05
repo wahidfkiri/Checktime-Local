@@ -11,6 +11,7 @@ use App\Models\Leave;
 use App\Models\EmployeePermission;
 use App\Models\ReportTemplate;
 use App\Models\Setting;
+use App\Models\Holiday;
 use App\Reports\PresencePonctualiteColumns;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -1277,10 +1278,10 @@ class CustomReportController extends Controller
         $periodStart = Carbon::parse($startDate)->startOfDay();
         $periodEnd   = Carbon::parse($endDate)->startOfDay();
 
-        // --- Colonnes : uniquement les jours ouvrés (lundi-vendredi) ---
+        // --- Colonnes : uniquement les jours ouvrés (lundi-vendredi hors jours fériés chômés) ---
         $days = [];
         for ($d = $periodStart->copy(); $d->lte($periodEnd); $d->addDay()) {
-            if ($d->dayOfWeekIso <= 5) {
+            if ($d->dayOfWeekIso <= 5 && !Holiday::isNonWorkingHoliday($d->format('Y-m-d'))) {
                 $days[] = [
                     'date'       => $d->format('Y-m-d'),
                     'day_short'  => self::JOURS_COURTS[$d->dayOfWeekIso],

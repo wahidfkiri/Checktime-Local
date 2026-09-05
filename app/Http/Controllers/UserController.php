@@ -29,6 +29,7 @@ class UserController extends Controller
                 'menu.work-hours' => "Types d'horaires",
                 'menu.employee-schedules' => 'Plannings employés',
                 'menu.schedules' => 'Calendrier',
+                'menu.holidays' => 'Jours Fériés',
             ],
             'Gestion des autorisations' => [
                 'menu.employee-permissions' => 'Permissions',
