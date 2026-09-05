@@ -213,10 +213,10 @@ class CustomReportController extends Controller
         }
 
         // Calculer les jours ouvrés (lundi à vendredi), ou tous les jours
-        // calendaires si le modèle choisi inclut les week-ends.
-        $workingDays = $includeWeekends
-            ? Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1
-            : $this->countWorkingDays($startDate, $endDate);
+        // calendaires si le modèle choisi inclut les week-ends — jours fériés
+        // chômés toujours exclus dans les deux cas (voir countWorkingDays()).
+        $workingDays  = $this->countWorkingDays($startDate, $endDate, $includeWeekends);
+        $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
 
         // Récupérer toutes les présences pour la période
         $allAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -332,7 +332,10 @@ class CustomReportController extends Controller
                 // gonfler le total de présence au-delà des jours ouvrés,
                 // sinon l'absence (jours ouvrés - présence) devient négative.
                 // Sauf si le modèle choisi inclut explicitement les week-ends.
-                if (!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5) {
+                // Un jour férié chômé reste exclu dans tous les cas (il n'est
+                // jamais compté dans $workingDays, voir countWorkingDays()).
+                if ((!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5)
+                    || isset($holidayDates[$dateKey])) {
                     continue;
                 }
 
@@ -359,13 +362,16 @@ class CustomReportController extends Controller
             }
 
             foreach ($missionDates as $dateStr => $mission) {
-                if ($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) {
+                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                    && !isset($holidayDates[$dateStr])) {
                     $totalPresent++;
                 }
             }
 
             foreach ($leaveDates as $dateStr => $leave) {
-                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) && !isset($missionDates[$dateStr])) {
+                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                    && !isset($holidayDates[$dateStr])
+                    && !isset($missionDates[$dateStr])) {
                     $totalPresent++;
                 }
             }
@@ -374,6 +380,7 @@ class CustomReportController extends Controller
             // (même traitement que mission / congé), sans double comptage.
             foreach ($permissionDates as $dateStr => $permission) {
                 if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                    && !isset($holidayDates[$dateStr])
                     && !isset($missionDates[$dateStr])
                     && !isset($leaveDates[$dateStr])) {
                     $totalPresent++;
@@ -456,6 +463,7 @@ class CustomReportController extends Controller
                 $dateStr = $currentDate->format('Y-m-d');
                 $dayOfWeek = $currentDate->dayOfWeekIso;
                 if (($includeWeekends || ($dayOfWeek >= 1 && $dayOfWeek <= 5))
+                    && !isset($holidayDates[$dateStr])
                     && !in_array($dateStr, $recordedDates)
                     && !isset($missionDates[$dateStr])
                     && !isset($leaveDates[$dateStr])
@@ -512,9 +520,8 @@ class CustomReportController extends Controller
             $options  = $template->resolvedOptions();
             $includeWeekends = $options['show_weekends'];
 
-            $workingDays = $includeWeekends
-                ? Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1
-                : $this->countWorkingDays($startDate, $endDate);
+            $workingDays  = $this->countWorkingDays($startDate, $endDate, $includeWeekends);
+            $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
             $periodStart = Carbon::parse($startDate)->startOfDay();
             $periodEnd   = Carbon::parse($endDate)->startOfDay();
 
@@ -715,8 +722,10 @@ class CustomReportController extends Controller
                     // Idem que dans getPresencePonctualiteData() : ne pas compter les
                     // pointages du week-end dans la présence, sinon l'absence
                     // (jours ouvrés - présence) peut devenir négative. Sauf si le
-                    // modèle choisi inclut explicitement les week-ends.
-                    if (!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5) {
+                    // modèle choisi inclut explicitement les week-ends. Un jour
+                    // férié chômé reste exclu dans tous les cas.
+                    if ((!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5)
+                        || isset($holidayDates[$dateKey])) {
                         continue;
                     }
                     if ($status !== 'ABSENT' && !isset($missionDates[$dateKey]) && !isset($leaveDates[$dateKey])) {
@@ -731,12 +740,15 @@ class CustomReportController extends Controller
                 }
 
                 foreach ($missionDates as $dateStr => $mission) {
-                    if ($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) {
+                    if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                        && !isset($holidayDates[$dateStr])) {
                         $totalMission++;
                     }
                 }
                 foreach ($leaveDates as $dateStr => $leave) {
-                    if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5) && !isset($missionDates[$dateStr])) {
+                    if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                        && !isset($holidayDates[$dateStr])
+                        && !isset($missionDates[$dateStr])) {
                         $totalLeave++;
                     }
                 }
@@ -804,8 +816,11 @@ class CustomReportController extends Controller
             while ($currentDate <= $endDateObj) {
                 // N'afficher les colonnes samedi/dimanche que si l'option
                 // "Inclure les week-ends" du modèle est activée. On parcourt
-                // toute la période choisie et on saute uniquement le week-end.
-                if ($includeWeekends || $currentDate->dayOfWeekIso <= 5) {
+                // toute la période choisie et on saute le week-end, ainsi que
+                // les jours fériés chômés (jamais affichés, comme dans
+                // $workingDays — voir countWorkingDays()).
+                if (($includeWeekends || $currentDate->dayOfWeekIso <= 5)
+                    && !isset($holidayDates[$currentDate->format('Y-m-d')])) {
                     $daysList[] = [
                         'date'     => $currentDate->copy(),
                         'date_str' => $currentDate->format('Y-m-d'),
@@ -1639,16 +1654,46 @@ class CustomReportController extends Controller
     }
 
     /**
-     * Compter les jours ouvrés entre deux dates (lundi à vendredi)
+     * Jours fériés chômés compris dans une période, indexés par date
+     * (Y-m-d) pour un test en O(1). Évite de ré-interroger la base à
+     * chaque jour et pour chaque employé dans les boucles de calcul de
+     * présence (une même date est testée une fois par employé sinon).
      */
-    private function countWorkingDays($startDate, $endDate)
+    private function getNonWorkingHolidayDates($startDate, $endDate): array
     {
-        $start       = Carbon::parse($startDate);
-        $end         = Carbon::parse($endDate);
-        $workingDays = 0;
+        $dates   = [];
+        $current = Carbon::parse($startDate);
+        $end     = Carbon::parse($endDate);
+
+        while ($current <= $end) {
+            $dateStr = $current->format('Y-m-d');
+            if (Holiday::isNonWorkingHoliday($dateStr)) {
+                $dates[$dateStr] = true;
+            }
+            $current->addDay();
+        }
+
+        return $dates;
+    }
+
+    /**
+     * Compter les jours d'une période, jours fériés chômés toujours exclus :
+     * seulement les jours ouvrés (lundi-vendredi) par défaut, ou tous les
+     * jours calendaires si $includeWeekends est vrai (un jour férié chômé
+     * reste exclu même dans ce cas, contrairement à un simple week-end).
+     */
+    private function countWorkingDays($startDate, $endDate, $includeWeekends = false)
+    {
+        $start         = Carbon::parse($startDate);
+        $end           = Carbon::parse($endDate);
+        $holidayDates  = $this->getNonWorkingHolidayDates($startDate, $endDate);
+        $workingDays   = 0;
 
         for ($date = $start->copy(); $date <= $end; $date->addDay()) {
-            if ($date->dayOfWeekIso >= 1 && $date->dayOfWeekIso <= 5) {
+            if (isset($holidayDates[$date->format('Y-m-d')])) {
+                continue;
+            }
+            if ($includeWeekends || ($date->dayOfWeekIso >= 1 && $date->dayOfWeekIso <= 5)) {
                 $workingDays++;
             }
         }
