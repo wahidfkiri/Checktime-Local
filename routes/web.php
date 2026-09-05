@@ -222,6 +222,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
             Route::get('/data', [ReportController::class, 'getData'])->name('data');
             Route::get('/debug', [ReportController::class, 'debugGetData'])->name('reports.debug');
             Route::post('/export/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
+            Route::get('/export/excel', [ReportController::class, 'exportExcel'])->name('export.excel');
             Route::get('/preview/pdf', [ReportController::class, 'previewPdf'])->name('preview.pdf');
 
             Route::post('/custom/export-pdf', [CustomReportController::class, 'exportCustomPdf'])

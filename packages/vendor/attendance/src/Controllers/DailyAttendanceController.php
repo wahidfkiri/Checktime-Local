@@ -7,6 +7,9 @@ use App\Models\Employee;
 use App\Models\Device; 
 use App\Models\Department;
 use App\Models\DailyAttendance;
+use App\Models\EmployeePermission;
+use App\Models\Leave;
+use App\Models\Mission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -652,13 +655,16 @@ class DailyAttendanceController extends Controller
      * Observation générique d'un pointage (présence / absence / retard),
      * dérivée du statut et des indicateurs (retard, départ anticipé, notes…).
      */
-    private function generateAttendanceObservation($attendance): string
+    private function generateAttendanceObservation($attendance, ?string $effectiveStatus = null): string
     {
         $observations = [];
-        $status = strtoupper($attendance->status ?? '');
+        $status = strtoupper($effectiveStatus ?: ($attendance->status ?? ''));
 
         if ($status === 'ABSENT') {
             $observations[] = 'Absence';
+        }
+        if (in_array($status, ['LEAVE', 'MISSION', 'PERMISSION'], true)) {
+            $observations[] = $this->getStatusLabel($status);
         }
         if (($attendance->late_minutes ?? 0) > 0) {
             $observations[] = 'Retard de ' . $this->formatMinutesToHours($attendance->late_minutes);
@@ -1005,9 +1011,7 @@ class DailyAttendanceController extends Controller
             $endDate = $request->input('end_date');
             $empCode = $request->input('emp_code');
             $department = $request->input('department');
-            $terminalSn = $request->input('terminal_sn');
-            $terminalAlias  = $request->input('terminal_alias');
-            
+
             // Si aucune date n'est fournie, utiliser aujourd'hui
             if (!$startDate && !$endDate) {
                 $today = Carbon::today();
@@ -1046,38 +1050,9 @@ class DailyAttendanceController extends Controller
                 }
             }
             
-            // Filtrer par statut
-            if ($request->has('status') && $request->status && $request->status !== 'all') {
-                if ($request->status === 'present') {
-                    $query->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK']);
-                } elseif ($request->status === 'absent') {
-                    $query->where('status', 'ABSENT');
-                } elseif ($request->status === 'late') {
-                    $query->where('is_late', true);
-                } elseif ($request->status === 'early_leave') {
-                    $query->where('is_early_leave', true);
-                }
-            }
-            
-            // Filtrer par terminal SN (ancien filtre caché)
-            if ($terminalSn && $terminalSn !== 'all') {
-              $query->where('raw_data', 'LIKE', '%"' . $terminalSn . '"%');
-            }
+            // Filtres statut + terminal (partagés avec l'export Excel).
+            $this->applyHistoryFilters($query, $request);
 
-            // Filtrer par terminal alias (depuis raw_data JSON longtext, avec/sans caractères d'échappement)
-            if ($terminalAlias && $terminalAlias !== 'all' && trim($terminalAlias) !== '') {
-                $terminalAlias = trim($terminalAlias);
-                $escapedAlias = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower($terminalAlias));
-                $jsonAliasNeedle = '%"terminal_alias":"' . $escapedAlias . '"%';
-
-                // Certains enregistrements sont stockés comme JSON échappé (avec \"...\"), d'autres non.
-                // On normalise en retirant les backslashes puis on applique un LIKE insensible à la casse.
-                $query->whereRaw(
-                    "LOWER(REPLACE(raw_data, '\\\\', '')) LIKE ? ESCAPE '\\\\'",
-                    [$jsonAliasNeedle]
-                );
-            }
-            
             // Exécuter la requête
             $attendances = $query->orderBy('attendance_date', 'desc')
                 ->orderBy('emp_code')
@@ -1204,7 +1179,11 @@ class DailyAttendanceController extends Controller
      */
     private function formatAttendancesForDataTables($attendances)
     {
-        return $attendances->map(function ($attendance) {
+        $justifications = $this->absenceJustifications($attendances);
+
+        return $attendances->map(function ($attendance) use ($justifications) {
+            // Congé / mission / autorisation : une absence justifiée n'est pas un absent.
+            $status = $this->effectiveStatus($attendance, $justifications);
             // Gérer raw_data de manière sécurisée (peut être tableau, string ou null)
             $rawData = $this->ensureArray($attendance->raw_data);
             
@@ -1267,8 +1246,9 @@ class DailyAttendanceController extends Controller
                 'effective_hours' => $attendance->effective_hours ?? $attendance->work_hours,
                 'overtime_hours' => $attendance->overtime_hours ?? 0,
                 'devices_used' => $devicesUsed ?: 'Non disponible',
-                'status' => $attendance->status,
-                'status_label' => $this->getStatusLabel($attendance->status),
+                'status' => $status,
+                'status_label' => $this->getStatusLabel($status),
+                'is_justified_absence' => $status !== (string) $attendance->status,
                 'is_late' => (bool) $attendance->is_late,
                 // 'late_minutes' => $attendance->late_minutes ?? 0,
                 'is_early_leave' => (bool) $attendance->is_early_leave,
@@ -1336,9 +1316,17 @@ class DailyAttendanceController extends Controller
      */
     private function calculateAttendanceStats($attendances)
     {
+        $justifications = $this->absenceJustifications($attendances);
+
         $total = $attendances->count();
         $present = $attendances->whereIn('status', ['PRESENT', 'LATE', 'OVERTIME', 'SHORT_WORK'])->count();
-        $absent = $attendances->where('status', 'ABSENT')->count();
+
+        // Une absence couverte par un congé / une mission / une autorisation est
+        // comptée à part, pas comme un absent.
+        $justified = $attendances->filter(
+            fn ($a) => $this->effectiveStatus($a, $justifications) !== (string) $a->status
+        )->count();
+        $absent = $attendances->where('status', 'ABSENT')->count() - $justified;
         $late = $attendances->where('status', 'LATE')->count();
         $halfDay = $attendances->where('status', 'HALF_DAY')->count();
         $leave = $attendances->where('status', 'LEAVE')->count();
@@ -1363,6 +1351,7 @@ class DailyAttendanceController extends Controller
             'total_days' => $total,
             'present_days' => $present,
             'absent_days' => $absent,
+            'justified_days' => $justified,
             'late_days' => $late,
             'half_days' => $halfDay,
             'leave_days' => $leave,
@@ -1379,6 +1368,112 @@ class DailyAttendanceController extends Controller
     /**
      * Obtenir le label du statut
      */
+    /**
+     * Index des absences justifiées (congé, mission, autorisation) sur la période
+     * couverte par une collection de pointages.
+     *
+     * Clé : "<employee_id>_<Y-m-d>". Valeur : le code statut à afficher.
+     * En cas de chevauchement, la justification la plus forte l'emporte :
+     * congé > mission > autorisation d'absence.
+     *
+     * @return array<string, string>
+     */
+    private function absenceJustifications($attendances): array
+    {
+        $dates = $attendances->pluck('attendance_date')->filter();
+
+        if ($dates->isEmpty()) {
+            return [];
+        }
+
+        $periodStart = Carbon::parse($dates->min())->startOfDay();
+        $periodEnd   = Carbon::parse($dates->max())->startOfDay();
+
+        $index = [];
+
+        // Remplit l'index jour par jour, en se limitant à la période affichée.
+        $mark = function ($employeeId, $from, $to, string $status, int $priority)
+            use (&$index, $periodStart, $periodEnd) {
+            if (!$employeeId || !$from) {
+                return;
+            }
+
+            // Bornage sur la période affichée. On recopie systématiquement les
+            // instances : Carbon::max()/min() renvoient l'un des deux objets
+            // reçus, et $day->addDay() muterait alors les bornes partagées.
+            $day  = Carbon::parse($from)->startOfDay();
+            $last = Carbon::parse($to ?: $from)->startOfDay();
+
+            if ($day->lt($periodStart)) {
+                $day = $periodStart->copy();
+            }
+
+            if ($last->gt($periodEnd)) {
+                $last = $periodEnd->copy();
+            }
+
+            while ($day->lte($last)) {
+                $key = $employeeId . '_' . $day->format('Y-m-d');
+
+                if (!isset($index[$key]) || $priority > $index[$key][1]) {
+                    $index[$key] = [$status, $priority];
+                }
+
+                $day->addDay();
+            }
+        };
+
+        // Congés approuvés.
+        Leave::where('status', 'approved')
+            ->whereDate('start_date', '<=', $periodEnd)
+            ->whereDate('end_date', '>=', $periodStart)
+            ->get()
+            ->each(fn ($leave) => $mark($leave->employee_id, $leave->start_date, $leave->end_date, 'LEAVE', 3));
+
+        // Missions (pas de statut sur ce modèle : toute mission compte).
+        Mission::whereDate('start_date', '<=', $periodEnd)
+            ->whereDate('end_date', '>=', $periodStart)
+            ->get()
+            ->each(fn ($mission) => $mark($mission->employee_id, $mission->start_date, $mission->end_date, 'MISSION', 2));
+
+        // Autorisations d'absence approuvées (plage date_debut → date_fin).
+        EmployeePermission::where('status', 'approved')
+            ->overlappingPeriod($periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d'))
+            ->get()
+            ->each(fn ($permission) => $mark(
+                $permission->employee_id,
+                $permission->getEffectiveStartDate(),
+                $permission->getEffectiveEndDate(),
+                'PERMISSION',
+                1
+            ));
+
+        return array_map(fn ($entry) => $entry[0], $index);
+    }
+
+    /**
+     * Statut réel d'un pointage : une absence couverte par un congé, une mission
+     * ou une autorisation n'est pas un « Absent ».
+     *
+     * Les journées où l'employé a pointé gardent leur statut : une autorisation de
+     * deux heures ne transforme pas une présence en absence justifiée.
+     *
+     * @param array<string, string> $justifications
+     */
+    private function effectiveStatus($attendance, array $justifications): string
+    {
+        $status = (string) $attendance->status;
+
+        if ($status !== 'ABSENT' || !$attendance->employee_id) {
+            return $status;
+        }
+
+        $key = $attendance->employee_id . '_'
+            . Carbon::parse($attendance->attendance_date)->format('Y-m-d');
+
+        return $justifications[$key] ?? $status;
+    }
+
     private function getStatusLabel($status)
     {
         $labels = [
@@ -1389,7 +1484,9 @@ class DailyAttendanceController extends Controller
             'HALF_DAY' => 'Demi-journée',
             'OVERTIME' => 'Heures supplémentaires',
             'SHORT_WORK' => 'Présent',
-            'LEAVE' => 'Congé',
+            'LEAVE' => 'En congé',
+            'MISSION' => 'En mission',
+            'PERMISSION' => "Autorisation d'absence",
             'IRREGULAR' => 'Présent',
             'MULTIPLE_PUNCHES' => 'Pointages multiples'
         ];
@@ -1411,6 +1508,8 @@ class DailyAttendanceController extends Controller
             'OVERTIME' => 'primary',
             'SHORT_WORK' => 'warning',
             'LEAVE' => 'secondary',
+            'MISSION' => 'info',
+            'PERMISSION' => 'secondary',
             'IRREGULAR' => 'warning',
             'MULTIPLE_PUNCHES' => 'info'
         ];
@@ -2352,6 +2451,7 @@ class DailyAttendanceController extends Controller
         }
 
         $rows = $query->get();
+        $justifications = $this->absenceJustifications($rows);
 
         $xlsx = new \App\Support\SimpleXlsxWriter('Présences');
         $xlsx->setColumnWidths([12, 12, 26, 20, 10, 10, 10, 16, 8, 24, 32]);
@@ -2370,9 +2470,9 @@ class DailyAttendanceController extends Controller
                 $a->check_in ? Carbon::parse($a->check_in)->format('H:i') : '--:--',
                 $a->check_out ? Carbon::parse($a->check_out)->format('H:i') : '--:--',
                 (string) ($a->work_hours ?? ''),
-                (string) $this->getStatusLabel($a->status),
+                (string) $this->getStatusLabel($this->effectiveStatus($a, $justifications)),
                 $a->is_late ? 'Oui' : 'Non',
-                (string) $this->generateAttendanceObservation($a),
+                (string) $this->generateAttendanceObservation($a, $this->effectiveStatus($a, $justifications)),
                 (string) ($a->notes ?: '-'),
             ]);
         }
@@ -2396,6 +2496,7 @@ class DailyAttendanceController extends Controller
         $this->applyCommonFilters($query, $request);
 
         $rows = $query->get();
+        $justifications = $this->absenceJustifications($rows);
 
         $xlsx = new \App\Support\SimpleXlsxWriter('Absences');
         $xlsx->setColumnWidths([12, 14, 12, 26, 20, 14, 24, 32]);
@@ -2411,8 +2512,8 @@ class DailyAttendanceController extends Controller
                 (string) $a->emp_code,
                 $this->employeeFullName($a),
                 (string) ($a->employee->dept_name ?? 'Non défini'),
-                (string) $this->getStatusLabel($a->status),
-                (string) $this->generateAttendanceObservation($a),
+                (string) $this->getStatusLabel($this->effectiveStatus($a, $justifications)),
+                (string) $this->generateAttendanceObservation($a, $this->effectiveStatus($a, $justifications)),
                 (string) ($a->notes ?: '-'),
             ]);
         }
@@ -2442,6 +2543,7 @@ class DailyAttendanceController extends Controller
         $this->applyCommonFilters($query, $request);
 
         $rows = $query->get();
+        $justifications = $this->absenceJustifications($rows);
 
         $xlsx = new \App\Support\SimpleXlsxWriter('Retards');
         $xlsx->setColumnWidths([12, 12, 12, 26, 20, 10, 14, 14, 14, 24, 30]);
@@ -2463,13 +2565,99 @@ class DailyAttendanceController extends Controller
                 $a->check_in ? Carbon::parse($a->check_in)->format('H:i') : '--:--',
                 $lateMinutes,
                 (string) $this->formatMinutesToHours($lateMinutes),
-                (string) $this->getStatusLabel($a->status),
+                (string) $this->getStatusLabel($this->effectiveStatus($a, $justifications)),
                 (string) $this->generateRetardObservation($a),
                 (string) ($a->notes ?: '-'),
             ]);
         }
 
         return $xlsx->download('rapport_retards_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Export Excel de l'historique complet des pointages.
+     *
+     * Reprend exactement les colonnes du tableau de la page « Pointages »
+     * (Date, Code, Employé, Pointages, Département, Terminal, Statut) et les
+     * mêmes filtres, via formatAttendancesForDataTables().
+     */
+    public function exportExcel(Request $request)
+    {
+        [$startDate, $endDate] = $this->resolveExportDates($request);
+
+        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            ->with('employee')
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('emp_code');
+
+        $this->applyCommonFilters($query, $request);
+        $this->applyHistoryFilters($query, $request);
+
+        $rows = $this->formatAttendancesForDataTables($query->get());
+
+        $xlsx = new \App\Support\SimpleXlsxWriter('Pointages');
+        $xlsx->setColumnWidths([12, 12, 26, 40, 20, 24, 16]);
+        $xlsx->addRow(['Historique des pointages — du ' . Carbon::parse($startDate)->format('d/m/Y')
+            . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
+        $xlsx->addRow([]);
+        $xlsx->addRow(['Date', 'Code', 'Employé', 'Pointages', 'Département',
+            'Terminal', 'Statut'], true);
+
+        foreach ($rows as $row) {
+            $xlsx->addRow([
+                (string) ($row['date_formatted'] ?? ''),
+                (string) ($row['emp_code'] ?? ''),
+                (string) ($row['full_name'] ?? ''),
+                (string) ($row['all_punches'] ?? ''),
+                (string) ($row['dept_name'] ?? 'Non défini'),
+                (string) ($row['devices_used'] ?? ''),
+                (string) ($row['status_label'] ?? ''),
+            ]);
+        }
+
+        return $xlsx->download('historique_pointages_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Filtres propres à l'historique : statut, terminal (SN et alias).
+     *
+     * Partagé entre le tableau (getData) et l'export Excel pour que les deux
+     * renvoient toujours le même jeu de lignes.
+     */
+    private function applyHistoryFilters($query, Request $request)
+    {
+        $status = $request->input('status');
+        if ($status && $status !== 'all') {
+            if ($status === 'present') {
+                $query->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK']);
+            } elseif ($status === 'absent') {
+                $query->where('status', 'ABSENT');
+            } elseif ($status === 'late') {
+                $query->where('is_late', true);
+            } elseif ($status === 'early_leave') {
+                $query->where('is_early_leave', true);
+            }
+        }
+
+        // Ancien filtre caché par numéro de série du terminal.
+        $terminalSn = $request->input('terminal_sn');
+        if ($terminalSn && $terminalSn !== 'all') {
+            $query->where('raw_data', 'LIKE', '%"' . $terminalSn . '"%');
+        }
+
+        // Alias du terminal, stocké dans raw_data (JSON longtext, parfois échappé).
+        $terminalAlias = trim((string) $request->input('terminal_alias'));
+        if ($terminalAlias !== '' && $terminalAlias !== 'all') {
+            $escapedAlias = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower($terminalAlias));
+            $jsonAliasNeedle = '%"terminal_alias":"' . $escapedAlias . '"%';
+
+            $query->whereRaw(
+                "LOWER(REPLACE(raw_data, '\\\\', '')) LIKE ? ESCAPE '\\\\'",
+                [$jsonAliasNeedle]
+            );
+        }
+
+        return $query;
     }
 
     /**
@@ -2544,7 +2732,9 @@ class DailyAttendanceController extends Controller
      */
     private function formatAttendancesForExport($attendances, $employees)
     {
-        return $attendances->map(function ($attendance) use ($employees) {
+        $justifications = $this->absenceJustifications($attendances);
+
+        return $attendances->map(function ($attendance) use ($employees, $justifications) {
             $employee = $attendance->employee ?? $employees->get($attendance->emp_code);
             
             $fullName = 'Non enregistré';
@@ -2564,11 +2754,14 @@ class DailyAttendanceController extends Controller
                 'check_in' => $attendance->check_in ? Carbon::parse($attendance->check_in)->format('H:i') : '--:--',
                 'check_out' => $attendance->check_out ? Carbon::parse($attendance->check_out)->format('H:i') : '--:--',
                 'work_hours' => $attendance->work_hours,
-                'status' => $this->getStatusLabel($attendance->status),
+                'status' => $this->getStatusLabel($this->effectiveStatus($attendance, $justifications)),
                 'is_late' => $attendance->is_late ? 'Oui' : 'Non',
                 // 'late_minutes' => $attendance->late_minutes ?? 0,
                 'notes' => $attendance->notes ?: '-',
-                'observation' => $this->generateAttendanceObservation($attendance)
+                'observation' => $this->generateAttendanceObservation(
+                    $attendance,
+                    $this->effectiveStatus($attendance, $justifications)
+                )
             ];
         })->toArray();
     }

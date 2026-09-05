@@ -341,31 +341,12 @@
     @php
         // Grouper les données par département
         $groupedByDept = collect($report_data)->groupBy('department_name');
-        
-        // Générer la liste des jours de la période
-        $start = \Carbon\Carbon::parse($start_date);
-        $end = \Carbon\Carbon::parse($end_date);
-        $daysOfWeek = [];
-        $currentDate = $start->copy();
-        
-        while ($currentDate <= $end) {
-            $dayOfWeekNumber = $currentDate->dayOfWeekIso;
-            // Inclure seulement les jours de semaine (lundi-vendredi)
-            if ($dayOfWeekNumber >= 1 && $dayOfWeekNumber <= 5) {
-                $daysOfWeek[] = [
-                    'date' => $currentDate->copy(),
-                    'day_name' => $this->getDayNameFrench($currentDate->dayOfWeekIso),
-                    'date_str' => $currentDate->format('Y-m-d'),
-                    'day_number' => $currentDate->day
-                ];
-            }
-            $currentDate->addDay();
-        }
-        
-        // Semaine du...
-        $weekStart = $start->copy();
-        $weekEnd = $end->copy();
-        $weekRange = "SEMAINE DU LUNDI " . $weekStart->format('d') . " " . $this->getMonthNameFrench($weekStart->month) . " AU VENDREDI " . $weekEnd->format('d') . " " . $this->getMonthNameFrench($weekEnd->month);
+
+        // Jours ouvrés, libellé de période et pointages sont précalculés par le
+        // contrôleur : une vue Blade ne peut pas appeler $this.
+        $daysOfWeek = $days_of_week ?? [];
+        $weekRange  = $week_range ?? '';
+        $checkIndex = $check_data ?? [];
     @endphp
     
     @foreach($groupedByDept as $deptName => $employees)
@@ -412,8 +393,8 @@
                     
                     @foreach($daysOfWeek as $day)
                         @php
-                            // Récupérer les données de pointage pour ce jour
-                            $checkData = $this->getEmployeeCheckData($employee['employee_id'], $day['date_str']);
+                            // Pointage du jour, depuis l'index fourni par le contrôleur.
+                            $checkData = $checkIndex[$employee['employee_id'] . '_' . $day['date_str']] ?? null;
                         @endphp
                         <td class="check-time">
                             @if($checkData)

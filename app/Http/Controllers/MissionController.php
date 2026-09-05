@@ -69,20 +69,21 @@ class MissionController extends Controller
                 if (!$mission->start_date || !$mission->end_date) {
                     return '-';
                 }
-                return $mission->start_date->format('d/m/Y H:i') . '<br>' . 
-                       $mission->end_date->format('d/m/Y H:i');
+                $start = $mission->start_date->format('d/m/Y');
+                $end   = $mission->end_date->format('d/m/Y');
+
+                // Mission d'une seule journée : une seule date suffit.
+                return $start === $end ? $start : $start . '<br>' . $end;
             })
             ->addColumn('duration_formatted', function($mission) {
                 if (!$mission->start_date || !$mission->end_date) {
                     return '-';
                 }
-                $days = $mission->start_date->diffInDays($mission->end_date);
-                $hours = $mission->start_date->diffInHours($mission->end_date) % 24;
-                
-                if ($days > 0) {
-                    return $days . 'j' . ($hours > 0 ? ' ' . $hours . 'h' : '');
-                }
-                return $hours . 'h';
+                // Une mission s'exprime en journées : les deux bornes sont incluses
+                // (du 10 au 10 = 1 jour, du 10 au 12 = 3 jours).
+                $days = $this->missionDays($mission->start_date, $mission->end_date);
+
+                return $days . ' jour' . ($days > 1 ? 's' : '');
             })
             ->addColumn('actions', function($mission) {
                 return '
@@ -121,6 +122,8 @@ class MissionController extends Controller
                 'start_date' => 'required|date',
                 'end_date' => 'required|date|after_or_equal:start_date',
             ]);
+
+            $validated = $this->normalizeMissionDates($validated);
 
             $mission = Mission::create($validated);
             $mission->load('employee');
@@ -165,8 +168,14 @@ class MissionController extends Controller
                 'title' => $mission->title,
                 'description' => $mission->description,
                 'destination' => $mission->destination,
-                'start_date' => $mission->start_date->toISOString(),
-                'end_date' => $mission->end_date->toISOString(),
+                // Format jour : alimente directement les <input type="date">,
+                // sans conversion UTC qui décalerait la date d'un jour.
+                'start_date' => $mission->start_date->format('Y-m-d'),
+                'end_date' => $mission->end_date->format('Y-m-d'),
+                'start_date_formatted' => $mission->start_date->format('d/m/Y'),
+                'end_date_formatted' => $mission->end_date->format('d/m/Y'),
+                'duration_formatted' => $this->missionDays($mission->start_date, $mission->end_date)
+                    . ' jour' . ($this->missionDays($mission->start_date, $mission->end_date) > 1 ? 's' : ''),
                 'employee_id' => $mission->employee_id,
                 'employee' => $mission->employee ? [
                     'id' => $mission->employee->id,
@@ -214,6 +223,8 @@ class MissionController extends Controller
                 'end_date' => 'required|date|after_or_equal:start_date',
             ]);
 
+            $validated = $this->normalizeMissionDates($validated);
+
             $mission->update($validated);
 
             Log::info("Mission mise à jour: {$mission->reference}");
@@ -236,6 +247,39 @@ class MissionController extends Controller
                 'message' => 'Erreur lors de la modification: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Nombre de journées couvertes par une mission, bornes incluses.
+     */
+    private function missionDays($start, $end): int
+    {
+        return Carbon::parse($start)->startOfDay()
+            ->diffInDays(Carbon::parse($end)->startOfDay()) + 1;
+    }
+
+    /**
+     * Une mission s'exprime en journées : on force le début au début de journée
+     * et la fin à la fin de journée, quelle que soit l'heure reçue.
+     *
+     * Les colonnes restent en datetime (données existantes conservées), mais toute
+     * comparaison sur une journée entière devient exacte — notamment le rattachement
+     * des pointages « En mission ».
+     *
+     * @param  array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeMissionDates(array $validated): array
+    {
+        if (!empty($validated['start_date'])) {
+            $validated['start_date'] = Carbon::parse($validated['start_date'])->startOfDay();
+        }
+
+        if (!empty($validated['end_date'])) {
+            $validated['end_date'] = Carbon::parse($validated['end_date'])->endOfDay();
+        }
+
+        return $validated;
     }
 
     public function destroy($id)

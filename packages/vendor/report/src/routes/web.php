@@ -40,6 +40,7 @@ Route::prefix('admin/reports')->name('admin.reports.')->group(function () {
 Route::get('/admin/rapport/presence-ponctualite', [CustomReportController::class, 'presencePonctualite'])->name('admin.reports.custom.presence');
 Route::post('/admin/rapport/presence-ponctualite/generate', [CustomReportController::class, 'generateCustomReport'])->name('admin.reports.custom.generate');
 Route::post('/admin/rapport/presence-ponctualite/export-pdf', [CustomReportController::class, 'exportCustomPdf'])->name('admin.reports.custom.export.pdf');
+Route::get('/admin/rapport/presence-ponctualite/export-excel', [CustomReportController::class, 'exportCustomExcel'])->name('admin.reports.custom.export.excel');
 
 
 });

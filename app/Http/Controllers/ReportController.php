@@ -21,6 +21,39 @@ class ReportController extends Controller
     /**
      * Afficher la page des rapports
      */
+    /**
+     * Libellés français des statuts de pointage.
+     *
+     * Les codes stockés sont en anglais (voir determineStatus) : cette table est
+     * la source unique des libellés affichés, pour que le tableau HTML, le PDF
+     * et l'Excel disent tous la même chose.
+     */
+    public const STATUS_LABELS_FR = [
+        'present'     => 'Présent',
+        'absent'      => 'Absent',
+        'leave'       => 'Congé',
+        'permission'  => 'Permission',
+        'weekend'     => 'Week-end',
+        'holiday'     => 'Férié',
+        'day_off'     => 'Repos',
+        'no_schedule' => 'Non planifié',
+    ];
+
+    /**
+     * Libellé français d'un statut, en distinguant le présent en retard.
+     */
+    public static function statusLabelFr($status, $lateMinutes = 0): string
+    {
+        $status = (string) $status;
+        $label  = self::STATUS_LABELS_FR[$status] ?? ucfirst(str_replace('_', ' ', $status));
+
+        if ($status === 'present' && (int) $lateMinutes > 0) {
+            return 'Présent (retard)';
+        }
+
+        return $label;
+    }
+
     public function absencesDelays(Request $request)
     {
         $employees = Employee::whereNotNull('emp_code')
@@ -811,6 +844,185 @@ class ReportController extends Controller
     /**
      * Exporter le rapport en PDF
      */
+    /**
+     * Construit les enregistrements jour / employé de la période.
+     *
+     * Source unique de l'export PDF et de l'export Excel : les deux affichent
+     * ainsi exactement les mêmes lignes pour un même filtre.
+     *
+     * @return array{records: array<int, array<string, mixed>>, employees_count: int}
+     *
+     * @throws \RuntimeException Message prêt à être affiché à l'utilisateur.
+     */
+    private function collectAbsencesDelaysRecords(string $startDate, string $endDate, string $empCode): array
+    {
+        $token = \App\Services\CheckTimeService::getConfigToken();
+
+        if (!$token) {
+            throw new \RuntimeException("Token d'accès non configuré");
+        }
+
+        $devices = Device::all();
+
+        if ($devices->isEmpty()) {
+            throw new \RuntimeException('Aucun device trouvé.');
+        }
+
+        $employeesQuery = Employee::whereNotNull('emp_code')
+            ->where('emp_code', '!=', '');
+
+        if ($empCode && $empCode !== 'all') {
+            $employeesQuery->where('emp_code', $empCode);
+        }
+
+        $employees = $employeesQuery->get();
+
+        if ($employees->isEmpty()) {
+            throw new \RuntimeException('Aucun employé trouvé pour les critères sélectionnés.');
+        }
+
+        $currentDate = Carbon::parse($startDate);
+        $endDateObj  = Carbon::parse($endDate);
+
+        // La collecte interroge l'API device par device et jour par jour :
+        // on borne la période pour éviter les timeouts.
+        if ($currentDate->diffInDays($endDateObj) > 31) {
+            throw new \RuntimeException("La période ne doit pas dépasser 31 jours pour l'export.");
+        }
+
+        $permissions = EmployeePermission::where('status', 'approved')
+            ->overlappingPeriod($startDate, $endDate)
+            ->get()
+            ->groupBy('employee_id');
+
+        $leaves = Leave::whereBetween('start_date', [$startDate, $endDate])->get();
+
+        $records = [];
+
+        while ($currentDate <= $endDateObj) {
+            $dateStr = $currentDate->format('Y-m-d');
+
+            $allTransactions = collect();
+            foreach ($devices as $device) {
+                $allTransactions = $allTransactions->merge(
+                    $this->getDeviceTransactionsForDate($device, $currentDate, $token, $employees)
+                );
+            }
+
+            $groupedTransactions = $this->groupTransactionsByEmployee($allTransactions, $employees);
+
+            foreach ($employees as $employee) {
+                $analysis = $this->analyzeEmployeeDay(
+                    $employee,
+                    $dateStr,
+                    $groupedTransactions[$employee->emp_code] ?? null,
+                    $permissions,
+                    $leaves
+                );
+
+                if ($analysis) {
+                    $records[] = $analysis;
+                }
+            }
+
+            $currentDate->addDay();
+        }
+
+        return ['records' => $records, 'employees_count' => $employees->count()];
+    }
+
+    /**
+     * Exporter l'état de pointage en Excel (.xlsx).
+     *
+     * Mêmes filtres et mêmes lignes que l'export PDF.
+     */
+    public function exportExcel(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'emp_code'   => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+        $empCode   = $request->input('emp_code', 'all');
+
+        try {
+            $collected = $this->collectAbsencesDelaysRecords($startDate, $endDate, $empCode);
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        $records = $collected['records'];
+
+        // Tri par employé puis par date décroissante, comme le PDF.
+        usort($records, function ($a, $b) {
+            $byEmployee = strcmp($a['employee_code'], $b['employee_code']);
+            return $byEmployee !== 0 ? $byEmployee : strcmp($b['date'], $a['date']);
+        });
+
+        $xlsx = new \App\Support\SimpleXlsxWriter('Etat de pointage');
+        $xlsx->setColumnWidths([12, 12, 12, 28, 20, 12, 12, 12, 18, 16, 18]);
+
+        $xlsx->addRow(['État de pointage (arrivées – départs) — du '
+            . Carbon::parse($startDate)->format('d/m/Y')
+            . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
+        $xlsx->addRow([]);
+        $xlsx->addRow([
+            'Date', 'Jour', 'Code', 'Employé', 'Planning',
+            'Arrivée', 'Départ', 'Retard (min)', 'Départ anticipé (min)',
+            'Temps au poste', 'Statut',
+        ], true);
+
+        foreach ($records as $record) {
+            $date = Carbon::parse($record['date']);
+
+            $xlsx->addRow([
+                $date->format('d/m/Y'),
+                ucfirst($date->locale('fr')->dayName),
+                (string) ($record['employee_code'] ?? ''),
+                (string) ($record['employee_name'] ?? ''),
+                $this->formatScheduleRange($record),
+                (string) ($record['actual_arrival'] ?: '-'),
+                (string) ($record['actual_departure'] ?: '-'),
+                (int) ($record['late_minutes'] ?? 0),
+                (int) ($record['early_leave_minutes'] ?? 0),
+                $this->formatWorkMinutes($record['work_minutes'] ?? 0),
+                self::statusLabelFr($record['status'] ?? '', $record['late_minutes'] ?? 0),
+            ]);
+        }
+
+        return $xlsx->download('etat_pointage_' . Carbon::now()->format('Y-m-d_H-i-s') . '.xlsx');
+    }
+
+    /**
+     * Horaire prévu « HH:MM - HH:MM », ou « - » si le planning est incomplet.
+     */
+    private function formatScheduleRange(array $record): string
+    {
+        $start = $record['schedule_start'] ?? '-';
+        $end   = $record['schedule_end'] ?? '-';
+
+        return ($start !== '-' && $end !== '-') ? $start . ' - ' . $end : '-';
+    }
+
+    /**
+     * Minutes travaillées au format « 7h30 ».
+     */
+    private function formatWorkMinutes($minutes): string
+    {
+        $minutes = (int) $minutes;
+
+        return $minutes > 0
+            ? sprintf('%dh%02d', intdiv($minutes, 60), $minutes % 60)
+            : '-';
+    }
+
     public function exportPdf(Request $request)
     {
         // Valider les paramètres
@@ -831,92 +1043,15 @@ class ReportController extends Controller
         
         Log::info("Export PDF - Début: {$start_date}, Fin: {$end_date}, Employé: {$emp_code}");
         
-        // Récupérer le token d'authentification
-        $token = \App\Services\CheckTimeService::getConfigToken();
-
-        if (!$token) {
-            return redirect()->back()->with('error', 'Token d\'accès non configuré');
+        try {
+            $collected = $this->collectAbsencesDelaysRecords($start_date, $end_date, $emp_code);
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         }
 
-        // Récupérer tous les devices
-        $devices = Device::all();
-        
-        if ($devices->isEmpty()) {
-            return redirect()->back()->with('error', 'Aucun device trouvé.');
-        }
-        
-        // Récupérer les employés selon le filtre
-        $employeesQuery = Employee::whereNotNull('emp_code')
-            ->where('emp_code', '!=', '');
-        
-        if ($emp_code && $emp_code !== 'all') {
-            $employeesQuery->where('emp_code', $emp_code);
-        }
-        
-        $employees = $employeesQuery->get();
-        
-        if ($employees->isEmpty()) {
-            return redirect()->back()->with('error', 'Aucun employé trouvé pour les critères sélectionnés.');
-        }
-        
-        // Récupérer les permissions approuvées
-        $permissions = EmployeePermission::where('status', 'approved')
-            ->overlappingPeriod($start_date, $end_date)
-            ->get()
-            ->groupBy('employee_id');
-        
-        // Récupérer les congés
-        $leaves = Leave::whereBetween('start_date', [$start_date, $end_date])
-            ->get();
-        
-        // Analyser chaque jour de la période
-        $reportData = [];
-        $currentDate = Carbon::parse($start_date);
-        $endDateObj = Carbon::parse($end_date);
-        
-        // Limiter la période pour éviter les timeouts
-        $daysDiff = $currentDate->diffInDays($endDateObj);
-        if ($daysDiff > 31) {
-            return redirect()->back()->with('error', 'La période ne doit pas dépasser 31 jours pour l\'export PDF.');
-        }
-        
-        while ($currentDate <= $endDateObj) {
-            $dateStr = $currentDate->format('Y-m-d');
-            
-            // Collecter toutes les transactions pour cette date
-            $allTransactions = collect();
-            
-            foreach ($devices as $device) {
-                $deviceTransactions = $this->getDeviceTransactionsForDate(
-                    $device,
-                    $currentDate,
-                    $token,
-                    $employees
-                );
-                $allTransactions = $allTransactions->merge($deviceTransactions);
-            }
-            
-            // Grouper par employé
-            $groupedTransactions = $this->groupTransactionsByEmployee($allTransactions, $employees);
-            
-            // Analyser chaque employé pour cette date
-            foreach ($employees as $employee) {
-                $analysis = $this->analyzeEmployeeDay(
-                    $employee,
-                    $dateStr,
-                    $groupedTransactions[$employee->emp_code] ?? null,
-                    $permissions,
-                    $leaves
-                );
-                
-                if ($analysis) {
-                    $reportData[] = $analysis;
-                }
-            }
-            
-            $currentDate->addDay();
-        }
-        
+        $reportData     = $collected['records'];
+        $employeesCount = $collected['employees_count'];
+
         // Grouper les données par employé pour l'affichage
         $groupedData = [];
         foreach ($reportData as $record) {
@@ -954,9 +1089,10 @@ class ReportController extends Controller
             'filters' => [
                 'emp_code' => $emp_code === 'all' ? 'Tous les employés' : $emp_code
             ],
-            'total_employees' => $employees->count(),
+            'total_employees' => $employeesCount,
             'total_records' => count($reportData),
             'grouped_data' => $groupedData,
+            'status_labels' => self::STATUS_LABELS_FR,
         ];
         
         // Générer le PDF

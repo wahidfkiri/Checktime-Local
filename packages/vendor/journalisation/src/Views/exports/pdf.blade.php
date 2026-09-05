@@ -43,8 +43,7 @@
                 <th style="width:13%;">Date &amp; heure</th>
                 <th style="width:15%;">Utilisateur</th>
                 <th style="width:10%;">Action</th>
-                <th style="width:46%;">Description</th>
-                <th style="width:16%;">IP / Route</th>
+                <th style="width:62%;">Description</th>
             </tr>
         </thead>
         <tbody>
@@ -54,10 +53,9 @@
                     <td>{{ $log->user_name ?? '—' }}</td>
                     <td><span class="badge b-{{ $log->action }}">{{ $log->action_label }}</span></td>
                     <td>{{ $log->description }}</td>
-                    <td>{{ $log->ip_address }}<br><span style="color:#888;">{{ $log->route }}</span></td>
                 </tr>
             @empty
-                <tr><td colspan="5" style="text-align:center;padding:20px;">Aucune activité.</td></tr>
+                <tr><td colspan="4" style="text-align:center;padding:20px;">Aucune activité.</td></tr>
             @endforelse
         </tbody>
     </table>

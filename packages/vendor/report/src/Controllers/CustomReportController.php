@@ -9,6 +9,7 @@ use App\Models\EmployeeSchedule;
 use App\Models\Leave;
 use App\Models\EmployeePermission;
 use App\Models\DailyAttendance;
+use App\Models\Mission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class CustomReportController extends Controller
 {
+    /** Libellé d'une journée couverte par une autorisation d'absence. */
+    private const LABEL_AUTORISATION = "Autorisation d'absence";
+
     /**
      * Afficher la page du rapport personnalisé
      */
@@ -117,9 +121,16 @@ class CustomReportController extends Controller
             ->get()
             ->groupBy('employee_id');
         
-        // Récupérer les congés pour la période
-        $leaves = Leave::where('start_date', '<=', $endDate)
+        // Récupérer les congés APPROUVÉS : un congé en attente ou refusé ne
+        // justifie pas une absence.
+        $leaves = Leave::where('status', 'approved')
+            ->where('start_date', '<=', $endDate)
             ->where('end_date', '>=', $startDate)
+            ->get();
+
+        // Récupérer les missions de la période (ce modèle n'a pas de statut).
+        $missions = Mission::where('start_date', '<=', $endDate . ' 23:59:59')
+            ->where('end_date', '>=', $startDate . ' 00:00:00')
             ->get();
         
         $reportData = [];
@@ -136,7 +147,8 @@ class CustomReportController extends Controller
                 $endDate,
                 $totalWorkingDays,
                 $permissions,
-                $leaves
+                $leaves,
+                $missions
             );
             
             if ($analysis) {
@@ -184,7 +196,7 @@ class CustomReportController extends Controller
     /**
      * Analyser la période pour un employé
      */
-    private function analyzeEmployeePeriod($employee, $startDate, $endDate, $totalWorkingDays, $permissions, $leaves)
+    private function analyzeEmployeePeriod($employee, $startDate, $endDate, $totalWorkingDays, $permissions, $leaves, $missions = null)
     {
         $start = Carbon::parse($startDate);
         $end = Carbon::parse($endDate);
@@ -225,17 +237,24 @@ class CustomReportController extends Controller
                 
                 // Vérifier les congés
                 $isOnLeave = $this->isEmployeeOnLeave($employee->id, $dateStr, $leaves);
+
+                // Vérifier les missions
+                $isOnMission = $this->isEmployeeOnMission($employee->id, $dateStr, $missions);
                 
                 // Récupérer le planning pour calculer les retards
                 $schedule = $this->getEmployeeScheduleForDate($employee, $dateStr);
                 
+                // Priorité des justifications : congé > mission > autorisation.
                 if ($isOnLeave) {
                     // Congé : ne compte ni présent ni absent
                     $observations[] = 'Congé le ' . $currentDate->format('d/m');
+                } else if ($isOnMission) {
+                    // Mission : ne compte ni présent ni absent
+                    $observations[] = 'Mission le ' . $currentDate->format('d/m');
                 } else if ($hasPermission) {
-                    // Permission : ne compte ni présent ni absent
-                    $observations[] = 'Permission le ' . $currentDate->format('d/m');
-                } else if ($attendance) {
+                    // Autorisation d'absence : ne compte ni présent ni absent
+                    $observations[] = self::LABEL_AUTORISATION . ' le ' . $currentDate->format('d/m');
+                } else if ($attendance && $this->isPresenceStatus($attendance->status)) {
                     // Présent
                     $presenceData['present']++;
                     $presenceData['present_days'][] = $currentDate->format('d/m');
@@ -381,6 +400,125 @@ class CustomReportController extends Controller
     /**
      * Exporter le rapport personnalisé en PDF
      */
+    /**
+     * Vérifier si l'employé est en mission ce jour-là.
+     */
+    private function isEmployeeOnMission($employeeId, $date, $missions)
+    {
+        if (!$missions) {
+            return false;
+        }
+
+        $checkDate = Carbon::parse($date)->startOfDay();
+
+        foreach ($missions as $mission) {
+            if ($mission->employee_id != $employeeId) {
+                continue;
+            }
+
+            $start = Carbon::parse($mission->start_date)->startOfDay();
+            $end   = Carbon::parse($mission->end_date)->endOfDay();
+
+            if ($checkDate->between($start, $end)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Le pointage du jour correspond-il à une présence effective ?
+     *
+     * La synchronisation crée aussi des lignes ABSENT : la seule existence d'une
+     * ligne dans daily_attendance ne suffit pas à conclure à une présence.
+     */
+    private function isPresenceStatus($status): bool
+    {
+        return in_array(strtoupper((string) $status), [
+            'PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK', 'IRREGULAR',
+        ], true);
+    }
+
+    /**
+     * Nom du jour en français (1 = lundi … 7 = dimanche).
+     */
+    private function getDayNameFrench($dayOfWeekIso): string
+    {
+        return [
+            1 => 'LUNDI', 2 => 'MARDI', 3 => 'MERCREDI', 4 => 'JEUDI',
+            5 => 'VENDREDI', 6 => 'SAMEDI', 7 => 'DIMANCHE',
+        ][$dayOfWeekIso] ?? '';
+    }
+
+    /**
+     * Nom du mois en français.
+     */
+    private function getMonthNameFrench($month): string
+    {
+        return [
+            1 => 'JANVIER', 2 => 'FÉVRIER', 3 => 'MARS', 4 => 'AVRIL',
+            5 => 'MAI', 6 => 'JUIN', 7 => 'JUILLET', 8 => 'AOÛT',
+            9 => 'SEPTEMBRE', 10 => 'OCTOBRE', 11 => 'NOVEMBRE', 12 => 'DÉCEMBRE',
+        ][$month] ?? '';
+    }
+
+    /**
+     * Jours ouvrés de la période, avec leur nom français, pour l'entête du PDF.
+     *
+     * @return array<int, array{date: \Carbon\Carbon, day_name: string, date_str: string, day_number: int}>
+     */
+    private function buildDaysOfWeek($startDate, $endDate): array
+    {
+        $days    = [];
+        $current = Carbon::parse($startDate)->startOfDay();
+        $end     = Carbon::parse($endDate)->startOfDay();
+
+        while ($current <= $end) {
+            if ($current->dayOfWeekIso <= 5) {
+                $days[] = [
+                    'date'       => $current->copy(),
+                    'day_name'   => $this->getDayNameFrench($current->dayOfWeekIso),
+                    'date_str'   => $current->format('Y-m-d'),
+                    'day_number' => $current->day,
+                ];
+            }
+            $current->addDay();
+        }
+
+        return $days;
+    }
+
+    /**
+     * Pointages de la période indexés par "<employee_id>_<Y-m-d>".
+     *
+     * Précalculé ici plutôt que dans la vue : une requête unique au lieu d'une
+     * requête par employé et par jour, et le template reste sans logique métier.
+     *
+     * @return array<string, array{check_in: ?string, check_out: ?string, is_late: bool, late_minutes: int}>
+     */
+    private function buildCheckDataIndex($startDate, $endDate): array
+    {
+        $index = [];
+
+        $rows = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            ->whereNotNull('employee_id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $key = $row->employee_id . '_' . Carbon::parse($row->attendance_date)->format('Y-m-d');
+
+            $index[$key] = [
+                'check_in'     => $row->check_in ? Carbon::parse($row->check_in)->format('H:i') : null,
+                'check_out'    => $row->check_out ? Carbon::parse($row->check_out)->format('H:i') : null,
+                'is_late'      => (bool) $row->is_late,
+                'late_minutes' => (int) ($row->late_minutes ?? 0),
+            ];
+        }
+
+        return $index;
+    }
+
     public function exportCustomPdf(Request $request)
     {
         try {
@@ -423,11 +561,20 @@ class CustomReportController extends Controller
                 'totals' => $totals,
                 'total_employees' => count($reportData),
                 'period_days' => Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1,
-                'working_days' => $this->countWorkingDays($startDate, $endDate)
+                'working_days' => $this->countWorkingDays($startDate, $endDate),
+                // Précalculés pour la vue, qui ne peut pas appeler le contrôleur.
+                'days_of_week' => $this->buildDaysOfWeek($startDate, $endDate),
+                'week_range' => 'SEMAINE DU ' . $this->getDayNameFrench(Carbon::parse($startDate)->dayOfWeekIso)
+                    . ' ' . Carbon::parse($startDate)->format('d')
+                    . ' ' . $this->getMonthNameFrench(Carbon::parse($startDate)->month)
+                    . ' AU ' . $this->getDayNameFrench(Carbon::parse($endDate)->dayOfWeekIso)
+                    . ' ' . Carbon::parse($endDate)->format('d')
+                    . ' ' . $this->getMonthNameFrench(Carbon::parse($endDate)->month),
+                'check_data' => $this->buildCheckDataIndex($startDate, $endDate),
             ];
             
             // Générer le PDF
-            $pdf = Pdf::loadView('report::pontualites.exports.pdf', $data);
+            $pdf = Pdf::loadView('report::ponctualites.exports.pdf', $data);
             $pdf->setPaper('A4', 'landscape');
             
             $filename = 'rapport_presence_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
@@ -440,6 +587,84 @@ class CustomReportController extends Controller
         }
     }
     
+    /**
+     * Exporter le rapport présence & ponctualité en Excel (.xlsx).
+     *
+     * Mêmes filtres et mêmes données que le tableau et le PDF : une ligne par
+     * employé, avec la colonne Observation (congés, missions, autorisations).
+     */
+    public function exportCustomExcel(Request $request)
+    {
+        try {
+            $client = \App\Models\Setting::company();
+
+            $validator = \Validator::make($request->all(), [
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after_or_equal:start_date',
+                'emp_code' => 'nullable|string',
+                'department_id' => 'nullable|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return redirect()->back()->withErrors($validator)->withInput();
+            }
+
+            $startDate    = $request->input('start_date');
+            $endDate      = $request->input('end_date');
+            $empCode      = $request->input('emp_code', 'all');
+            $departmentId = $request->input('department_id', 'all');
+
+            $reportData = $this->getPresencePonctualiteData($client, $startDate, $endDate, $empCode, $departmentId);
+            $totals     = $this->calculateTotals($reportData, $startDate, $endDate);
+
+            $xlsx = new \App\Support\SimpleXlsxWriter('Présence & Ponctualité');
+            $xlsx->setColumnWidths([6, 14, 28, 22, 10, 10, 18, 10, 10, 18, 45]);
+
+            $xlsx->addRow(['Rapport Présence & Ponctualité — du ' . Carbon::parse($startDate)->format('d/m/Y')
+                . ' au ' . Carbon::parse($endDate)->format('d/m/Y')], true);
+            $xlsx->addRow([]);
+            $xlsx->addRow([
+                'N°', 'Code', 'Nom & Prénom', 'Département',
+                'Présent', 'Absent', 'Taux présence (%)',
+                "A l'heure", 'Retard', 'Taux ponctualité (%)',
+                'Observations',
+            ], true);
+
+            foreach ($reportData as $row) {
+                $xlsx->addRow([
+                    (int) ($row['order_number'] ?? 0),
+                    (string) ($row['employee_code'] ?? ''),
+                    (string) ($row['employee_name'] ?? ''),
+                    (string) ($row['department_name'] ?? ''),
+                    (int) ($row['presence_data']['present'] ?? 0),
+                    (int) ($row['presence_data']['absent'] ?? 0),
+                    (float) ($row['presence_data']['rate'] ?? 0),
+                    (int) ($row['ponctualite_data']['on_time'] ?? 0),
+                    (int) ($row['ponctualite_data']['late'] ?? 0),
+                    (float) ($row['ponctualite_data']['rate'] ?? 0),
+                    (string) ($row['observation'] ?? ''),
+                ]);
+            }
+
+            $xlsx->addRow([
+                '', '', 'TOTAUX', '',
+                (int) $totals['total_presence_present'],
+                (int) $totals['total_presence_absent'],
+                (float) $totals['avg_presence_rate'],
+                (int) $totals['total_ponctualite_on_time'],
+                (int) $totals['total_ponctualite_late'],
+                (float) $totals['avg_ponctualite_rate'],
+                '',
+            ], true);
+
+            return $xlsx->download('rapport_presence_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.xlsx');
+
+        } catch (\Exception $e) {
+            Log::error('Erreur export Excel personnalisé: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Erreur lors de la génération du fichier Excel: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Exporter le rapport par département en PDF
      */
@@ -489,7 +714,7 @@ class CustomReportController extends Controller
             ];
             
             // Générer le PDF
-            $pdf = Pdf::loadView('report::pontualites.departements.exports.pdf', $data);
+            $pdf = Pdf::loadView('report::ponctualites.departements.exports.pdf', $data);
             $pdf->setPaper('A4', 'landscape');
             
             $filename = 'rapport_departements_' . Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';

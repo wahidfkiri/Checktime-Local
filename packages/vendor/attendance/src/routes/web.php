@@ -21,6 +21,7 @@ Route::prefix('admin/daily-attendance')->group(function () {
         Route::get('/debug-codes', [DailyAttendanceController::class, 'debugEmpCodes'])->name('admin.daily-attendance.debug-codes');
         Route::get('/get-employee-by-code', [DailyAttendanceController::class, 'getEmployeeByCode'])->name('admin.daily-attendance.get-employee-by-code');
         Route::post('/export-pdf', [DailyAttendanceController::class, 'exportPDF'])->name('admin.daily-attendance.export-pdf');
+        Route::get('/export-excel', [DailyAttendanceController::class, 'exportExcel'])->name('admin.daily-attendance.export-excel');
         Route::get('/api-diagnostic', [DailyAttendanceController::class, 'apiDiagnostic'])->name('admin.daily-attendance.api-diagnostic');
         Route::post('/sync/data', [DailyAttendanceController::class, 'syncAttendance'])->name('admin.daily-attendance.sync.data');
         Route::get('/attendance/details', [DailyAttendanceController::class, 'showDetails'])->name('admin.daily-attendance.details');

@@ -115,14 +115,11 @@
                                                 <div class="form-group text-start">
                                                     <label class="form-label d-block" style="margin-bottom:0px;">&nbsp;</label>
                                                     <div class="btn-group d-flex flex-wrap" role="group">
-                                                        <button type="button" class="btn btn-primary" id="apply_filters">
-                                                            <i class="bi bi-funnel me-1"></i> Appliquer
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-primary ms-2" id="today_button">
-                                                            <i class="bi bi-calendar-check me-1"></i> Aujourd'hui
-                                                        </button>
-                                                        <button type="button" id="syncDataBtn" class="btn btn-success ms-2">
+                                                        <button type="button" id="syncDataBtn" class="btn btn-success">
                                                             <i class="fas fa-sync-alt me-1"></i> Synchroniser
+                                                        </button>
+                                                        <button type="button" id="exportExcelBtn" class="btn btn-success ms-2">
+                                                            <i class="fas fa-file-excel me-1"></i> Exporter Excel
                                                         </button>
                                                         <button type="button" id="exportPdfBtn" class="btn btn-danger ms-2">
                                                             <i class="fas fa-file-pdf me-1"></i> Exporter PDF
@@ -423,7 +420,7 @@ $(document).ready(function() {
     // Progression pour la génération des données
     function showDataProgress(title, details = '') {
         isGeneratingReport = true;
-        $('#apply_filters').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i> Traitement...');
+        $('#syncDataBtn, #exportExcelBtn, #exportPdfBtn').prop('disabled', true);
         
         $('#data-progress-title').text(title || 'Génération du rapport en cours...');
         $('#data-progress-details').html('<i class="bi bi-info-circle me-1"></i> ' + details);
@@ -440,7 +437,7 @@ $(document).ready(function() {
     
     function hideDataProgress() {
         isGeneratingReport = false;
-        $('#apply_filters').prop('disabled', false).html('<i class="bi bi-funnel me-1"></i> Appliquer');
+        $('#syncDataBtn, #exportExcelBtn, #exportPdfBtn').prop('disabled', false);
         $('#data-progress-container').addClass('d-none');
     }
     
@@ -788,6 +785,10 @@ $(document).ready(function() {
                         badgeClass = 'primary';
                     } else if (row.status === 'HALF_DAY') {
                         badgeClass = 'info';
+                    } else if (row.status === 'MISSION') {
+                        badgeClass = 'info';
+                    } else if (row.status === 'LEAVE' || row.status === 'PERMISSION') {
+                        badgeClass = 'secondary';
                     }
                     
                     return '<span class="badge bg-' + badgeClass + '">' + data + '</span>';
@@ -824,8 +825,9 @@ $(document).ready(function() {
     
     // ========== GESTION DES FILTRES ==========
     
-    // Appliquer les filtres avec barre de progression
-    $('#apply_filters').on('click', function() {
+    // Applique les filtres (barre de progression) — déclenché par un changement
+    // de filtre ou après une synchronisation, il n'y a plus de bouton « Appliquer ».
+    function applyAttendanceFilters(showToast) {
         if (isSyncing) {
             showSweetAlert('info', 'Info', 'Une synchronisation est en cours. Veuillez patienter.');
             return;
@@ -870,14 +872,16 @@ $(document).ready(function() {
             
             setTimeout(function() {
                 hideDataProgress();
-                showSweetAlert('success', 'Succès', 'Données chargées avec succès.', 2000);
+                if (showToast) {
+                    showSweetAlert('success', 'Succès', 'Données chargées avec succès.', 2000);
+                }
             }, 800);
         });
-    });
-    
+    }
+
     // Appliquer automatiquement les filtres quand on change les valeurs
-    $('#filter_start_date, #filter_end_date, #filter_terminal_sn, #filter_terminal_alias, #filter_emp_code, #filter_department, #filter_status').on('change', function() {        
-        $('#apply_filters').click();
+    $('#filter_start_date, #filter_end_date, #filter_terminal_sn, #filter_terminal_alias, #filter_emp_code, #filter_department, #filter_status').on('change', function() {
+        applyAttendanceFilters(false);
     });
 
     // ========== SYNCHRONISATION DES DONNÉES ==========
@@ -936,7 +940,7 @@ $(document).ready(function() {
                                 });
                                 
                                 // Recharger les données
-                                $('#apply_filters').click();
+                                applyAttendanceFilters(false);
                             }, 500);
                         } else {
                             clearInterval(progressInterval);
@@ -961,6 +965,44 @@ $(document).ready(function() {
         });
     });
     
+    // ========== EXPORT EXCEL ==========
+
+    $('#exportExcelBtn').click(function() {
+        if (isSyncing || isGeneratingReport || isGeneratingPDF) {
+            showSweetAlert('info', 'Info', 'Une opération est déjà en cours. Veuillez patienter.');
+            return;
+        }
+
+        var startDate = $('#filter_start_date').val();
+        var endDate = $('#filter_end_date').val();
+
+        if (!startDate || !endDate) {
+            showSweetAlert('error', 'Erreur', 'Veuillez sélectionner une période valide pour l\'export.');
+            return;
+        }
+        if (new Date(startDate) > new Date(endDate)) {
+            showSweetAlert('error', 'Erreur', 'La date de début ne peut pas être après la date de fin.');
+            return;
+        }
+
+        // Mêmes filtres que le tableau : "all" vaut "aucun filtre" côté serveur.
+        function filterValue(selector) {
+            var value = $(selector).val();
+            return (!value || value === 'all') ? '' : value;
+        }
+
+        var params = $.param({
+            start_date: startDate,
+            end_date: endDate,
+            emp_code: filterValue('#filter_emp_code'),
+            department: filterValue('#filter_department'),
+            status: filterValue('#filter_status'),
+            terminal_alias: filterValue('#filter_terminal_alias')
+        });
+
+        window.location.href = "{{ route('admin.daily-attendance.export-excel') }}?" + params;
+    });
+
     // ========== EXPORT PDF AVEC PROGRESSION ==========
     
     // Bouton d'export PDF
@@ -1078,24 +1120,6 @@ $(document).ready(function() {
         showSweetAlert('info', 'Annulé', 'Génération du PDF annulée.');
     });
     
-    // ========== BOUTON AUJOURD'HUI ==========
-    
-    $('#today_button').on('click', function() {
-        // Réinitialiser tous les filtres
-        $('#filter_start_date').val(todayDate);
-        $('#filter_end_date').val(todayDate);
-        $('#filter_terminal_sn').val('all');
-        $('#filter_emp_code').val('all');
-        $('#filter_department').val('all');
-        $('#filter_status').val('all');
-        
-        // Recharger le tableau avec barre de progression
-        $('#apply_filters').click();
-        
-        // Notification
-        showSweetAlert('success', 'Succès', 'Filtres réinitialisés à aujourd\'hui', 2000);
-    });
-    
     // ========== STYLES DYNAMIQUES ==========
     
     // Ajouter les styles CSS dynamiquement
@@ -1165,7 +1189,7 @@ $(document).ready(function() {
                 gap: 5px;
             }
             
-            #today_button, #syncDataBtn, #exportPdfBtn {
+            #syncDataBtn, #exportExcelBtn, #exportPdfBtn {
                 margin-left: 0 !important;
                 margin-top: 5px;
             }

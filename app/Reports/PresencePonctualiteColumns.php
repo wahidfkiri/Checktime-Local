@@ -48,7 +48,7 @@ class PresencePonctualiteColumns
                     'on_time' => ['label' => "A l'heure", 'align' => 'center', 'width' => '6%', 'total' => 'sum'],
                     'late' => ['label' => 'Retard', 'align' => 'center', 'width' => '6%', 'total' => 'sum'],
                     'early_leave' => ['label' => 'Départ anticipé', 'align' => 'center', 'width' => '6%', 'total' => 'sum'],
-                    'half_day' => ['label' => 'Demi-journée', 'align' => 'center', 'width' => '6%', 'total' => 'sum'],
+                    'half_day' => ['label' => 'Pointage incomplet', 'align' => 'center', 'width' => '6%', 'total' => 'sum'],
                     'ponctualite_rate' => ['label' => 'Taux de ponctualité', 'align' => 'center', 'width' => '8%', 'type' => 'percent', 'total' => 'avg'],
                 ],
             ],

@@ -66,9 +66,9 @@
                                                         <button type="button" class="btn btn-primary" id="generate_report">
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
-                                                        <!-- <button type="button" class="btn btn-success" id="export_excel">
+                                                        <button type="button" class="btn btn-success" id="export_excel">
                                                             <i class="bi bi-file-excel me-1"></i> Excel
-                                                        </button> -->
+                                                        </button>
                                                         <button type="button" class="btn btn-danger" id="export_pdf">
                                                             <i class="bi bi-file-pdf me-1"></i> PDF
                                                         </button>
@@ -204,7 +204,6 @@
                                         <th>Départ anticipé</th>
                                         <th>Temps passé au poste</th>
                                         <th>Statut</th>
-                                        <th>Observations</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -761,7 +760,7 @@ $(document).ready(function() {
                                 text = 'Permission';
                                 break;
                             case 'weekend':
-                                text = 'Weekend';
+                                text = 'Week-end';
                                 badgeClass = 'light text-dark';
                                 break;
                             case 'holiday':
@@ -787,39 +786,6 @@ $(document).ready(function() {
                         
                         return badge;
                     }
-                },
-                { 
-                    data: null,
-                    render: function(data) {
-                        var observations = [];
-                        
-                        if (data.is_weekend) observations.push('Weekend');
-                        if (data.is_holiday) observations.push('Férié');
-                        if (data.is_on_leave) observations.push('Congé');
-                        if (data.has_permission) observations.push('Permission');
-                        if (data.schedule_type && data.schedule_type !== 'Non planifié') {
-                            observations.push(data.schedule_type);
-                        }
-                        
-                        // Ajouter les pointages
-                        if (data.all_punches && data.all_punches.length > 0) {
-                            if (data.all_punches.length === 1) {
-                                observations.push('1 pointage');
-                            } else {
-                                observations.push(data.all_punches.length + ' pointages');
-                            }
-                        }
-                        
-                        // Ajouter info sur le retard/départ anticipé
-                        if (data.late_minutes > 0) {
-                            observations.push('Retard: ' + data.late_minutes + 'min');
-                        }
-                        if (data.early_leave_minutes > 0) {
-                            observations.push('Départ: ' + data.early_leave_minutes + 'min');
-                        }
-                        
-                        return observations.join(', ') || '-';
-                    }
                 }
             ],
             language: {
@@ -829,24 +795,6 @@ $(document).ready(function() {
             order: [[0, 'desc']], // Trier par date décroissante par défaut
             dom: 'Bfrtip',
             buttons: [
-                {
-                    extend: 'excel',
-                    text: '<i class="bi bi-file-excel me-1"></i> Excel',
-                    className: 'btn btn-success btn-sm',
-                    title: 'Rapport Absences Retards',
-                    messageTop: function() {
-                        var startDate = $('#report_start_date').val();
-                        var endDate = $('#report_end_date').val();
-                        var empName = $('#report_emp_code option:selected').text();
-                        
-                        return 'Période: ' + startDate + ' au ' + endDate + '\n' +
-                               'Employé: ' + empName + '\n' +
-                               'Généré le: ' + new Date().toLocaleDateString('fr-FR');
-                    },
-                    exportOptions: {
-                        columns: ':visible'
-                    }
-                },
                 {
                     extend: 'print',
                     text: '<i class="bi bi-printer me-1"></i> Imprimer',
@@ -1040,9 +988,18 @@ $(document).ready(function() {
         exportToPdf();
     });
     
-    // Exporter en Excel (via DataTables)
+    // Exporter en Excel : téléchargement serveur avec les filtres courants
+    // (l'export DataTables ne portait que sur les lignes déjà chargées).
     $('#export_excel').on('click', function() {
-        $('.buttons-excel').click();
+        if (!validateDatesForExport()) return;
+
+        var params = $.param({
+            start_date: $('#report_start_date').val(),
+            end_date: $('#report_end_date').val(),
+            emp_code: $('#report_emp_code').val()
+        });
+
+        window.location.href = "{{ route('reports.export.excel') }}?" + params;
     });
     
     // Prévisualiser PDF dans un nouvel onglet

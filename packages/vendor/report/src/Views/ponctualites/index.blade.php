@@ -58,6 +58,9 @@
                                                         <button type="button" class="btn btn-primary" id="generate_report">
                                                             <i class="bi bi-file-earmark-text me-1"></i> Générer
                                                         </button>
+                                                        <button type="button" class="btn btn-success" id="export_excel">
+                                                            <i class="bi bi-file-earmark-excel me-1"></i> Exporter Excel
+                                                        </button>
                                                         <button type="button" class="btn btn-danger" id="export_pdf">
                                                             <i class="bi bi-file-pdf me-1"></i> Exporter PDF
                                                         </button>
@@ -718,6 +721,19 @@ $(document).ready(function() {
     
     $('#export_pdf').on('click', function() {
         exportToPdf();
+    });
+
+    // Export Excel : simple téléchargement GET avec les filtres courants.
+    $('#export_excel').on('click', function() {
+        if (!validateDatesForExport()) return;
+
+        var params = $.param({
+            start_date: $('#report_start_date').val(),
+            end_date: $('#report_end_date').val(),
+            emp_code: $('#report_emp_code').val()
+        });
+
+        window.location.href = "{{ route('admin.reports.custom.export.excel') }}?" + params;
     });
     
     // Générer automatiquement au chargement de la page

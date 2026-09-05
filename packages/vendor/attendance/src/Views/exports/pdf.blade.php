@@ -376,7 +376,8 @@
         <p>Document généré automatiquement par le système de pointage</p>
         <p>Total: {{ count($attendances) }} présence(s) | 
            Présents: {{ $statistics['present_days'] ?? 0 }} | 
-           Absents: {{ $statistics['absent_days'] ?? 0 }}</p>
+           Absents: {{ $statistics['absent_days'] ?? 0 }} |
+           Absences justifiées (congé / mission / autorisation): {{ $statistics['justified_days'] ?? 0 }}</p>
     </div>
     @else
     <div class="no-data">

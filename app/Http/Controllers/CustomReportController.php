@@ -8,6 +8,7 @@ use App\Models\DailyAttendance;
 use App\Models\EmployeeSchedule;
 use App\Models\Mission;
 use App\Models\Leave;
+use App\Models\EmployeePermission;
 use App\Models\ReportTemplate;
 use App\Models\Setting;
 use App\Reports\PresencePonctualiteColumns;
@@ -18,6 +19,13 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class CustomReportController extends Controller
 {
+    /** Nombre d'observations affichées dans la colonne avant troncature. */
+    private const MAX_OBSERVATIONS = 5;
+
+    /** Priorités d'affichage dans la colonne Observation (le plus petit d'abord). */
+    private const OBS_JUSTIFICATION = 0;
+    private const OBS_COURANTE      = 1;
+
     /**
      * Afficher la page du rapport personnalisé
      */
@@ -104,6 +112,39 @@ class CustomReportController extends Controller
      * Récupérer les données de présence et ponctualité depuis la base de données
      * en utilisant EmployeeSchedule pour le calcul des retards
      */
+    /**
+     * Met en forme la colonne Observation.
+     *
+     * Les entrées arrivent sous la forme [date Y-m-d, texte, priorité] et sont
+     * classées par priorité puis par date.
+     *
+     * Les justifications (mission, congé, autorisation) passent devant : elles
+     * sont l'information exceptionnelle du rapport, alors que les absences et
+     * retards sont nombreux et faisaient disparaître les justifications, la
+     * colonne n'affichant que les cinq premières entrées.
+     *
+     * @param  array<int, array{0: string, 1: string, 2?: int}> $observations
+     */
+    private function formatObservations(array $observations): string
+    {
+        if (empty($observations)) {
+            return 'Aucune observation';
+        }
+
+        usort($observations, function ($a, $b) {
+            $priorite = ($a[2] ?? self::OBS_COURANTE) <=> ($b[2] ?? self::OBS_COURANTE);
+
+            return $priorite !== 0 ? $priorite : strcmp($a[0], $b[0]);
+        });
+
+        $textes   = array_column($observations, 1);
+        $affiches = array_slice($textes, 0, self::MAX_OBSERVATIONS);
+        $reste    = count($textes) - count($affiches);
+
+        return implode(', ', $affiches)
+            . ($reste > 0 ? ' … (+' . $reste . ' autre' . ($reste > 1 ? 's' : '') . ')' : '');
+    }
+
     /**
      * Filtrer une collection d'employés par nom de département.
      *
@@ -205,6 +246,12 @@ class CustomReportController extends Controller
             ->get()
             ->groupBy('employee_id');
 
+        // Récupérer les autorisations d'absence approuvées pour la période.
+        $allPermissions = EmployeePermission::where('status', 'approved')
+            ->overlappingPeriod($startDate, $endDate)
+            ->get()
+            ->groupBy('employee_id');
+
         $attendances = $allAttendances->groupBy('employee_id');
 
         $reportData  = [];
@@ -214,6 +261,7 @@ class CustomReportController extends Controller
             $employeeAttendances = $attendances->get($employee->id, collect());
             $employeeMissions    = $allMissions->get($employee->id, collect());
             $employeeLeaves      = $leaves->get($employee->id, collect());
+            $employeePermissions = $allPermissions->get($employee->id, collect());
 
             // La requête de missions/congés remonte tout enregistrement qui
             // chevauche la période (y compris ceux qui commencent avant ou
@@ -253,6 +301,20 @@ class CustomReportController extends Controller
                 }
             }
 
+            // --- Dates d'autorisation d'absence ---
+            $permissionDates = [];
+            foreach ($employeePermissions as $permission) {
+                $permStart = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
+                $permEnd   = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                $current   = $permStart->copy();
+                while ($current <= $permEnd) {
+                    $permissionDates[$current->format('Y-m-d')] = [
+                        'raison' => $permission->raison,
+                    ];
+                    $current->addDay();
+                }
+            }
+
             // --- Compteurs ---
             $totalPresent    = 0;
             $totalAbsent     = 0;
@@ -273,7 +335,8 @@ class CustomReportController extends Controller
                     continue;
                 }
 
-                if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])) {
+                if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])
+                    || isset($permissionDates[$dateKey])) {
                     continue;
                 }
 
@@ -306,6 +369,16 @@ class CustomReportController extends Controller
                 }
             }
 
+            // Une autorisation d'absence ne compte pas comme une absence
+            // (même traitement que mission / congé), sans double comptage.
+            foreach ($permissionDates as $dateStr => $permission) {
+                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
+                    && !isset($missionDates[$dateStr])
+                    && !isset($leaveDates[$dateStr])) {
+                    $totalPresent++;
+                }
+            }
+
             $totalAbsent = $workingDays - $totalPresent;
             $totalOnTime = $totalPresent - $totalLate - $totalEarlyLeave;
 
@@ -313,6 +386,10 @@ class CustomReportController extends Controller
             $ponctualiteRate = $totalPresent > 0 ? round(($totalOnTime / $totalPresent) * 100, 1) : 0;
 
             // --- Observations ---
+            // Chaque entrée porte sa date : les observations sont ensuite triées
+            // chronologiquement. Sans ce tri, toutes les absences étaient listées
+            // avant les missions et congés (et pouvaient les évincer, la colonne
+            // n'affichant que les 5 premières entrées).
             $observations = [];
 
             foreach ($employeeAttendances as $attendance) {
@@ -320,35 +397,52 @@ class CustomReportController extends Controller
                 $date   = Carbon::parse($attendance->attendance_date)->format('d/m');
                 $dateKey = Carbon::parse($attendance->attendance_date)->format('Y-m-d');
 
+                // Journée déjà justifiée (mission / congé / autorisation) : la
+                // justification est ajoutée plus bas, ne pas la contredire avec
+                // un « Absent le … ».
+                if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])
+                    || isset($permissionDates[$dateKey])) {
+                    continue;
+                }
+
                 if ($status === 'ABSENT') {
-                    $observations[] = 'Absent le ' . $date;
+                    $observations[] = [$dateKey, 'Absent le ' . $date];
                 } else {
                     $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateKey);
                     if ($lateData['is_late']) {
-                        $observations[] = 'Retard ' . $lateData['late_minutes'] . ' min le ' . $date;
+                        $observations[] = [$dateKey, 'Retard ' . $lateData['late_minutes'] . ' min le ' . $date];
                     }
                     if ($status === 'HALF_DAY') {
-                        $observations[] = 'Demi-journée le ' . $date;
+                        $observations[] = [$dateKey, 'Pointage incomplet le ' . $date];
                     }
                     if ($status === 'EARLY_LEAVE') {
-                        $observations[] = 'Départ anticipé le ' . $date;
+                        $observations[] = [$dateKey, 'Départ anticipé le ' . $date];
                     }
                     if ($status === 'PRESENT' && $attendance->notes) {
-                        $observations[] = $attendance->notes . ' le ' . $date;
+                        $observations[] = [$dateKey, $attendance->notes . ' le ' . $date];
                     }
                 }
             }
 
             foreach ($missionDates as $dateStr => $mission) {
-                $date = Carbon::parse($dateStr)->format('d/m');
-                $observations[] = 'Mission: ' . $mission['title'] . ' (' . $mission['destination'] . ') le ' . $date;
+                $observations[] = [$dateStr, 'En mission le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
             }
 
             foreach ($leaveDates as $dateStr => $leave) {
                 if (!isset($missionDates[$dateStr])) {
-                    $date = Carbon::parse($dateStr)->format('d/m');
-                    $observations[] = $leave['type_name'] . ' le ' . $date;
+                    $observations[] = [$dateStr, $leave['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
                 }
+            }
+
+            foreach ($permissionDates as $dateStr => $permission) {
+                if (isset($missionDates[$dateStr]) || isset($leaveDates[$dateStr])) {
+                    continue;
+                }
+
+                $raison = trim((string) ($permission['raison'] ?? ''));
+                $observations[] = [$dateStr, "Autorisation d'absence"
+                    . ($raison !== '' ? ' (' . $raison . ')' : '')
+                    . ' le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
             }
 
             $recordedDates = $employeeAttendances
@@ -364,8 +458,9 @@ class CustomReportController extends Controller
                     && !in_array($dateStr, $recordedDates)
                     && !isset($missionDates[$dateStr])
                     && !isset($leaveDates[$dateStr])
+                    && !isset($permissionDates[$dateStr])
                 ) {
-                    $observations[] = 'Absent le ' . $currentDate->format('d/m');
+                    $observations[] = [$dateStr, 'Absent le ' . $currentDate->format('d/m')];
                 }
                 $currentDate->addDay();
             }
@@ -390,9 +485,7 @@ class CustomReportController extends Controller
                     'rate'        => $ponctualiteRate
                 ],
                 'mission_dates' => $missionDates,
-                'observation'   => !empty($observations)
-                    ? implode(', ', array_slice($observations, 0, 5))
-                    : 'Aucune observation'
+                'observation'   => $this->formatObservations($observations)
             ];
         }
 
@@ -652,28 +745,36 @@ class CustomReportController extends Controller
                 $presenceRate  = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
                 $ponctualiteRate = $totalPresent > 0 ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
 
+                // Entrées datées puis triées chronologiquement (cf. formatObservations).
                 $observations = [];
                 foreach ($employeeAttendances as $att) {
                     $status = strtoupper($att->status);
                     $date   = Carbon::parse($att->attendance_date)->format('d/m');
                     $dateKey = Carbon::parse($att->attendance_date)->format('Y-m-d');
+
+                    // Journée justifiée : la mission ou le congé est ajouté plus bas,
+                    // ne pas le contredire avec un « Absent le … ».
+                    if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])) {
+                        continue;
+                    }
+
                     if ($status === 'ABSENT') {
-                        $observations[] = 'Absent le ' . $date;
+                        $observations[] = [$dateKey, 'Absent le ' . $date];
                     } else {
                         $lateData = $this->calculateLateFromPlanning($employee, $att, $dateKey);
                         if ($lateData['is_late']) {
-                            $observations[] = 'Retard ' . $lateData['late_minutes'] . ' min le ' . $date;
+                            $observations[] = [$dateKey, 'Retard ' . $lateData['late_minutes'] . ' min le ' . $date];
                         }
-                        if ($status === 'HALF_DAY')    $observations[] = 'Demi-journée le ' . $date;
-                        if ($status === 'EARLY_LEAVE') $observations[] = 'Départ anticipé le ' . $date;
+                        if ($status === 'HALF_DAY')    $observations[] = [$dateKey, 'Pointage incomplet le ' . $date];
+                        if ($status === 'EARLY_LEAVE') $observations[] = [$dateKey, 'Départ anticipé le ' . $date];
                     }
                 }
                 foreach ($missionDates as $dateStr => $mission) {
-                    $observations[] = 'Mission: ' . $mission['title'] . ' (' . $mission['destination'] . ') le ' . Carbon::parse($dateStr)->format('d/m');
+                    $observations[] = [$dateStr, 'En mission le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
                 }
                 foreach ($leaveDates as $dateStr => $leave) {
                     if (!isset($missionDates[$dateStr])) {
-                        $observations[] = $leave['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m');
+                        $observations[] = [$dateStr, $leave['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
                     }
                 }
 
@@ -692,9 +793,7 @@ class CustomReportController extends Controller
                         'presence_rate'    => $presenceRate,
                         'ponctualite_rate' => $ponctualiteRate,
                     ],
-                    'observations' => !empty($observations)
-                        ? implode(', ', array_slice($observations, 0, 5))
-                        : 'Aucune observation',
+                    'observations' => $this->formatObservations($observations),
                 ];
             }
 

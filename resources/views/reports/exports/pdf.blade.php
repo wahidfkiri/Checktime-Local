@@ -218,7 +218,7 @@
             <span class="badge badge-permission">Permission</span>
             <span class="badge badge-leave">Congé</span>
             <span class="badge badge-holiday">Férié</span>
-            <span class="badge badge-weekend">Weekend</span>
+            <span class="badge badge-weekend">Week-end</span>
             <span class="badge badge-day_off">Repos</span>
             <span class="badge badge-no_schedule">Non planifié</span>
         </div>
@@ -294,15 +294,14 @@
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 10%;">Date</th>
-                            <th style="width: 12%;">Jour</th>
-                            <th style="width: 10%;">Horaire prévu</th>
-                            <th style="width: 15%;">Pointages</th>
-                            <th style="width: 8%;">Retard</th>
-                            <th style="width: 8%;">Départ anticipé</th>
-                            <th style="width: 8%;">Heures travaillées</th>
+                            <th style="width: 12%;">Date</th>
+                            <th style="width: 13%;">Jour</th>
+                            <th style="width: 14%;">Horaire prévu</th>
+                            <th style="width: 22%;">Pointages</th>
+                            <th style="width: 10%;">Retard</th>
+                            <th style="width: 10%;">Départ anticipé</th>
+                            <th style="width: 9%;">Heures travaillées</th>
                             <th style="width: 10%;">Statut</th>
-                            <th style="width: 19%;">Observation</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -363,21 +362,11 @@
                             
                             // Badge de statut
                             $statusClass = 'badge-' . $record['status'];
-                            $statusText = ucfirst(str_replace('_', ' ', $record['status']));
+                            // Libellé français : les codes stockés sont en anglais.
+                            $statusText = ($record['status'] === 'present' && ($record['late_minutes'] ?? 0) > 0)
+                                ? 'Présent (retard)'
+                                : ($status_labels[$record['status']] ?? ucfirst(str_replace('_', ' ', $record['status'])));
                             
-                            // Remarques
-                            $remarks = [];
-                            if ($record['is_weekend']) $remarks[] = 'Weekend';
-                            if ($record['is_holiday']) $remarks[] = 'Jour férié';
-                            if ($record['is_on_leave']) $remarks[] = 'En congé';
-                            if ($record['has_permission']) $remarks[] = 'Permission';
-                            if ($record['schedule_type'] == 'Non planifié') $remarks[] = 'Non planifié';
-                            if (($record['late_minutes'] ?? 0) > 0) $remarks[] = 'Retard ' . $record['late_minutes'] . ' min';
-                            if (($record['early_leave_minutes'] ?? 0) > 0) $remarks[] = 'Départ anticipé ' . $record['early_leave_minutes'] . ' min';
-                            if (!empty($record['all_punches'])) {
-                                $remarks[] = count($record['all_punches']) . ' pointage(s)';
-                            }
-                            $remarksText = implode(', ', $remarks);
                         @endphp
                         <tr>
                             <td class="time-cell">{{ $date->format('d/m/Y') }}</td>
@@ -394,7 +383,6 @@
                             <td class="text-center">
                                 <span class="badge {{ $statusClass }}">{{ $statusText }}</span>
                             </td>
-                            <td>{{ $remarksText }}</td>
                         </tr>
                         @endforeach
                         
@@ -417,7 +405,6 @@
                             <td class="text-center">
                                 {{ $presentCount }} / {{ $totalDays }}
                             </td>
-                            <td></td>
                         </tr>
                     </tbody>
                 </table>

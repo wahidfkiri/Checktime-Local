@@ -178,12 +178,12 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="start_date" class="form-label">Date de début <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" id="start_date" name="start_date" required>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
                             <div class="invalid-feedback" id="start_date-error"></div>
                         </div>
                         <div class="col-md-6">
                             <label for="end_date" class="form-label">Date de fin <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" id="end_date" name="end_date" required>
+                            <input type="date" class="form-control" id="end_date" name="end_date" required>
                             <div class="invalid-feedback" id="end_date-error"></div>
                         </div>
                     </div>
@@ -267,12 +267,12 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="edit_start_date" class="form-label">Date de début <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" id="edit_start_date" name="start_date" required>
+                            <input type="date" class="form-control" id="edit_start_date" name="start_date" required>
                             <div class="invalid-feedback" id="edit_start_date-error"></div>
                         </div>
                         <div class="col-md-6">
                             <label for="edit_end_date" class="form-label">Date de fin <span class="text-danger">*</span></label>
-                            <input type="datetime-local" class="form-control" id="edit_end_date" name="end_date" required>
+                            <input type="date" class="form-control" id="edit_end_date" name="end_date" required>
                             <div class="invalid-feedback" id="edit_end_date-error"></div>
                         </div>
                     </div>
@@ -431,36 +431,26 @@ $(document).ready(function() {
     $('#reference').val(generateReference());
     
     // Calculer et afficher la durée
+    // Une mission s'exprime en journées : les deux bornes sont incluses
+    // (du 10 au 10 = 1 jour, du 10 au 12 = 3 jours).
     function calculateDuration(start, end, previewElement) {
-        if (start && end) {
-            const startDate = new Date(start);
-            const endDate = new Date(end);
-            
-            if (endDate >= startDate) {
-                const diffTime = endDate - startDate;
-                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                const diffHours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                
-                let durationText = 'Durée: ';
-                if (diffDays > 0) {
-                    durationText += diffDays + ' jour' + (diffDays > 1 ? 's' : '');
-                    if (diffHours > 0) {
-                        durationText += ' et ' + diffHours + ' heure' + (diffHours > 1 ? 's' : '');
-                    }
-                } else {
-                    durationText += diffHours + ' heure' + (diffHours > 1 ? 's' : '');
-                }
-                
-                $(previewElement).text(durationText);
-                return diffDays + (diffHours > 0 ? '.' + Math.floor(diffHours * 100 / 24) : '');
-            } else {
-                $(previewElement).text('Durée: La date de fin doit être après la date de début');
-                return null;
-            }
-        } else {
+        if (!start || !end) {
             $(previewElement).text('Durée: Non définie');
             return null;
         }
+
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+
+        if (endDate < startDate) {
+            $(previewElement).text('Durée: La date de fin doit être après la date de début');
+            return null;
+        }
+
+        const days = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+        $(previewElement).text('Durée: ' + days + ' jour' + (days > 1 ? 's' : ''));
+        return days;
     }
     
     // Écouteurs pour le calcul de durée
@@ -653,8 +643,8 @@ $(document).ready(function() {
                     $('#view_department').text(mission.department?.name || '-');
                     $('#view_title').text(mission.title);
                     $('#view_destination').text(mission.destination || '-');
-                    $('#view_start_date').text(new Date(mission.start_date).toLocaleString('fr-FR'));
-                    $('#view_end_date').text(new Date(mission.end_date).toLocaleString('fr-FR'));
+                    $('#view_start_date').text(mission.start_date_formatted || '-');
+                    $('#view_end_date').text(mission.end_date_formatted || '-');
                     $('#view_duration').text(mission.duration_formatted || '-');
                     $('#view_description').text(mission.description || 'Aucune description');
                     $('#view_created_at').text(new Date(mission.created_at).toLocaleString('fr-FR'));
@@ -685,24 +675,15 @@ $(document).ready(function() {
                 if (response.success) {
                     const mission = response.data;
                     
-                    function formatForDateTimeInput(isoDate) {
-                        const date = new Date(isoDate);
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        const hours = String(date.getHours()).padStart(2, '0');
-                        const minutes = String(date.getMinutes()).padStart(2, '0');
-                        return `${year}-${month}-${day}T${hours}:${minutes}`;
-                    }
-
                     $('#edit_mission_id').val(mission.id);
                     $('#edit_employee_id').val(mission.employee_id);
                     $('#edit_reference').val(mission.reference);
                     $('#edit_title').val(mission.title);
                     $('#edit_description').val(mission.description);
                     $('#edit_destination').val(mission.destination);
-                    $('#edit_start_date').val(formatForDateTimeInput(mission.start_date));
-                    $('#edit_end_date').val(formatForDateTimeInput(mission.end_date));
+                    // start_date / end_date arrivent déjà au format Y-m-d.
+                    $('#edit_start_date').val(mission.start_date);
+                    $('#edit_end_date').val(mission.end_date);
                     
                     // Calculer et afficher la durée
                     calculateDuration(
