@@ -33,7 +33,7 @@ class CurlSmtpTransport extends AbstractTransport
             throw new TransportException('Le serveur SMTP curl n\'est pas configuré.');
         }
 
-        $netrc = $this->createNetrcFile();
+        $curlConfig = $this->createCurlConfigFile();
 
         try {
             $url = ($this->encryption === 'ssl' ? 'smtps' : 'smtp') . '://' . $this->host . ':' . $this->port;
@@ -59,12 +59,11 @@ class CurlSmtpTransport extends AbstractTransport
                 $command[] = '--ssl-reqd';
             }
 
-            if ($netrc !== null) {
-                $command[] = '--netrc-file';
-                $command[] = $netrc;
-                // Required by mail.gouv.bj and harmless for servers supporting LOGIN.
-                $command[] = '--login-options';
-                $command[] = 'AUTH=LOGIN';
+            if ($curlConfig !== null) {
+                // Equivalent to --user "username:password", but the secret is
+                // never exposed in the process command line.
+                $command[] = '--config';
+                $command[] = $curlConfig;
             }
 
             $result = $this->runCurl($command, $message->toString());
@@ -74,8 +73,8 @@ class CurlSmtpTransport extends AbstractTransport
                 throw new TransportException('curl SMTP a échoué (code ' . $result['exit_code'] . '): ' . trim($result['stderr']));
             }
         } finally {
-            if ($netrc !== null && is_file($netrc)) {
-                @unlink($netrc);
+            if ($curlConfig !== null && is_file($curlConfig)) {
+                @unlink($curlConfig);
             }
         }
     }
@@ -85,25 +84,31 @@ class CurlSmtpTransport extends AbstractTransport
         return 'curl-smtp://' . $this->host . ':' . $this->port;
     }
 
-    private function createNetrcFile(): ?string
+    private function createCurlConfigFile(): ?string
     {
         if ($this->username === null || $this->username === '') {
             return null;
         }
 
-        $path = tempnam(sys_get_temp_dir(), 'checktime-mail-');
+        $path = tempnam(sys_get_temp_dir(), 'checktime-curl-');
         if ($path === false) {
             throw new TransportException('Impossible de préparer les identifiants SMTP pour curl.');
         }
 
-        $value = sprintf("machine %s\nlogin %s\npassword %s\n", $this->host, $this->username, $this->password ?? '');
+        $credentials = $this->escapeCurlConfigValue($this->username . ':' . ($this->password ?? ''));
+        $value = "user = \"{$credentials}\"\nlogin-options = \"AUTH=LOGIN\"\n";
         if (file_put_contents($path, $value, LOCK_EX) === false) {
             @unlink($path);
-            throw new TransportException('Impossible d\'écrire les identifiants SMTP temporaires pour curl.');
+            throw new TransportException('Impossible d\'écrire la configuration SMTP temporaire pour curl.');
         }
 
         @chmod($path, 0600);
         return $path;
+    }
+
+    private function escapeCurlConfigValue(string $value): string
+    {
+        return str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '\\r', '\\n'], $value);
     }
 
     /** @return array{exit_code:int, stderr:string} */

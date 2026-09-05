@@ -7,19 +7,20 @@ class MailPassword
 {
     public static function resolve(?string $configuredPassword): ?string
     {
-        if ($configuredPassword !== null && $configuredPassword !== '') {
-            return $configuredPassword;
-        }
-
         // Le chemin peut être adapté en production avec MAIL_PASSWORD_FILE.
-        // Par défaut, le fichier demandé est placé à la racine du projet.
+        // Par défaut, le fichier demandé est placé à la racine du projet. Le
+        // fichier est prioritaire : il permet de remplacer sans ambiguïté un
+        // ancien mot de passe encore présent dans la table settings.
         $path = config('mail.mailers.smtp.password_file', base_path('MAIL.txt'));
-        if (!is_file($path) || !is_readable($path)) {
-            return null;
+        if (is_file($path) && is_readable($path)) {
+            $password = file_get_contents($path);
+            if ($password !== false && rtrim($password, "\r\n") !== '') {
+                return rtrim($password, "\r\n");
+            }
         }
 
-        $password = file_get_contents($path);
-
-        return $password === false ? null : rtrim($password, "\r\n");
+        return $configuredPassword !== null && $configuredPassword !== ''
+            ? $configuredPassword
+            : null;
     }
 }
