@@ -118,10 +118,11 @@ class NotificationSettingsController extends Controller
             $password = $request->filled('mail_password')
                 ? $request->input('mail_password')
                 : Setting::where('key', 'mail_password')->value('value');
+            $password = \App\Support\MailPassword::resolve($password);
 
             config([
                 'mail.mailers.smtp' => array_merge(config('mail.mailers.smtp', []), [
-                    'transport'  => 'smtp',
+                    'transport'  => 'curl-smtp',
                     'host'       => $request->input('mail_host'),
                     'port'       => (int) $request->input('mail_port'),
                     'username'   => $request->input('mail_username'),
@@ -133,6 +134,7 @@ class NotificationSettingsController extends Controller
                 'mail.from'    => ['address' => $fromAddress, 'name' => $fromName],
             ]);
 
+            Mail::purge('smtp');
             Mail::mailer('smtp');
 
             Mail::raw(
@@ -416,16 +418,17 @@ class NotificationSettingsController extends Controller
 
         config([
             'mail.default'                     => 'smtp',
-            'mail.mailers.smtp.transport'      => 'smtp',
+            'mail.mailers.smtp.transport'      => 'curl-smtp',
             'mail.mailers.smtp.host'           => $mail['mail_host'],
             'mail.mailers.smtp.port'           => (int) ($mail['mail_port'] ?: 587),
             'mail.mailers.smtp.username'       => $mail['mail_username'] ?: null,
-            'mail.mailers.smtp.password'       => $mail['mail_password'] ?: null,
+            'mail.mailers.smtp.password'       => \App\Support\MailPassword::resolve($mail['mail_password'] ?: null),
             'mail.mailers.smtp.encryption'     => $this->resolveEncryptionForTransport($mail['mail_encryption']),
             'mail.from.address'                => $mail['mail_from_address'] ?: null,
             'mail.from.name'                   => $mail['mail_from_name'] ?: config('app.name', 'CheckTime'),
         ]);
 
+        Mail::purge('smtp');
         Mail::mailer('smtp');
     }
 

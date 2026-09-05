@@ -35,12 +35,15 @@ return [
 
     'mailers' => [
         'smtp' => [
-            'transport' => 'smtp',
+            // Curl force AUTH=LOGIN when a username is configured, for SMTP
+            // servers which reject Symfony Mailer's authentication negotiation.
+            'transport' => 'curl-smtp',
             'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
             'port' => env('MAIL_PORT', 587),
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
+            'password_file' => env('MAIL_PASSWORD_FILE', base_path('MAIL.txt')),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],

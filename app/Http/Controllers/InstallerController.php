@@ -234,7 +234,7 @@ class InstallerController extends Controller
             $host = $request->input('mail_host');
             $port = $request->input('mail_port');
             $username = $request->input('mail_username');
-            $password = $request->input('mail_password');
+            $password = \App\Support\MailPassword::resolve($request->input('mail_password'));
             $encryption = $request->input('mail_encryption');
             $fromAddress = $request->input('mail_from_address');
             $fromName = $request->input('mail_from_name', 'CheckTime');
@@ -242,7 +242,7 @@ class InstallerController extends Controller
             // Temporarily override mail config
             config([
                 'mail.mailers.smtp' => array_merge(config('mail.mailers.smtp', []), [
-                    'transport' => 'smtp',
+                    'transport' => 'curl-smtp',
                     'host' => $host,
                     'port' => (int) $port,
                     'username' => $username,
@@ -258,7 +258,8 @@ class InstallerController extends Controller
                 ],
             ]);
 
-            // Purge the mailer to pick up the new config
+            // Purge the mailer to pick up the new config.
+            Mail::purge('smtp');
             Mail::mailer('smtp');
 
             // Send test email

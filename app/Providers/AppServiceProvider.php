@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +23,20 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        // Certains serveurs SMTP (ex. mail.gouv.bj) imposent AUTH LOGIN.
+        // Ce transport délègue à curl et conserve le MIME généré par Laravel,
+        // y compris les PDF attachés aux rapports automatiques.
+        Mail::extend('curl-smtp', function (array $config) {
+            return new \App\Mail\Transport\CurlSmtpTransport(
+                (string) ($config['host'] ?? ''),
+                (int) ($config['port'] ?? 587),
+                $config['username'] ?? null,
+                $config['password'] ?? null,
+                $config['encryption'] ?? null,
+                (int) ($config['timeout'] ?? 30),
+            );
+        });
+
         // Le thème de l'app est Bootstrap 5 : aligne les vues de pagination
         // Laravel (par défaut en Tailwind) sur Bootstrap 5.
         Paginator::useBootstrapFive();
@@ -87,11 +102,11 @@ class AppServiceProvider extends ServiceProvider
 
             config([
                 'mail.default'                 => 'smtp',
-                'mail.mailers.smtp.transport'  => 'smtp',
+                'mail.mailers.smtp.transport'  => 'curl-smtp',
                 'mail.mailers.smtp.host'       => $mail['mail_host'],
                 'mail.mailers.smtp.port'       => (int) ($mail['mail_port'] ?? 587),
                 'mail.mailers.smtp.username'   => $mail['mail_username'] ?? null,
-                'mail.mailers.smtp.password'   => $mail['mail_password'] ?? null,
+                'mail.mailers.smtp.password'   => \App\Support\MailPassword::resolve($mail['mail_password'] ?? null),
                 // Le transport SMTP de Laravel/Symfony Mailer ne connaît que
                 // 'tls' (négociation STARTTLS, ou implicite si port 465) et
                 // 'ssl'. « STARTTLS » est une option distincte côté interface,
