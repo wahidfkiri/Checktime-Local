@@ -95,7 +95,7 @@
 
                         <div id="suivi_result" class="d-none">
                             <div class="text-center mb-3">
-                                <h5 class="mb-1">STATISTIQUES DES RETARDS, SORTIES ET ABSENCES NON JUSTIFIÉES PAR JOUR</h5>
+                                <h5 class="mb-1">Tableau de Suivi de la Ponctualité</h5>
                                 <div class="fw-bold" id="suivi_month"></div>
                                 <div class="text-muted small" id="suivi_period"></div>
                             </div>
@@ -110,7 +110,7 @@
                             <div class="mt-3 small">
                                 <span class="legende cell-ok">08:30 , 17:00</span> arrivée et départ
                                 <span class="legende cell-late">25 mn</span> retard
-                                <span class="legende cell-early">sortie</span> sortie anticipée
+                                <span class="legende cell-early">Incomplet</span> Incomplet
                                 <span class="legende cell-absent">absent</span> absence non justifiée
                                 <span class="legende cell-mission">en mission</span>
                                 <span class="legende cell-leave">en congé</span>

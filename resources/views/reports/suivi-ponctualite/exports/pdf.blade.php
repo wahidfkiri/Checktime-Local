@@ -67,7 +67,7 @@
         @if($logoPath)
             <img src="{{ public_path($logoPath) }}" alt="{{ $companyName }}" class="logo">
         @endif
-        <div class="titre">Statistiques des retards, sorties et absences non justifiées par jour</div>
+        <div class="titre">Tableau de Suivi de la Ponctualité</div>
         <div class="mois">{{ $report['month_label'] }}</div>
         <div class="periode">{{ $report['period_label'] }}</div>
     </div>
@@ -124,7 +124,7 @@
         <strong>Légende :</strong>
         <span class="cell-ok">08:30 , 17:00</span> arrivée et départ
         <span class="cell-late">25 mn</span> retard
-        <span class="cell-early">sortie</span> sortie anticipée
+        <span class="cell-early">Incomplet</span> Incomplet
         <span class="cell-absent">absent</span> absence non justifiée
         <span class="cell-mission">en mission</span>
         <span class="cell-leave">en congé</span>

@@ -1188,7 +1188,7 @@ class CustomReportController extends Controller
         $xlsx->setLandscape();
         $xlsx->setColumnWidths(array_merge([32], array_fill(0, $nbJours, 6), [9, 9]));
 
-        $xlsx->addRow(['STATISTIQUES DES RETARDS, SORTIES ET ABSENCES NON JUSTIFIÉES PAR JOUR'], true);
+        $xlsx->addRow(['Tableau de Suivi de la Ponctualité'], true);
         $xlsx->addRow([$report['month_label']], true);
         $xlsx->addRow([$report['period_label']]);
         $xlsx->addRow([]);
@@ -1374,7 +1374,7 @@ class CustomReportController extends Controller
                 }
 
                 if (strtoupper($attendance->status) === 'EARLY_LEAVE' || !empty($attendance->is_early_leave)) {
-                    $details[] = 'sortie';
+                    $details[] = 'Incomplet';
                 }
 
                 $cells[$dateKey] = [
