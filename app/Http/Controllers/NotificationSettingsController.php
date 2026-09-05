@@ -119,11 +119,13 @@ class NotificationSettingsController extends Controller
             $fromName    = $request->input('mail_from_name', config('app.name', 'CheckTime'));
             $testEmail   = $request->input('test_email');
 
-            // Si le mot de passe n'est pas fourni, réutiliser celui déjà enregistré.
+            // Une valeur saisie pour le test doit être utilisée telle quelle.
+            // Le fichier MAIL.txt ne sert de repli que lorsque le champ est vide.
             $password = $request->filled('mail_password')
                 ? $request->input('mail_password')
-                : Setting::where('key', 'mail_password')->value('value');
-            $password = \App\Support\MailPassword::resolve($password);
+                : \App\Support\MailPassword::resolve(
+                    Setting::where('key', 'mail_password')->value('value')
+                );
 
             config([
                 'mail.mailers.smtp' => array_merge(config('mail.mailers.smtp', []), [
