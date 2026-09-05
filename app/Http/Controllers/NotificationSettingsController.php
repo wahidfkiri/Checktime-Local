@@ -149,7 +149,7 @@ class NotificationSettingsController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Email de test envoyé avec succès à ' . $testEmail . '.',
+                'message' => 'Message accepté par le serveur SMTP pour ' . $testEmail . '. Vérifiez la boîte de réception et les indésirables ; cette confirmation ne garantit pas la remise finale par le serveur destinataire.',
             ]);
         } catch (\Throwable $e) {
             Log::error('Erreur test SMTP: ' . $e->getMessage());

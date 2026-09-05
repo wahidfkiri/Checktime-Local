@@ -2,6 +2,7 @@
 
 namespace App\Mail\Transport;
 
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
@@ -39,9 +40,11 @@ class CurlSmtpTransport extends AbstractTransport
             $url = ($this->encryption === 'ssl' ? 'smtps' : 'smtp') . '://' . $this->host . ':' . $this->port;
             $command = [
                 'curl',
+                '--disable',
                 '--silent',
                 '--show-error',
                 '--fail',
+                '--write-out', 'CHECKTIME_SMTP_CODE:%{response_code}',
                 '--url', $url,
                 '--mail-from', $message->getEnvelope()->getSender()->getAddress(),
                 '--upload-file', '-',
@@ -67,11 +70,19 @@ class CurlSmtpTransport extends AbstractTransport
             }
 
             $result = $this->runCurl($command, $message->toString());
-            $message->appendDebug($result['stderr']);
+            $message->appendDebug($result['stderr'] . $result['stdout']);
 
             if ($result['exit_code'] !== 0) {
                 throw new TransportException('curl SMTP a échoué (code ' . $result['exit_code'] . '): ' . trim($result['stderr']));
             }
+
+            preg_match('/CHECKTIME_SMTP_CODE:(\d+)/', $result['stdout'], $matches);
+            Log::info('Message accepté par le serveur SMTP via curl.', [
+                'smtp_code' => $matches[1] ?? null,
+                'message_id' => $message->getMessageId(),
+                'from' => $message->getEnvelope()->getSender()->getAddress(),
+                'recipients' => array_map(fn ($recipient) => $recipient->getAddress(), $message->getEnvelope()->getRecipients()),
+            ]);
         } finally {
             if ($curlConfig !== null && is_file($curlConfig)) {
                 @unlink($curlConfig);
@@ -111,7 +122,7 @@ class CurlSmtpTransport extends AbstractTransport
         return str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '\\r', '\\n'], $value);
     }
 
-    /** @return array{exit_code:int, stderr:string} */
+    /** @return array{exit_code:int, stdout:string, stderr:string} */
     private function runCurl(array $command, string $message): array
     {
         $process = proc_open($command, [
@@ -136,11 +147,11 @@ class CurlSmtpTransport extends AbstractTransport
             $offset += $written;
         }
         fclose($pipes[0]);
-        stream_get_contents($pipes[1]);
+        $stdout = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
 
-        return ['exit_code' => proc_close($process), 'stderr' => $stderr];
+        return ['exit_code' => proc_close($process), 'stdout' => $stdout, 'stderr' => $stderr];
     }
 }
