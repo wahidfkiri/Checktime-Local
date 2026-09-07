@@ -20,37 +20,17 @@ class CheckTimeService
     }
 
     /**
-     * Charge base_url et token depuis la table settings (group=company)
-     * Fallback: access_configs table, puis hardcoded default
+     * Charge base_url et token depuis la table settings (group=company).
+     * Repli token : table access_configs (installations historiques).
+     * Aucune lecture de .env : ces valeurs ne vivent plus dans l'environnement.
      */
     private function loadConfig(): void
     {
-        try {
-            $settings = Setting::getGroup('company');
+        $this->baseUrl = Setting::apiUrl();
+        $this->generalToken = Setting::apiToken();
 
-            $this->baseUrl = $settings['api_url']
-                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-
-            $this->generalToken = $settings['api_token'] ?? null;
-
-            if (!$this->generalToken) {
-                $access_credentials = DB::table('access_configs')->first();
-                if ($access_credentials && !empty($access_credentials->general_token)) {
-                    $this->generalToken = $access_credentials->general_token;
-                }
-            }
-
-            if (!$this->generalToken) {
-                $this->generalToken = env('CHECKTIME_TOKEN');
-            }
-
-            if (!$this->generalToken) {
-                \Log::warning('Aucun token trouvé dans settings ni access_configs.');
-            }
-        } catch (\Exception $e) {
-            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-            $this->generalToken = env('CHECKTIME_TOKEN');
-            \Log::error('Erreur chargement config CheckTimeService: ' . $e->getMessage());
+        if (!$this->generalToken) {
+            \Log::warning('Aucun token trouvé dans settings ni access_configs.');
         }
     }
 
@@ -325,17 +305,11 @@ class CheckTimeService
     // ─── Static helpers ─────────────────────────────────────────────
 
     /**
-     * Lire l'URL de base depuis la table settings (fallback access_configs)
+     * Lire l'URL de base depuis la table settings (group=company, clé api_url)
      */
     public static function getConfigBaseUrl(): string
     {
-        try {
-            $settings = Setting::getGroup('company');
-            return $settings['api_url']
-                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-        } catch (\Exception $e) {
-            return env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-        }
+        return Setting::apiUrl();
     }
 
     /**
@@ -343,23 +317,7 @@ class CheckTimeService
      */
     public static function getConfigToken(): ?string
     {
-        try {
-            $settings = Setting::getGroup('company');
-            $token = $settings['api_token'] ?? null;
-
-            if (!$token) {
-                $config = DB::table('access_configs')->first();
-                $token = $config->general_token ?? null;
-            }
-
-            if (!$token) {
-                $token = env('CHECKTIME_TOKEN');
-            }
-
-            return $token;
-        } catch (\Exception $e) {
-            return env('CHECKTIME_TOKEN');
-        }
+        return Setting::apiToken();
     }
 
     /**

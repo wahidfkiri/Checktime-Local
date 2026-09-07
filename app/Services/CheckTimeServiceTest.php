@@ -22,19 +22,9 @@ class CheckTimeServiceTest
 
     private function loadConfig(): void
     {
-        try {
-            $settings = Setting::getGroup('company');
-            $this->baseUrl = $settings['api_url']
-                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-            $this->generalToken = $settings['api_token'] ?? null;
-
-            if (!$this->generalToken) {
-                $config = DB::table('access_configs')->first();
-                $this->generalToken = $config->general_token ?? null;
-            }
-        } catch (\Exception $e) {
-            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-        }
+        // URL et token lus depuis la table settings (group "company"), jamais depuis .env.
+        $this->baseUrl = Setting::apiUrl();
+        $this->generalToken = Setting::apiToken();
     }
 
     public function testCredentials(string $login, string $password)

@@ -17,13 +17,8 @@ class BiometricService
 
     public function __construct()
     {
-        try {
-            $settings = Setting::getGroup('company');
-            $this->baseUrl = $settings['api_url']
-                ?? env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-        } catch (\Exception $e) {
-            $this->baseUrl = env('CHECKTIME_BASE_URL', 'http://54.37.15.111');
-        }
+        // URL lue depuis la table settings (group "company"), jamais depuis .env.
+        $this->baseUrl = Setting::apiUrl();
     }
 
     /**

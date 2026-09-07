@@ -42,6 +42,52 @@ class Setting extends Model
     }
 
     /**
+     * URL de base de l'API biométrique (table settings, group "company").
+     *
+     * Source unique de vérité : la clé `api_url` enregistrée par l'installeur
+     * ou l'écran des paramètres. Aucune lecture de .env ici — les identifiants
+     * de l'appareil ne doivent plus transiter par le fichier d'environnement.
+     * Repli final : la valeur par défaut de config/checktime.php.
+     */
+    public static function apiUrl(): string
+    {
+        try {
+            $value = self::where('group', 'company')->where('key', 'api_url')->value('value');
+        } catch (\Exception $e) {
+            $value = null;
+        }
+
+        $value = is_string($value) ? trim($value) : '';
+
+        return $value !== '' ? $value : (string) config('checktime.base_url');
+    }
+
+    /**
+     * Token d'accès à l'API biométrique (table settings, group "company").
+     *
+     * Repli sur la table access_configs pour les installations antérieures
+     * à la migration vers la table settings. Retourne null si rien n'est
+     * configuré : l'appelant doit gérer ce cas explicitement.
+     */
+    public static function apiToken(): ?string
+    {
+        try {
+            $value = self::where('group', 'company')->where('key', 'api_token')->value('value');
+
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+
+            $config = \Illuminate\Support\Facades\DB::table('access_configs')->first();
+            $legacy = $config->general_token ?? null;
+
+            return (is_string($legacy) && trim($legacy) !== '') ? trim($legacy) : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Tolérance de retard (en minutes) configurée dans les paramètres.
      *
      * Un employé arrivé dans cette marge après l'heure de début planifiée

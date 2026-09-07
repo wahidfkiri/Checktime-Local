@@ -498,13 +498,14 @@ protected function updateEnvFile(array $appInfo, array $endpoint, array $smtp): 
 
     $hasSmtp = !empty($smtp['mail_host']);
 
+    // NOTE : l'URL et le token de l'appareil biométrique ne sont volontairement
+    // PAS écrits dans .env. Ils sont enregistrés uniquement en base par
+    // saveSettings() (table settings, group "company") et lus via
+    // Setting::apiUrl() / Setting::apiToken().
     $replacements = [
         'APP_NAME' => '"' . $appInfo['app_name'] . '"',
         'APP_TIMEZONE' => $appInfo['timezone'],
         'APP_LOCALE' => $appInfo['locale'],
-
-        'CHECKTIME_BASE_URL' => $endpoint['api_url'],
-        'CHECKTIME_TOKEN' => $endpoint['api_token'],
 
         'MAIL_MAILER' => $hasSmtp ? 'smtp' : 'log',
         'MAIL_HOST' => $smtp['mail_host'] ?? '',
@@ -526,6 +527,12 @@ protected function updateEnvFile(array $appInfo, array $endpoint, array $smtp): 
         } else {
             $envContent .= "\n" . $key . '=' . $value;
         }
+    }
+
+    // Purge des anciennes clés : sur une installation existante, elles peuvent
+    // encore traîner dans .env avec un token en clair. La base fait autorité.
+    foreach (['CHECKTIME_BASE_URL', 'CHECKTIME_TOKEN'] as $legacyKey) {
+        $envContent = preg_replace('/^' . $legacyKey . '=.*$\R?/m', '', $envContent);
     }
 
     File::put($envPath, $envContent);

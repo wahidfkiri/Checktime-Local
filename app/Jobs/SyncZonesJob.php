@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\Zone;
 use Carbon\Carbon;
+use App\Models\Setting;
 
 class SyncZonesJob implements ShouldQueue
 {
@@ -121,7 +122,7 @@ class SyncZonesJob implements ShouldQueue
             ])
             ->timeout(45)
             ->retry(3, 1000)
-            ->get(config('services.checktime.base_url') . '/personnel/api/areas/', [
+            ->get(Setting::apiUrl() . '/personnel/api/areas/', [
                 'page' => $page,
                 'limit' => $limit
             ]);

@@ -32,7 +32,7 @@ return [
     ],
 
     'zones' => [
-    'base_url' => env('CHECKTIME_BASE_URL', 'http://54.37.15.111'),
+    // L'URL de l'API vient de la table settings : Setting::apiUrl().
     'sync_interval' => env('ZONES_SYNC_INTERVAL', 3600), // 1 heure
     'client_sync_interval' => env('ZONES_CLIENT_SYNC_INTERVAL', 3600), // 1 heure par client
     'batch_size' => env('ZONES_BATCH_SIZE', 100),

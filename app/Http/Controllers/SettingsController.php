@@ -164,8 +164,8 @@ class SettingsController extends Controller
      *
      * - Si le formulaire contient une valeur (candidate pas encore
      *   enregistrée), c'est ELLE qui est testée.
-     * - Sinon, teste la clé actuellement active, quelle que soit sa source
-     *   (table settings, ou repli .env CHECKTIME_TOKEN).
+     * - Sinon, teste la clé actuellement active, telle que stockée en base
+     *   (table settings, group "company", clé api_token ; repli access_configs).
      */
     public function testAccessKey(Request $request)
     {
@@ -174,17 +174,17 @@ class SettingsController extends Controller
             $source = 'saisie dans le formulaire';
 
             if ($token === '') {
-                $token = (string) CheckTimeService::getConfigToken();
+                $token = (string) Setting::apiToken();
                 $source = !empty(Setting::getGroup('company')['api_token'] ?? null)
                     ? 'enregistrée dans les paramètres'
-                    : 'repli .env (CHECKTIME_TOKEN)';
+                    : 'repli base (access_configs)';
             }
 
             if ($token === '') {
                 return response()->json([
                     'success' => false,
                     'valid' => false,
-                    'message' => "Aucune clé à tester : rien n'est enregistré ni défini dans .env.",
+                    'message' => "Aucune clé à tester : aucune clé n'est enregistrée dans les paramètres.",
                 ], 400);
             }
 

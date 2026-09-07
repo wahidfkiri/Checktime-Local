@@ -442,84 +442,128 @@
                     </div>
                 </div>
                 
-                <!-- Information CRON -->
+                <!-- Planification automatique & envoi manuel des rapports -->
                 <div class="row mt-3">
                     <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
-                                <h4 class="card-title">⏰ Planification des Emails</h4>
-                            </div>
-                            <div class="card-body">
-                                <div class="alert alert-light">
-                                    <h6><i class="bi bi-calendar-week me-1"></i> Planification automatique</h6>
-                                    <ul class="mb-0">
-                                        <li><strong>Emails RH :</strong> Dernier jour du mois à 9h (rapport mensuel)</li>
-                                        <li><strong>Emails employés :</strong> Tous les samedis à 9h (rapport hebdomadaire)</li>
-                                        <li><strong>Statut CRON :</strong> <span id="cron-status" class="badge bg-success">Actif</span></li>
-                                    </ul>
-                                    <div class="mt-2 small text-muted">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        Ces plannings sont gérés automatiquement par le système.
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Envoi manuel des rapports -->
-                <div class="row mt-3">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h4 class="card-title">📤 Envoi manuel des rapports</h4>
+                                <h4 class="card-title">⏰ Planification automatique des rapports</h4>
                             </div>
                             <div class="card-body">
                                 <p class="text-muted small mb-3">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Déclenche immédiatement l'envoi d'un rapport, sans attendre sa planification automatique.
+                                    Activez chaque rapport, choisissez sa fréquence, l'heure (et le jour) d'envoi, puis
+                                    « Enregistrer la planification ». L'envoi automatique nécessite que le planificateur
+                                    du serveur (<code>cron</code>) soit actif — voir <code>scripts/run-scheduler.sh</code>.
+                                    Le bouton « Envoyer » déclenche un envoi immédiat, sans attendre l'heure planifiée.
                                 </p>
-                                <div class="table-responsive">
-                                    <table class="table table-bordered align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Rapport</th>
-                                                <th>Dernière exécution</th>
-                                                <th class="text-center" style="width: 160px;">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($scheduledJobs ?? [] as $job)
-                                                <tr class="report-run-row" data-command="{{ $job->command }}">
-                                                    <td>
-                                                        {{ $job->label ?: $job->command }}
-                                                        @if($job->description)
-                                                            <br><span class="text-muted small">{{ $job->description }}</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($job->last_run_at)
-                                                            {{ $job->last_run_at->format('d/m/Y H:i') }}
-                                                            <br><span class="text-muted small">{{ $job->last_status }}</span>
-                                                        @else
-                                                            <span class="text-muted">Jamais exécuté</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <button type="button" class="btn btn-sm btn-primary js-run-report">
-                                                            <i class="bi bi-send me-1"></i> Envoyer
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            @empty
+                                <form id="settings-jobs-form">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered align-middle">
+                                            <thead class="table-light">
                                                 <tr>
-                                                    <td colspan="3" class="text-center text-muted">Aucun rapport configuré.</td>
+                                                    <th style="min-width:200px;">Rapport</th>
+                                                    <th class="text-center">Actif</th>
+                                                    <th style="min-width:280px;">Planification</th>
+                                                    <th style="min-width:200px;">Destinataires</th>
+                                                    <th>Dernière exécution</th>
+                                                    <th class="text-center" style="width: 110px;">Action</th>
                                                 </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div id="run-report-output-wrapper" class="d-none">
+                                            </thead>
+                                            <tbody>
+                                                @forelse($scheduledJobs ?? [] as $job)
+                                                    <tr class="settings-job-row" data-id="{{ $job->id }}" data-command="{{ $job->command }}">
+                                                        <td>
+                                                            {{ $job->label ?: $job->command }}
+                                                            @if($job->description)
+                                                                <br><span class="text-muted small">{{ $job->description }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <div class="form-check form-switch d-inline-block">
+                                                                <input class="form-check-input js-job-active" type="checkbox"
+                                                                       role="switch" {{ $job->is_active ? 'checked' : '' }}>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div class="row g-1">
+                                                                <div class="col-12">
+                                                                    <select class="form-select form-select-sm js-job-frequency">
+                                                                        <option value="daily"   {{ $job->frequency === 'daily' ? 'selected' : '' }}>Quotidien</option>
+                                                                        <option value="weekly"  {{ $job->frequency === 'weekly' ? 'selected' : '' }}>Hebdomadaire</option>
+                                                                        <option value="monthly" {{ $job->frequency === 'monthly' ? 'selected' : '' }}>Mensuel</option>
+                                                                        <option value="once"    {{ $job->frequency === 'once' ? 'selected' : '' }}>Date précise (une fois)</option>
+                                                                        <option value="custom"  {{ $job->frequency === 'custom' ? 'selected' : '' }}>Personnalisé (cron)</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-6 js-job-field js-job-field-time">
+                                                                    <input type="time" class="form-control form-control-sm js-job-time"
+                                                                           value="{{ $job->time ?: '09:00' }}">
+                                                                </div>
+                                                                <div class="col-6 js-job-field js-job-field-dow">
+                                                                    <select class="form-select form-select-sm js-job-dow">
+                                                                        @foreach([1=>'Lundi',2=>'Mardi',3=>'Mercredi',4=>'Jeudi',5=>'Vendredi',6=>'Samedi',7=>'Dimanche'] as $k=>$v)
+                                                                            <option value="{{ $k }}" {{ (int)$job->day_of_week === $k ? 'selected' : '' }}>{{ $v }}</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-6 js-job-field js-job-field-dom">
+                                                                    <input type="number" min="1" max="31" class="form-control form-control-sm js-job-dom"
+                                                                           placeholder="Jour" value="{{ $job->day_of_month ?: '' }}">
+                                                                </div>
+                                                                <div class="col-12 js-job-field js-job-field-cron">
+                                                                    <input type="text" class="form-control form-control-sm js-job-cron"
+                                                                           placeholder="* * * * *" value="{{ $job->cron_expression ?: '' }}">
+                                                                </div>
+                                                                <div class="col-12 js-job-field js-job-field-runat">
+                                                                    <input type="datetime-local" class="form-control form-control-sm js-job-runat"
+                                                                           value="{{ $job->run_at ? $job->run_at->format('Y-m-d\TH:i') : '' }}">
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            @if($job->supports_recipients)
+                                                                <input type="text" class="form-control form-control-sm js-job-recipients"
+                                                                       placeholder="email1@x.com, email2@y.com"
+                                                                       value="{{ is_array($job->recipients) ? implode(', ', $job->recipients) : '' }}">
+                                                                <small class="text-muted">Séparez par des virgules</small>
+                                                            @else
+                                                                <span class="text-muted">Envoyé à chaque employé</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            @if($job->last_run_at)
+                                                                {{ $job->last_run_at->format('d/m/Y H:i') }}
+                                                                <br><span class="text-muted small">{{ $job->last_status }}</span>
+                                                            @else
+                                                                <span class="text-muted">Jamais exécuté</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <button type="button" class="btn btn-sm btn-primary js-run-report" title="Envoyer maintenant">
+                                                                <i class="bi bi-send"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="6" class="text-center text-muted">Aucun rapport configuré.</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    @if(($scheduledJobs ?? collect())->isNotEmpty())
+                                        <div class="text-end">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="bi bi-save me-1"></i> Enregistrer la planification
+                                            </button>
+                                        </div>
+                                    @endif
+                                </form>
+
+                                <div id="run-report-output-wrapper" class="mt-3 d-none">
                                     <label class="form-label fw-bold">Résultat de l'exécution :</label>
                                     <pre id="run-report-output" class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow:auto;font-size:12px;"></pre>
                                 </div>
@@ -888,7 +932,7 @@ $(document).ready(function() {
         if (isSaving) return;
 
         var $btn = $(this);
-        var $row = $btn.closest('.report-run-row');
+        var $row = $btn.closest('.settings-job-row');
         var command = $row.data('command');
 
         if (isTesting) return;
@@ -925,8 +969,77 @@ $(document).ready(function() {
                 }
             },
             complete: function() {
-                $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> Envoyer');
+                $btn.prop('disabled', false).html('<i class="bi bi-send"></i>');
                 isTesting = false;
+            }
+        });
+    });
+
+    // ---- Affichage conditionnel des champs de planification ----
+    function refreshSettingsJobFields($row) {
+        var freq = $row.find('.js-job-frequency').val();
+        $row.find('.js-job-field-time').toggle(freq === 'daily' || freq === 'weekly' || freq === 'monthly');
+        $row.find('.js-job-field-dow').toggle(freq === 'weekly');
+        $row.find('.js-job-field-dom').toggle(freq === 'monthly');
+        $row.find('.js-job-field-cron').toggle(freq === 'custom');
+        $row.find('.js-job-field-runat').toggle(freq === 'once');
+    }
+    $('.settings-job-row').each(function() { refreshSettingsJobFields($(this)); });
+    $(document).on('change', '.js-job-frequency', function() { refreshSettingsJobFields($(this).closest('.settings-job-row')); });
+
+    function splitEmailsSettings(str) {
+        return (str || '').split(/[,;\s]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+    }
+
+    // ---- Enregistrer la planification ----
+    $('#settings-jobs-form').on('submit', function(e) {
+        e.preventDefault();
+        if (isSaving) return;
+
+        var jobs = [];
+        $('.settings-job-row').each(function() {
+            var $r = $(this);
+            jobs.push({
+                id:              parseInt($r.data('id')),
+                is_active:       $r.find('.js-job-active').is(':checked'),
+                frequency:       $r.find('.js-job-frequency').val(),
+                time:            $r.find('.js-job-time').val() || '09:00',
+                day_of_week:     $r.find('.js-job-dow').val() ? parseInt($r.find('.js-job-dow').val()) : null,
+                day_of_month:    $r.find('.js-job-dom').val() ? parseInt($r.find('.js-job-dom').val()) : null,
+                cron_expression: $r.find('.js-job-cron').val() || null,
+                run_at:          $r.find('.js-job-runat').val() || null,
+                recipients:      $r.find('.js-job-recipients').length ? splitEmailsSettings($r.find('.js-job-recipients').val()) : []
+            });
+        });
+
+        hideAlerts();
+        var $btn = $(this).find('button[type=submit]');
+        $btn.prop('disabled', true);
+        showLoading('Enregistrement de la planification...');
+
+        $.ajax({
+            url: "{{ route('profile.notifications.jobs') }}",
+            type: 'POST',
+            contentType: 'application/json',
+            headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
+            data: JSON.stringify({ jobs: jobs }),
+            success: function(response) {
+                if (response.success) {
+                    showSuccessAlert('Planification enregistrée', response.message);
+                } else {
+                    showErrorAlert('Erreur', response.message);
+                }
+            },
+            error: function(xhr) {
+                var errorMsg = 'Erreur lors de l\'enregistrement de la planification';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showErrorAlert('Erreur', errorMsg);
+            },
+            complete: function() {
+                hideLoading();
+                $btn.prop('disabled', false);
             }
         });
     });

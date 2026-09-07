@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use App\Models\Zone;
+use App\Models\Setting;
 
 class SyncZonesBackground extends Command
 {
@@ -33,7 +34,7 @@ class SyncZonesBackground extends Command
                 "Accept" => "application/json"
             ])
             ->timeout(45)
-            ->get(config('services.checktime.base_url') . '/personnel/api/areas/', [
+            ->get(Setting::apiUrl() . '/personnel/api/areas/', [
                 'limit' => 500
             ]);
             
