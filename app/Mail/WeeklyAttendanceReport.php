@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\SimpleXlsxWriter;
 
 class WeeklyAttendanceReport extends Mailable
 {
@@ -44,7 +45,8 @@ class WeeklyAttendanceReport extends Mailable
         ])->setPaper('A4', 'landscape');
 
         $safeCode = strtolower(str_replace([' ', '/'], '_', $employee->emp_code));
-        $pdfFileName = "rapport_presence_{$safeCode}_{$this->emailData['export_date']->format('Y-m-d')}.pdf";
+        $pdfFileName  = "rapport_presence_{$safeCode}_{$this->emailData['export_date']->format('Y-m-d')}.pdf";
+        $xlsxFileName = "rapport_presence_{$safeCode}_{$this->emailData['export_date']->format('Y-m-d')}.xlsx";
 
         $employeeName = trim($employee->first_name . ' ' . $employee->last_name);
 
@@ -61,6 +63,64 @@ class WeeklyAttendanceReport extends Mailable
             ])
             ->attachData($pdf->output(), $pdfFileName, [
                 'mime' => 'application/pdf',
+            ])
+            ->attachData($this->buildExcel($employeeName), $xlsxFileName, [
+                'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ]);
+    }
+
+    /**
+     * Construit le classeur Excel joint au mail (mêmes données que le PDF :
+     * grille jour par jour de l'employé, plus le résumé de la semaine).
+     */
+    private function buildExcel(string $employeeName): string
+    {
+        $xlsx = new SimpleXlsxWriter('Mon rapport hebdo');
+        $xlsx->setColumnWidths([12, 12, 14, 10, 10, 30]);
+
+        $xlsx->addRow(['Rapport de présence hebdomadaire'], true);
+        $xlsx->addRow([$employeeName]);
+        $xlsx->addRow(['Période : ' . $this->emailData['week_range']]);
+        $xlsx->addRow([]);
+
+        $xlsx->addRow(['Date', 'Jour', 'Statut', 'Entrée', 'Sortie'], true);
+
+        $dailyChecks = $this->emailData['employee_data']['daily_checks'] ?? [];
+        foreach ($this->emailData['days_list'] ?? [] as $day) {
+            $check = $dailyChecks[$day['date_str']] ?? null;
+
+            if (!$check) {
+                $statut = 'Absent';
+                $checkIn = $checkOut = '';
+            } elseif (!empty($check['is_mission'])) {
+                $statut = 'Mission';
+                $checkIn = $checkOut = '';
+            } elseif (!empty($check['is_leave'])) {
+                $statut = 'Congé';
+                $checkIn = $checkOut = '';
+            } else {
+                $statut = $check['status'] ?? '';
+                $checkIn = $check['check_in'] ?? '';
+                $checkOut = $check['check_out'] ?? '';
+            }
+
+            $xlsx->addRow([$day['date_str'], $day['day_name'], $statut, $checkIn, $checkOut]);
+        }
+
+        $xlsx->addRow([]);
+        $stats = $this->emailData['employee_data']['stats'] ?? [];
+        $xlsx->addRow(['Résumé'], true);
+        $xlsx->addRow(['Présents', $stats['present'] ?? 0]);
+        $xlsx->addRow(['Absents', $stats['absent'] ?? 0]);
+        $xlsx->addRow(['Retards', $stats['late'] ?? 0]);
+        $xlsx->addRow(['Départs anticipés', $stats['early_leave'] ?? 0]);
+        $xlsx->addRow(['Demi-journées', $stats['half_day'] ?? 0]);
+        $xlsx->addRow(['Missions', $stats['mission'] ?? 0]);
+        $xlsx->addRow(['Congés', $stats['leave'] ?? 0]);
+        $xlsx->addRow(['Taux de présence %', $stats['presence_rate'] ?? 0]);
+        $xlsx->addRow(['Taux de ponctualité %', $stats['ponctualite_rate'] ?? 0]);
+        $xlsx->addRow(['Observations', $this->emailData['employee_data']['observations'] ?? '']);
+
+        return $xlsx->build();
     }
 }

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Employee;
 use App\Models\DailyAttendance;
+use App\Models\Holiday;
 use App\Models\Mission;
 use App\Models\Leave;
 use App\Models\Setting;
@@ -43,7 +44,9 @@ class SendMonthlyRHReport extends Command
 
         $this->info('🚀 Début de l\'envoi du rapport mensuel RH...');
 
-        $today        = Carbon::create(2025, 12, 31, 9, 0, 0);
+        $today        = $this->option('date')
+            ? Carbon::parse($this->option('date'))
+            : Carbon::now();
         $startOfMonth = $today->copy()->startOfMonth();
         $endOfMonth   = $today->copy()->endOfMonth();
 
@@ -121,7 +124,10 @@ class SendMonthlyRHReport extends Command
      */
     private function buildDepartmentReportData($startDate, $endDate)
     {
-        $workingDays = $this->countWorkingDays($startDate, $endDate);
+        $periodStart  = Carbon::parse($startDate)->startOfDay();
+        $periodEnd    = Carbon::parse($endDate)->startOfDay();
+        $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
+        $workingDays  = $this->countWorkingDays($startDate, $endDate);
 
         // ── Présences ──────────────────────────────────────────────
         $attendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -186,11 +192,14 @@ class SendMonthlyRHReport extends Command
             $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
             $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
 
-            // Dates de mission
+            // Dates de mission — bornées à [$periodStart, $periodEnd] : la requête
+            // remonte aussi les missions qui débordent de la période, il ne faut
+            // pas compter leurs jours hors période (sinon l'absence peut devenir
+            // négative).
             $missionDates = [];
             foreach ($employeeMissions as $mission) {
-                $current = Carbon::parse($mission->start_date)->copy();
-                $end     = Carbon::parse($mission->end_date);
+                $current = Carbon::parse($mission->start_date)->max($periodStart);
+                $end     = Carbon::parse($mission->end_date)->min($periodEnd);
                 while ($current <= $end) {
                     $missionDates[$current->format('Y-m-d')] = [
                         'title'       => $mission->title,
@@ -200,11 +209,11 @@ class SendMonthlyRHReport extends Command
                 }
             }
 
-            // Dates de congé
+            // Dates de congé — idem, bornées à la période.
             $leaveDates = [];
             foreach ($employeeLeaves as $leave) {
-                $current  = Carbon::parse($leave->start_date)->copy();
-                $end      = Carbon::parse($leave->end_date);
+                $current  = Carbon::parse($leave->start_date)->max($periodStart);
+                $end      = Carbon::parse($leave->end_date)->min($periodEnd);
                 $typeName = $leave->type ? $leave->type->name : 'Congé';
                 while ($current <= $end) {
                     $leaveDates[$current->format('Y-m-d')] = ['type_name' => $typeName];
@@ -221,6 +230,14 @@ class SendMonthlyRHReport extends Command
             $totalLeave      = 0;
 
             foreach ($employeeAttendances as $att) {
+                $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
+                // Un pointage un week-end ou un jour férié chômé ne doit pas
+                // gonfler la présence au-delà de $workingDays, sinon l'absence
+                // (jours ouvrés - présence) devient négative.
+                if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) {
+                    continue;
+                }
+
                 $status = strtoupper($att->status);
                 if ($status !== 'ABSENT') {
                     $totalPresent++;
@@ -231,11 +248,14 @@ class SendMonthlyRHReport extends Command
             }
 
             foreach ($missionDates as $dateStr => $m) {
-                if (Carbon::parse($dateStr)->dayOfWeekIso <= 5) $totalMission++;
+                if (Carbon::parse($dateStr)->dayOfWeekIso <= 5 && !isset($holidayDates[$dateStr])) {
+                    $totalMission++;
+                }
             }
 
             foreach ($leaveDates as $dateStr => $l) {
-                if (Carbon::parse($dateStr)->dayOfWeekIso <= 5 && !isset($missionDates[$dateStr])) {
+                if (Carbon::parse($dateStr)->dayOfWeekIso <= 5 && !isset($holidayDates[$dateStr])
+                    && !isset($missionDates[$dateStr])) {
                     $totalLeave++;
                 }
             }
@@ -409,6 +429,59 @@ class SendMonthlyRHReport extends Command
         }
     }
 
+    /**
+     * Construit le classeur Excel joint au mail (mêmes données que le PDF :
+     * récapitulatif par département).
+     */
+    private function buildExcel($reportData, $startDate, $endDate): string
+    {
+        $xlsx = new \App\Support\SimpleXlsxWriter('Rapport Mensuel RH');
+        $xlsx->setLandscape();
+        $xlsx->setColumnWidths([24, 10, 9, 9, 8, 12, 10, 9, 9, 9, 12, 12]);
+
+        $xlsx->addRow(['Rapport Mensuel RH - ' . $startDate->locale('fr')->monthName . ' ' . $startDate->year], true);
+        $xlsx->addRow(['Période : ' . $startDate->format('d/m/Y') . ' au ' . $endDate->format('d/m/Y') . ' (' . $reportData['period_days'] . ' jours ouvrés)']);
+        $xlsx->addRow([]);
+
+        $xlsx->addRow([
+            'Département', 'Employés', 'Présents', 'Absents', 'Retards', 'Départs anticipés',
+            'Missions', 'Congés', 'À l\'heure', 'Taux présence %', 'Taux ponctualité %',
+        ], true);
+
+        foreach ($reportData['report_data'] as $dept) {
+            $xlsx->addRow([
+                $dept['department_name'],
+                $dept['total_employees'],
+                $dept['total_present'],
+                $dept['total_absent'],
+                $dept['total_late'],
+                $dept['total_early_leave'],
+                $dept['total_mission'],
+                $dept['total_leave'],
+                $dept['total_on_time'],
+                $dept['avg_presence_rate'],
+                $dept['avg_ponctualite_rate'],
+            ]);
+        }
+
+        $totals = $reportData['totals'];
+        $xlsx->addRow([
+            'TOTAL GÉNÉRAL',
+            $totals['total_employees'],
+            $totals['total_present'],
+            $totals['total_absent'],
+            $totals['total_late'],
+            $totals['total_early_leave'],
+            $totals['total_mission'],
+            $totals['total_leave'],
+            $totals['total_on_time'],
+            $totals['avg_presence_rate'],
+            $totals['avg_ponctualite_rate'],
+        ], true);
+
+        return $xlsx->build();
+    }
+
     // ══════════════════════════════════════════════════════════════
     // EMAIL
     // ══════════════════════════════════════════════════════════════
@@ -457,6 +530,11 @@ class SendMonthlyRHReport extends Command
             'as'   => 'Rapport_Mensuel_RH_' . $appName . '_' . $startDate->format('Y_m') . '.pdf',
             'mime' => 'application/pdf',
         ]);
+        $mail->attachData(
+            $this->buildExcel($reportData, $startDate, $endDate),
+            'Rapport_Mensuel_RH_' . $appName . '_' . $startDate->format('Y_m') . '.xlsx',
+            ['mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
 
         Mail::to(!empty($recipients) ? $recipients : $rhEmail)->send($mail);
 
@@ -469,17 +547,38 @@ class SendMonthlyRHReport extends Command
 
     private function countWorkingDays($startDate, $endDate)
     {
-        $start       = Carbon::parse($startDate);
-        $end         = Carbon::parse($endDate);
-        $workingDays = 0;
+        $start        = Carbon::parse($startDate);
+        $end          = Carbon::parse($endDate);
+        $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
+        $workingDays  = 0;
 
         for ($date = $start->copy(); $date <= $end; $date->addDay()) {
-            if ($date->dayOfWeekIso >= 1 && $date->dayOfWeekIso <= 5) {
+            if ($date->dayOfWeekIso >= 1 && $date->dayOfWeekIso <= 5
+                && !isset($holidayDates[$date->format('Y-m-d')])) {
                 $workingDays++;
             }
         }
 
         return $workingDays;
+    }
+
+    /**
+     * Jours fériés chômés compris dans une période, indexés par date
+     * (Y-m-d) pour un test en O(1).
+     */
+    private function getNonWorkingHolidayDates($startDate, $endDate): array
+    {
+        $dates = [];
+        $cur   = Carbon::parse($startDate);
+        $end   = Carbon::parse($endDate);
+        while ($cur->lte($end)) {
+            $dateStr = $cur->format('Y-m-d');
+            if (Holiday::isNonWorkingHoliday($dateStr)) {
+                $dates[$dateStr] = true;
+            }
+            $cur->addDay();
+        }
+        return $dates;
     }
 
     private function cleanupTempFile($filePath)

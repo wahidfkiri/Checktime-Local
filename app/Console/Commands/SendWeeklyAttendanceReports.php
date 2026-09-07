@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Employee;
 use App\Models\DailyAttendance;
+use App\Models\Holiday;
 use App\Models\Mission;
 use App\Models\Leave;
 use App\Models\Setting;
@@ -60,13 +61,16 @@ class SendWeeklyAttendanceReports extends Command
         $this->info("📊 Période du rapport: {$startOfWeek->format('d/m/Y')} au {$endOfWeek->format('d/m/Y')}");
         $this->info("📆 Jours ouvrés (Lun-Ven): 5 jours");
 
-        // ── Jours ouvrés + liste pour la vue ──
-        $workingDays = $this->countWorkingDays($startDate, $endDate);
+        // ── Jours ouvrés + liste pour la vue (jours fériés chômés exclus) ──
+        $periodStart  = Carbon::parse($startDate)->startOfDay();
+        $periodEnd    = Carbon::parse($endDate)->startOfDay();
+        $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
+        $workingDays  = $this->countWorkingDays($startDate, $endDate);
 
         $daysList = [];
         $cur      = Carbon::parse($startDate);
         while ($cur->lte(Carbon::parse($endDate))) {
-            if ($cur->dayOfWeekIso <= 5) {
+            if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$cur->format('Y-m-d')])) {
                 $daysList[] = [
                     'date'     => $cur->copy(),
                     'date_str' => $cur->format('Y-m-d'),
@@ -157,13 +161,16 @@ class SendWeeklyAttendanceReports extends Command
                 $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
                 $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
 
-                // ── Dates de mission (Lun-Ven uniquement) ────
+                // ── Dates de mission (Lun-Ven uniquement, jours fériés chômés
+                // exclus), bornées à [$periodStart, $periodEnd] : la requête
+                // remonte aussi les missions qui débordent de la période, il ne
+                // faut pas compter leurs jours hors période. ────
                 $missionDates = [];
                 foreach ($employeeMissions as $mission) {
-                    $cur = Carbon::parse($mission->start_date);
-                    $end = Carbon::parse($mission->end_date);
+                    $cur = Carbon::parse($mission->start_date)->max($periodStart);
+                    $end = Carbon::parse($mission->end_date)->min($periodEnd);
                     while ($cur->lte($end)) {
-                        if ($cur->dayOfWeekIso <= 5) {
+                        if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$cur->format('Y-m-d')])) {
                             $missionDates[$cur->format('Y-m-d')] = [
                                 'title'       => $mission->title,
                                 'destination' => $mission->destination,
@@ -173,21 +180,21 @@ class SendWeeklyAttendanceReports extends Command
                     }
                 }
 
-                // ── Dates de congé (Lun-Ven uniquement) ─────
+                // ── Dates de congé (Lun-Ven uniquement, jours fériés chômés exclus), idem bornées ─────
                 $leaveDates = [];
                 foreach ($employeeLeaves as $leave) {
-                    $cur      = Carbon::parse($leave->start_date);
-                    $end      = Carbon::parse($leave->end_date);
+                    $cur      = Carbon::parse($leave->start_date)->max($periodStart);
+                    $end      = Carbon::parse($leave->end_date)->min($periodEnd);
                     $typeName = $leave->type ? $leave->type->name : 'Congé';
                     while ($cur->lte($end)) {
-                        if ($cur->dayOfWeekIso <= 5) {
+                        if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$cur->format('Y-m-d')])) {
                             $leaveDates[$cur->format('Y-m-d')] = ['type_name' => $typeName];
                         }
                         $cur->addDay();
                     }
                 }
 
-                // ── Boucle journalière (Lun-Ven uniquement) ──
+                // ── Boucle journalière (Lun-Ven uniquement, jours fériés chômés exclus) ──
                 $dailyChecks = [];
                 $cur         = Carbon::parse($startDate);
                 $endObj      = Carbon::parse($endDate);
@@ -195,7 +202,7 @@ class SendWeeklyAttendanceReports extends Command
                 while ($cur->lte($endObj)) {
                     $dateStr = $cur->format('Y-m-d');
 
-                    if ($cur->dayOfWeekIso > 5) {
+                    if ($cur->dayOfWeekIso > 5 || isset($holidayDates[$dateStr])) {
                         $cur->addDay();
                         continue;
                     }
@@ -285,7 +292,8 @@ class SendWeeklyAttendanceReports extends Command
                 $totalLeave      = 0;
 
                 foreach ($employeeAttendances as $att) {
-                    if (Carbon::parse($att->attendance_date)->dayOfWeekIso > 5) continue;
+                    $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
+                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
 
                     $status = strtoupper($att->status);
                     if ($status !== 'ABSENT') {
@@ -316,7 +324,8 @@ class SendWeeklyAttendanceReports extends Command
                 // ── Observations ──────────────────────────────
                 $observations = [];
                 foreach ($employeeAttendances as $att) {
-                    if (Carbon::parse($att->attendance_date)->dayOfWeekIso > 5) continue;
+                    $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
+                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
 
                     $status = strtoupper($att->status);
                     $date   = Carbon::parse($att->attendance_date)->format('d/m');
@@ -419,19 +428,44 @@ class SendWeeklyAttendanceReports extends Command
     }
 
     /**
-     * Compte uniquement les jours ouvrés du Lundi au Vendredi.
+     * Compte uniquement les jours ouvrés du Lundi au Vendredi, jours fériés
+     * chômés exclus.
      */
     private function countWorkingDays(string $startDate, string $endDate): int
     {
-        $days = 0;
-        $cur  = Carbon::parse($startDate);
-        $end  = Carbon::parse($endDate);
+        $days         = 0;
+        $cur          = Carbon::parse($startDate);
+        $end          = Carbon::parse($endDate);
+        $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
+
         while ($cur->lte($end)) {
-            if ($cur->dayOfWeekIso >= 1 && $cur->dayOfWeekIso <= 5) {
+            if ($cur->dayOfWeekIso >= 1 && $cur->dayOfWeekIso <= 5
+                && !isset($holidayDates[$cur->format('Y-m-d')])) {
                 $days++;
             }
             $cur->addDay();
         }
         return $days;
+    }
+
+    /**
+     * Jours fériés chômés compris dans une période, indexés par date
+     * (Y-m-d) pour un test en O(1).
+     */
+    private function getNonWorkingHolidayDates(string $startDate, string $endDate): array
+    {
+        $dates = [];
+        $cur   = Carbon::parse($startDate);
+        $end   = Carbon::parse($endDate);
+
+        while ($cur->lte($end)) {
+            $dateStr = $cur->format('Y-m-d');
+            if (Holiday::isNonWorkingHoliday($dateStr)) {
+                $dates[$dateStr] = true;
+            }
+            $cur->addDay();
+        }
+
+        return $dates;
     }
 }
