@@ -19,6 +19,7 @@
         .b-update { background: #ffc107; color: #000; } .b-delete { background: #dc3545; }
         .b-export { background: #0dcaf0; color: #000; } .b-default { background: #343a40; }
         .footer { margin-top: 8px; font-size: 8px; color: #777; text-align: right; }
+        .muted { color: #777; font-size: 7.5px; }
     </style>
 </head>
 <body>
@@ -40,10 +41,13 @@
     <table>
         <thead>
             <tr>
-                <th style="width:13%;">Date &amp; heure</th>
-                <th style="width:15%;">Utilisateur</th>
-                <th style="width:10%;">Action</th>
-                <th style="width:62%;">Description</th>
+                <th style="width:10%;">Date &amp; heure</th>
+                <th style="width:11%;">Utilisateur</th>
+                <th style="width:8%;">Action</th>
+                <th style="width:13%;">Élément concerné</th>
+                <th style="width:21%;">Description</th>
+                <th style="width:25%;">Détails</th>
+                <th style="width:12%;">Origine</th>
             </tr>
         </thead>
         <tbody>
@@ -52,10 +56,21 @@
                     <td>{{ optional($log->created_at)->format('d/m/Y H:i:s') }}</td>
                     <td>{{ $log->user_name ?? '—' }}</td>
                     <td><span class="badge b-{{ $log->action }}">{{ $log->action_label }}</span></td>
+                    <td>{{ $log->subject_label ?? '—' }}</td>
                     <td>{{ $log->description }}</td>
+                    <td>{{ $log->details_summary ?? '—' }}</td>
+                    <td>
+                        {{ $log->ip_address ?? '—' }}
+                        @if($log->device_label)
+                            <div class="muted">{{ $log->device_label }}</div>
+                        @endif
+                        @if($log->route)
+                            <div class="muted">{{ $log->route }}</div>
+                        @endif
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="4" style="text-align:center;padding:20px;">Aucune activité.</td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:20px;">Aucune activité.</td></tr>
             @endforelse
         </tbody>
     </table>
