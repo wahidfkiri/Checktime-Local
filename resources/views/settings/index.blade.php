@@ -450,13 +450,6 @@
                                 <h4 class="card-title">⏰ Planification automatique des rapports</h4>
                             </div>
                             <div class="card-body">
-                                <p class="text-muted small mb-3">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    Activez chaque rapport, choisissez sa fréquence, l'heure (et le jour) d'envoi, puis
-                                    « Enregistrer la planification ». L'envoi automatique nécessite que le planificateur
-                                    du serveur (<code>cron</code>) soit actif — voir <code>scripts/run-scheduler.sh</code>.
-                                    Le bouton « Envoyer » déclenche un envoi immédiat, sans attendre l'heure planifiée.
-                                </p>
                                 <form id="settings-jobs-form">
                                     <div class="table-responsive">
                                         <table class="table table-bordered align-middle">
