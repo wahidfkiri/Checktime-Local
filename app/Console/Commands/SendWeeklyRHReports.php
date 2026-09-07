@@ -9,6 +9,7 @@ use App\Models\Mission;
 use App\Models\Leave;
 use App\Models\Setting;
 use App\Mail\WeeklyRHAttendanceReport;
+use App\Reports\SuiviPonctualiteReport;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -297,12 +298,28 @@ class SendWeeklyRHReports extends Command
         ];
 
         try {
-            Mail::to($recipients)->send(new WeeklyRHAttendanceReport(
+            $mail = new WeeklyRHAttendanceReport(
                 $reportData,
                 null,
                 $startOfWeek->format('d/m/Y'),
                 $endOfWeek->format('d/m/Y')
-            ));
+            );
+
+            // Tableau de Suivi de la Ponctualité de la semaine (mêmes PDF et
+            // Excel que l'écran /rapport/suivi-ponctualite), en pièces jointes
+            // séparées du rapport de présence.
+            $suivi = (new SuiviPonctualiteReport())->attachTo(
+                $mail,
+                $startDate,
+                $endDate,
+                'Semaine_' . $startOfWeek->format('Y_m_d')
+            );
+
+            if (!$suivi) {
+                $this->warn('⚠️  Suivi de ponctualité non joint : aucune donnée sur la semaine.');
+            }
+
+            Mail::to($recipients)->send($mail);
 
             $this->info("✅  Rapport envoyé à {$rhEmail}");
             Log::info("Rapport RH envoyé à {$rhEmail}");

@@ -9,6 +9,7 @@ use App\Models\Mission;
 use App\Models\Leave;
 use App\Models\Setting;
 use App\Mail\MonthlyRHReport;
+use App\Reports\SuiviPonctualiteReport;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -535,6 +536,19 @@ class SendMonthlyRHReport extends Command
             'Rapport_Mensuel_RH_' . $appName . '_' . $startDate->format('Y_m') . '.xlsx',
             ['mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
         );
+
+        // Tableau de Suivi de la Ponctualité du mois (mêmes PDF et Excel que
+        // l'écran /rapport/suivi-ponctualite), en pièces jointes séparées.
+        $suivi = (new SuiviPonctualiteReport())->attachTo(
+            $mail,
+            $startDate->format('Y-m-d'),
+            $endDate->format('Y-m-d'),
+            $appName . '_' . $startDate->format('Y_m')
+        );
+
+        if (!$suivi) {
+            Log::info('Suivi de ponctualité non joint au rapport mensuel : aucune donnée sur la période.');
+        }
 
         Mail::to(!empty($recipients) ? $recipients : $rhEmail)->send($mail);
 

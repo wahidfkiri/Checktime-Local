@@ -12,7 +12,9 @@ use App\Models\EmployeePermission;
 use App\Models\ReportTemplate;
 use App\Models\Setting;
 use App\Models\Holiday;
+use App\Reports\AttendanceSupport;
 use App\Reports\PresencePonctualiteColumns;
+use App\Reports\SuiviPonctualiteReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -155,31 +157,7 @@ class CustomReportController extends Controller
      */
     private function filterEmployeesByDepartment($employees, $departmentIds)
     {
-        if (!$departmentIds || !is_array($departmentIds) || in_array('all', $departmentIds)) {
-            return $employees->values();
-        }
-
-        $selectedDepts = array_values(array_filter(array_map(
-            fn ($d) => mb_strtolower(trim((string) $d)),
-            $departmentIds
-        ), fn ($d) => $d !== ''));
-
-        if (empty($selectedDepts)) {
-            return $employees->values();
-        }
-
-        return $employees->filter(function ($employee) use ($selectedDepts) {
-            $deptName = mb_strtolower(trim((string) ($employee->dept_name ?? '')));
-            if ($deptName === '') {
-                return false;
-            }
-            foreach ($selectedDepts as $selected) {
-                if (str_contains($deptName, $selected)) {
-                    return true;
-                }
-            }
-            return false;
-        })->values();
+        return AttendanceSupport::filterByDepartment($employees, $departmentIds);
     }
 
     /**
@@ -1089,16 +1067,6 @@ class CustomReportController extends Controller
     }
 
     /**
-     * Abréviations des jours utilisées en tête de colonne (Lund, Mard, …).
-     */
-    private const JOURS_COURTS = [
-        1 => 'Lund', 2 => 'Mard', 3 => 'Merc', 4 => 'Jeud', 5 => 'Vend', 6 => 'Sam', 7 => 'Dim',
-    ];
-
-    /** Période maximale couverte par le Tableau de Suivi de la Ponctualité. */
-    private const SUIVI_MAX_JOURS = 31;
-
-    /**
      * Page « Tableau de Suivi de la Ponctualité ».
      */
     public function suiviPonctualite(Request $request)
@@ -1170,12 +1138,7 @@ class CustomReportController extends Controller
             $validated['department_ids']
         );
 
-        $pdf = Pdf::loadView('reports.suivi-ponctualite.exports.pdf', [
-            'report'           => $data,
-            'export_date'      => Carbon::now(),
-            'signatairePostes' => $this->getSignatairePostes(),
-        ]);
-        $pdf->setPaper('A4', 'landscape');
+        $pdf = (new SuiviPonctualiteReport())->pdf($data);
 
         return $pdf->download('suivi_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.pdf');
     }
@@ -1198,45 +1161,10 @@ class CustomReportController extends Controller
             $validated['department_ids']
         );
 
-        $nbJours = count($report['days']);
-
-        $xlsx = new \App\Support\SimpleXlsxWriter('Suivi ponctualité');
-        $xlsx->setLandscape();
-        $xlsx->setColumnWidths(array_merge([32], array_fill(0, $nbJours, 6), [9, 9]));
-
-        $xlsx->addRow(['Tableau de Suivi de la Ponctualité'], true);
-        $xlsx->addRow([$report['month_label']], true);
-        $xlsx->addRow([$report['period_label']]);
-        $xlsx->addRow([]);
-
-        // Deux lignes d'en-tête : abréviation du jour, puis numéro du jour.
-        $ligneJours   = array_merge(['Nom et Prénoms'], array_column($report['days'], 'day_short'), ['TOTAL', '']);
-        $ligneNumeros = array_merge([''], array_column($report['days'], 'day_number'), ['Retard', 'en mn']);
-        $xlsx->addRow($ligneJours, true);
-        $xlsx->addRow($ligneNumeros, true);
-
-        foreach ($report['rows'] as $row) {
-            $cellules = [$row['employee_name']];
-            foreach ($report['days'] as $day) {
-                $cell = $row['cells'][$day['date']] ?? null;
-                $cellules[] = $cell
-                    ? $cell['text'] . (($cell['detail'] ?? '') !== '' ? ' (' . $cell['detail'] . ')' : '')
-                    : '';
-            }
-            $cellules[] = $row['total_retards'];
-            $cellules[] = $row['total_minutes'];
-
-            $xlsx->addRow($cellules);
-        }
-
-        // Ligne des totaux généraux.
-        $xlsx->addRow(array_merge(
-            ['TOTAL GÉNÉRAL'],
-            array_fill(0, $nbJours, ''),
-            [$report['totals']['retards'], $report['totals']['minutes']]
-        ), true);
-
-        return $xlsx->download('suivi_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.xlsx');
+        return (new SuiviPonctualiteReport())->excelDownload(
+            $report,
+            'suivi_ponctualite_' . Carbon::now()->format('Y-m-d_H-i-s') . '.xlsx'
+        );
     }
 
     /**
@@ -1262,8 +1190,8 @@ class CustomReportController extends Controller
         $endDate   = $request->input('end_date');
 
         $jours = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
-        if ($jours > self::SUIVI_MAX_JOURS) {
-            return ['error' => 'La période ne doit pas dépasser un mois (' . self::SUIVI_MAX_JOURS . ' jours).'];
+        if ($jours > SuiviPonctualiteReport::MAX_JOURS) {
+            return ['error' => 'La période ne doit pas dépasser un mois (' . SuiviPonctualiteReport::MAX_JOURS . ' jours).'];
         }
 
         $departmentIds = $request->input('department_ids', ['all']);
@@ -1280,360 +1208,30 @@ class CustomReportController extends Controller
     }
 
     /**
-     * Construit la grille employés × jours ouvrés du Tableau de Suivi de la Ponctualité.
-     *
-     * Une cellule porte, par ordre de priorité : congé, mission, autorisation
-     * d'absence, absence non justifiée, retard (en minutes), sortie anticipée.
-     * Une journée normale reste vide, comme sur le formulaire papier.
-     *
-     * @return array{days: array, rows: array, totals: array, month_label: string, period_label: string}
+     * Grille du Tableau de Suivi de la Ponctualité.
+     * La construction vit dans SuiviPonctualiteReport : les rapports envoyés
+     * par email joignent exactement la même grille.
      */
     private function buildSuiviPonctualiteData($startDate, $endDate, $empCode, $departmentIds): array
     {
-        $periodStart = Carbon::parse($startDate)->startOfDay();
-        $periodEnd   = Carbon::parse($endDate)->startOfDay();
-
-        // --- Colonnes : uniquement les jours ouvrés (lundi-vendredi hors jours fériés chômés) ---
-        $days = [];
-        for ($d = $periodStart->copy(); $d->lte($periodEnd); $d->addDay()) {
-            if ($d->dayOfWeekIso <= 5 && !Holiday::isNonWorkingHoliday($d->format('Y-m-d'))) {
-                $days[] = [
-                    'date'       => $d->format('Y-m-d'),
-                    'day_short'  => self::JOURS_COURTS[$d->dayOfWeekIso],
-                    'day_number' => $d->format('d'),
-                ];
-            }
-        }
-
-        // --- Employés ---
-        $employeesQuery = Employee::whereNotNull('emp_code')->where('emp_code', '!=', '');
-        if ($empCode && $empCode !== 'all') {
-            $employeesQuery->where('emp_code', $empCode);
-        }
-        $employees = $this->filterEmployeesByDepartment(
-            $employeesQuery->orderBy('emp_code')->get(),
-            $departmentIds
-        );
-
-        // --- Sources annexes, chargées en une fois pour toute la période ---
-        $attendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
-            ->get()
-            ->groupBy('employee_id');
-
-        $leaves = Leave::where('status', 'approved')
-            ->whereDate('start_date', '<=', $periodEnd)
-            ->whereDate('end_date', '>=', $periodStart)
-            ->get()
-            ->groupBy('employee_id');
-
-        $missions = Mission::whereDate('start_date', '<=', $periodEnd)
-            ->whereDate('end_date', '>=', $periodStart)
-            ->get()
-            ->groupBy('employee_id');
-
-        $permissions = EmployeePermission::where('status', 'approved')
-            ->overlappingPeriod($startDate, $endDate)
-            ->get()
-            ->groupBy('employee_id');
-
-        $rows = [];
-        $totalRetards = 0;
-        $totalMinutes = 0;
-
-        foreach ($employees as $employee) {
-            $employeeAttendances = $attendances->get($employee->id, collect())
-                ->keyBy(fn ($a) => Carbon::parse($a->attendance_date)->format('Y-m-d'));
-
-            $missionDates    = $this->joursCouverts($missions->get($employee->id, collect()), $periodStart, $periodEnd,
-                fn ($m) => [$m->start_date, $m->end_date]);
-            $leaveDates      = $this->joursCouverts($leaves->get($employee->id, collect()), $periodStart, $periodEnd,
-                fn ($l) => [$l->start_date, $l->end_date]);
-            $permissionDates = $this->joursCouverts($permissions->get($employee->id, collect()), $periodStart, $periodEnd,
-                fn ($p) => [$p->getEffectiveStartDate(), $p->getEffectiveEndDate()]);
-
-            $cells        = [];
-            $nbRetards    = 0;
-            $minutesTotal = 0;
-
-            foreach ($days as $day) {
-                $dateKey    = $day['date'];
-                $attendance = $employeeAttendances->get($dateKey);
-
-                // Justifications d'abord : congé > mission > autorisation.
-                if (isset($leaveDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'en congé', 'detail' => '', 'type' => 'leave'];
-                    continue;
-                }
-                if (isset($missionDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'en mission', 'detail' => '', 'type' => 'mission'];
-                    continue;
-                }
-                if (isset($permissionDates[$dateKey])) {
-                    $cells[$dateKey] = ['text' => 'autorisation', 'detail' => '', 'type' => 'permission'];
-                    continue;
-                }
-
-                if (!$attendance || strtoupper($attendance->status) === 'ABSENT') {
-                    $cells[$dateKey] = ['text' => 'absent', 'detail' => '', 'type' => 'absent'];
-                    continue;
-                }
-
-                // Employé présent : la cellule porte les horaires d'arrivée et de
-                // départ, l'anomalie éventuelle (retard, sortie) passe en second.
-                $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateKey);
-                $details  = [];
-
-                if ($lateData['is_late']) {
-                    $nbRetards++;
-                    $minutesTotal += (int) $lateData['late_minutes'];
-                    $details[] = (int) $lateData['late_minutes'] . ' mn';
-                }
-
-                if (strtoupper($attendance->status) === 'EARLY_LEAVE' || !empty($attendance->is_early_leave)) {
-                    $details[] = 'Incomplet';
-                }
-
-                $cells[$dateKey] = [
-                    'text'   => $this->plageHoraire($attendance),
-                    'detail' => implode(' / ', $details),
-                    'type'   => $lateData['is_late'] ? 'late' : (empty($details) ? 'ok' : 'early'),
-                ];
-            }
-
-            $totalRetards += $nbRetards;
-            $totalMinutes += $minutesTotal;
-
-            $rows[] = [
-                'employee_code'   => $employee->emp_code,
-                'employee_name'   => trim($employee->first_name . ' ' . ($employee->last_name ?? '')),
-                'department_name' => $employee->dept_name ?? 'Non défini',
-                'cells'           => $cells,
-                'total_retards'   => $nbRetards,
-                'total_minutes'   => $minutesTotal,
-            ];
-        }
-
-        $moisDebut = $periodStart->locale('fr')->monthName;
-        $moisFin   = $periodEnd->locale('fr')->monthName;
-
-        return [
-            'days'   => $days,
-            'rows'   => $rows,
-            'totals' => ['retards' => $totalRetards, 'minutes' => $totalMinutes],
-            'month_label' => $moisDebut === $moisFin
-                ? 'Mois de ' . $moisDebut . ' ' . $periodStart->format('Y')
-                : 'Du ' . $moisDebut . ' ' . $periodStart->format('Y') . ' à ' . $moisFin . ' ' . $periodEnd->format('Y'),
-            'period_label' => 'Période du ' . $periodStart->locale('fr')->dayName . ' ' . $periodStart->format('d')
-                . ' ' . $moisDebut . ' au ' . $periodEnd->locale('fr')->dayName . ' ' . $periodEnd->format('d')
-                . ' ' . $moisFin . ' ' . $periodEnd->format('Y'),
-        ];
+        return (new SuiviPonctualiteReport())->build($startDate, $endDate, $empCode, $departmentIds);
     }
 
     /**
-     * Horaires d'arrivée et de départ d'un pointage, au format « 08:30 , 17:00 ».
-     *
-     * Un horaire manquant est rendu par « --:-- » pour que la cellule reste lisible.
-     */
-    private function plageHoraire($attendance): string
-    {
-        $format = function ($valeur) {
-            if (!$valeur) {
-                return '--:--';
-            }
-
-            return $valeur instanceof Carbon
-                ? $valeur->format('H:i')
-                : Carbon::parse($valeur)->format('H:i');
-        };
-
-        return $format($attendance->check_in) . ' , ' . $format($attendance->check_out);
-    }
-
-    /**
-     * Jours (Y-m-d) couverts par une collection d'enregistrements, bornés à la période.
-     *
-     * Les instances Carbon sont recopiées : Carbon::max()/min() renvoient l'un
-     * des deux objets reçus, et la boucle muterait alors les bornes partagées.
-     *
-     * @param  callable $bornes  Renvoie [début, fin] pour un enregistrement.
-     * @return array<string, true>
-     */
-    private function joursCouverts($records, Carbon $periodStart, Carbon $periodEnd, callable $bornes): array
-    {
-        $jours = [];
-
-        foreach ($records as $record) {
-            [$debut, $fin] = $bornes($record);
-
-            if (!$debut) {
-                continue;
-            }
-
-            $jour = Carbon::parse($debut)->startOfDay();
-            $last = Carbon::parse($fin ?: $debut)->startOfDay();
-
-            if ($jour->lt($periodStart)) {
-                $jour = $periodStart->copy();
-            }
-            if ($last->gt($periodEnd)) {
-                $last = $periodEnd->copy();
-            }
-
-            while ($jour->lte($last)) {
-                $jours[$jour->format('Y-m-d')] = true;
-                $jour->addDay();
-            }
-        }
-
-        return $jours;
-    }
-
-    /**
-     * Calculer le retard en comparant check-in avec l'heure de début du planning
+     * Calculer le retard en comparant check-in avec l'heure de début du planning.
+     * Règle partagée avec les rapports envoyés par email (cf. AttendanceSupport).
      */
     private function calculateLateFromPlanning($employee, $attendance, string $dateKey): array
     {
-        $result = [
-            'is_late' => false,
-            'late_minutes' => 0,
-        ];
-
-        if (!$attendance || !$attendance->check_in || strtoupper($attendance->status) === 'ABSENT') {
-            return $result;
-        }
-
-        $schedule = $this->getEmployeeScheduleForDateNew($employee, $dateKey);
-        if (!$schedule || !$schedule['is_working_day'] || !$schedule['start_time']) {
-            return $result;
-        }
-
-        try {
-            $plannedStartTime = Carbon::parse($schedule['start_time'])->format('H:i:s');
-            $checkInTime = $attendance->check_in instanceof Carbon
-                ? $attendance->check_in->format('H:i:s')
-                : Carbon::parse($attendance->check_in)->format('H:i:s');
-
-            $plannedStart = Carbon::createFromFormat('Y-m-d H:i:s', $dateKey . ' ' . $plannedStartTime);
-            $checkIn = Carbon::createFromFormat('Y-m-d H:i:s', $dateKey . ' ' . $checkInTime);
-
-            // Marge de tolérance configurable : en deçà, pas de retard.
-            $toleranceMinutes = Setting::lateToleranceMinutes();
-
-            if ($checkIn->gt($plannedStart)) {
-                $diffMinutes = $checkIn->diffInMinutes($plannedStart);
-                if ($diffMinutes > $toleranceMinutes) {
-                    $result['is_late'] = true;
-                    $result['late_minutes'] = $diffMinutes;
-                }
-            }
-        } catch (\Exception $e) {
-            Log::warning('Erreur calcul retard custom report', [
-                'employee_id' => $employee->id ?? null,
-                'date' => $dateKey,
-                'message' => $e->getMessage(),
-            ]);
-        }
-
-        return $result;
-    }
-
-    private function getEmployeeScheduleForDateNew($employee, $dateStr)
-    {
-        if (!$employee) {
-            return null;
-        }
-
-        $date = Carbon::parse($dateStr);
-        $dayOfWeek = $date->dayOfWeekIso;
-
-        // 1. Planning spécifique à la date exacte
-        $specificSchedule = EmployeeSchedule::where('employee_id', $employee->id)
-            ->where('schedule_date', $dateStr)
-            ->first();
-
-        if ($specificSchedule) {
-            return $this->formatScheduleData($specificSchedule);
-        }
-
-        // 2. Planning dans une plage de dates
-        $rangeSchedule = EmployeeSchedule::where('employee_id', $employee->id)
-            ->where('start_date', '<=', $dateStr)
-            ->where('end_date', '>=', $dateStr)
-            ->first();
-
-        if ($rangeSchedule) {
-            return $this->formatScheduleData($rangeSchedule);
-        }
-
-        // 3. Planning fixe par jour de semaine
-        $fixedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
-            ->where('schedule_type', 'fixe')
-            ->where('day_of_week', $dayOfWeek)
-            ->first();
-
-        if ($fixedSchedule) {
-            return $this->formatScheduleData($fixedSchedule);
-        }
-
-        // 4. Planning rotation
-        $rotationSchedule = EmployeeSchedule::where('employee_id', $employee->id)
-            ->where('schedule_type', 'rotation')
-            ->first();
-
-        if ($rotationSchedule && $rotationSchedule->start_date && $rotationSchedule->end_date) {
-            $scheduleStart = Carbon::parse($rotationSchedule->start_date);
-            $scheduleEnd = Carbon::parse($rotationSchedule->end_date);
-            $currentDate = Carbon::parse($dateStr);
-
-            if ($currentDate->between($scheduleStart, $scheduleEnd)) {
-                $daysFromStart = $scheduleStart->diffInDays($currentDate);
-                $workDaysCount = $rotationSchedule->work_days_count ?? 1;
-                $restDaysCount = $rotationSchedule->rest_days_count ?? 0;
-                $cycleLength = $workDaysCount + $restDaysCount;
-                $positionInCycle = $daysFromStart % $cycleLength;
-
-                if ($positionInCycle < $workDaysCount) {
-                    return $this->formatScheduleData($rotationSchedule);
-                } else {
-                    return [
-                        'schedule_type' => 'rotation',
-                        'is_working_day' => false,
-                        'start_time' => null,
-                        'end_time' => null,
-                    ];
-                }
-            }
-        }
-
-        // 5. Planning planifié (générique)
-        $plannedSchedule = EmployeeSchedule::where('employee_id', $employee->id)
-            ->where('schedule_type', 'planifie')
-            ->first();
-
-        if ($plannedSchedule) {
-            return $this->formatScheduleData($plannedSchedule);
-        }
-
-        return null;
+        return AttendanceSupport::lateFromPlanning($employee, $attendance, $dateKey);
     }
 
     /**
-     * Formater les données du planning
+     * Planning applicable à un employé pour une date donnée.
      */
-    private function formatScheduleData($schedule)
+    private function getEmployeeScheduleForDateNew($employee, $dateStr)
     {
-        return [
-            'schedule_type'   => $schedule->schedule_type,
-            'is_working_day'  => $schedule->is_working_day ?? true,
-            'start_time'      => $schedule->start_time ? Carbon::parse($schedule->start_time)->format('H:i:s') : null,
-            'end_time'        => $schedule->end_time ? Carbon::parse($schedule->end_time)->format('H:i:s') : null,
-            'work_days_count' => $schedule->work_days_count ?? null,
-            'rest_days_count' => $schedule->rest_days_count ?? null,
-            'daily_hours'     => $schedule->daily_hours ?? null,
-            'break_minutes'   => $schedule->break_minutes ?? 0,
-            'start_date'      => $schedule->start_date,
-            'end_date'        => $schedule->end_date,
-        ];
+        return AttendanceSupport::scheduleForDate($employee, $dateStr);
     }
 
     /**
