@@ -455,7 +455,7 @@ class NotificationSettingsController extends Controller
     private function resolveEncryptionForTransport(?string $raw): ?string
     {
         if ($raw === 'starttls') {
-            return 'tls';
+            return null;
         }
 
         return $raw ?: null;

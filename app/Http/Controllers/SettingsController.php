@@ -79,6 +79,47 @@ class SettingsController extends Controller
     }
     
     /**
+     * Enregistrer uniquement l'email RH et son activation (bouton dédié de
+     * la carte « Configuration Emails RH »), sans toucher aux autres
+     * paramètres de la page (tolérance, emails employés, SMS...).
+     */
+    public function updateRhEmail(Request $request)
+    {
+        try {
+            $validator = \Validator::make($request->all(), [
+                'email' => 'nullable|email',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur de validation',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $settings = Setting::firstOrNew([]);
+            $settings->email = $request->input('email', '');
+            $settings->email_is_active = $request->boolean('email_is_active');
+            $settings->save();
+
+            Log::info('Email RH mis à jour depuis les paramètres.', ['email' => $settings->email]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Email RH enregistré avec succès.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erreur enregistrement email RH: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur serveur: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Enregistrer / remplacer la clé d'accès (token API biométrique).
      *
      * Stockée en base via Setting::set('api_token', ..., 'company') — même

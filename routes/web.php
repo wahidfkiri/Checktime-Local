@@ -243,6 +243,7 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
     Route::middleware('role_or_permission:admin|menu.settings')->prefix('settings')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/rh-email', [SettingsController::class, 'updateRhEmail'])->name('settings.rh-email.update');
         Route::post('/test-rh', [SettingsController::class, 'testRhEmail'])->name('settings.test.rh');
         Route::post('/test-employees', [SettingsController::class, 'testEmployeesEmail'])->name('settings.test.employees');
         Route::get('/status', [SettingsController::class, 'getStatus'])->name('settings.status');

@@ -75,8 +75,8 @@
                                     <div class="form-text">Adresse email qui recevra les rapports mensuels</div>
                                 </div>
                                 
-                                <div class="form-check form-switch mb-4">
-                                    <input class="form-check-input" type="checkbox" id="email_is_active" 
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="email_is_active"
                                            {{ ($settings->email_is_active ?? false) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="email_is_active">
                                         <strong>Activer les emails RH</strong>
@@ -85,10 +85,14 @@
                                         Si activé, les rapports mensuels seront envoyés le dernier jour du mois à 9h
                                     </div>
                                 </div>
+
+                                <button type="button" id="save-rh-email" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-save me-1"></i> Enregistrer l'email RH
+                                </button>
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Section Emails Employés -->
                     <div class="col-md-6">
                         <div class="card">
@@ -833,6 +837,48 @@ $(document).ready(function() {
             complete: function() {
                 hideLoading();
                 isTesting = false;
+            }
+        });
+    });
+
+    // Enregistrer uniquement l'email RH (bouton dédié de la carte)
+    $('#save-rh-email').on('click', function() {
+        if (isSaving) return;
+
+        var $btn = $(this);
+        hideAlerts();
+        $btn.prop('disabled', true);
+        showLoading('Enregistrement de l\'email RH...');
+
+        $.ajax({
+            url: "{{ route('settings.rh-email.update') }}",
+            type: 'POST',
+            data: {
+                _token: "{{ csrf_token() }}",
+                email: $('#rh_email').val(),
+                email_is_active: $('#email_is_active').is(':checked') ? 1 : 0
+            },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessAlert('Succès', response.message);
+                } else {
+                    showErrorAlert('Erreur', response.message);
+                }
+            },
+            error: function(xhr) {
+                var errorMsg = 'Erreur lors de l\'enregistrement de l\'email RH';
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.errors) {
+                        errorMsg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                    } else if (xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                }
+                showErrorAlert('Erreur', errorMsg);
+            },
+            complete: function() {
+                hideLoading();
+                $btn.prop('disabled', false);
             }
         });
     });
