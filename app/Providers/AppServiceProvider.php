@@ -106,7 +106,7 @@ class AppServiceProvider extends ServiceProvider
                 'mail.mailers.smtp.host'       => $mail['mail_host'],
                 'mail.mailers.smtp.port'       => (int) ($mail['mail_port'] ?? 587),
                 'mail.mailers.smtp.username'   => $mail['mail_username'] ?? null,
-                'mail.mailers.smtp.password'   => \App\Support\MailPassword::resolve($mail['mail_password'] ?? null),
+                'mail.mailers.smtp.password'   => $mail['mail_password'] ?? null,
                 // Le transport SMTP de Laravel/Symfony Mailer ne connaît que
                 // 'tls' (négociation STARTTLS, ou implicite si port 465) et
                 // 'ssl'. « STARTTLS » est une option distincte côté interface,

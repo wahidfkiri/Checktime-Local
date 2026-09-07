@@ -309,7 +309,7 @@
                                                     <i class="bi bi-eye"></i>
                                                 </button>
                                                 </div>
-                                                <small class="text-muted">Si renseigné, le mot de passe est enregistré dans le fichier serveur sécurisé MAIL.txt.</small>
+                                                <small class="text-muted">Laisser vide pour ne pas changer le mot de passe déjà enregistré.</small>
                                         </div>
                                     </div>
                                     <div class="row mt-2">

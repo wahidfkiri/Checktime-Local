@@ -234,9 +234,7 @@ class InstallerController extends Controller
             $host = $request->input('mail_host');
             $port = $request->input('mail_port');
             $username = $request->input('mail_username');
-            $password = $request->filled('mail_password')
-                ? $request->input('mail_password')
-                : \App\Support\MailPassword::resolve(null);
+            $password = $request->input('mail_password');
             $encryption = $request->input('mail_encryption');
             $fromAddress = $request->input('mail_from_address');
             $fromName = $request->input('mail_from_name', 'CheckTime');

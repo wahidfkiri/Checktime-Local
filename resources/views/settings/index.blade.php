@@ -234,9 +234,9 @@
                                         <div class="form-group col-md-3">
                                             <label class="form-label">Chiffrement</label>
                                             <select class="form-select" name="mail_encryption">
-                                                <!-- <option value="" {{ empty($mail['mail_encryption']) ? 'selected' : '' }}>Aucun</option> -->
+                                                <option value="" {{ empty($mail['mail_encryption']) ? 'selected' : '' }}>Aucun</option>
                                                 <option value="tls" {{ ($mail['mail_encryption'] ?? '') === 'tls' ? 'selected' : '' }}>TLS</option>
-                                                <option value="" {{ ($mail['mail_encryption'] ?? '') === 'starttls' ? 'selected' : '' }}>STARTTLS</option>
+                                                <option value="starttls" {{ ($mail['mail_encryption'] ?? '') === 'starttls' ? 'selected' : '' }}>STARTTLS</option>
                                                 <option value="ssl" {{ ($mail['mail_encryption'] ?? '') === 'ssl' ? 'selected' : '' }}>SSL</option>
                                             </select>
                                         </div>
@@ -257,7 +257,7 @@
                                                     <i class="bi bi-eye"></i>
                                                 </button>
                                                 </div>
-                                                <small class="text-muted">Si renseigné, le mot de passe est enregistré dans le fichier serveur sécurisé MAIL.txt.</small>
+                                                <small class="text-muted">Laisser vide pour ne pas changer le mot de passe déjà enregistré.</small>
                                         </div>
                                     </div>
                                     <div class="row mt-2">

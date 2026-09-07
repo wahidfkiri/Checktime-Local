@@ -54,12 +54,9 @@ class NotificationSettingsController extends Controller
                 'mail_from_name'    => $request->input('mail_from_name', config('app.name', 'CheckTime')),
             ];
 
-            // Le mot de passe est conservé hors base, dans MAIL_PASSWORD_FILE.
-            // Une valeur vide conserve le secret déjà en place.
+            // Le mot de passe n'est mis à jour que s'il est fourni (évite de l'effacer).
             if ($request->filled('mail_password')) {
-                \App\Support\MailPassword::store($request->input('mail_password'));
-                // Efface un éventuel ancien secret stocké en base.
-                Setting::where('key', 'mail_password')->update(['value' => '']);
+                $fields['mail_password'] = $request->input('mail_password');
             }
 
             foreach ($fields as $key => $value) {
@@ -72,9 +69,7 @@ class NotificationSettingsController extends Controller
             // Appliquer immédiatement pour la requête courante.
             $this->applyMailConfig();
 
-            Log::info('Configuration SMTP mise à jour depuis le profil.', [
-                'password_file_updated' => $request->filled('mail_password'),
-            ]);
+            Log::info('Configuration SMTP mise à jour depuis le profil.');
 
             return response()->json([
                 'success' => true,
@@ -119,13 +114,10 @@ class NotificationSettingsController extends Controller
             $fromName    = $request->input('mail_from_name', config('app.name', 'CheckTime'));
             $testEmail   = $request->input('test_email');
 
-            // Une valeur saisie pour le test doit être utilisée telle quelle.
-            // Le fichier MAIL.txt ne sert de repli que lorsque le champ est vide.
+            // Si le mot de passe n'est pas fourni, réutiliser celui déjà enregistré.
             $password = $request->filled('mail_password')
                 ? $request->input('mail_password')
-                : \App\Support\MailPassword::resolve(
-                    Setting::where('key', 'mail_password')->value('value')
-                );
+                : Setting::where('key', 'mail_password')->value('value');
 
             config([
                 'mail.mailers.smtp' => array_merge(config('mail.mailers.smtp', []), [
@@ -432,7 +424,7 @@ class NotificationSettingsController extends Controller
             'mail.mailers.smtp.host'           => $mail['mail_host'],
             'mail.mailers.smtp.port'           => (int) ($mail['mail_port'] ?: 587),
             'mail.mailers.smtp.username'       => $mail['mail_username'] ?: null,
-            'mail.mailers.smtp.password'       => \App\Support\MailPassword::resolve($mail['mail_password'] ?: null),
+            'mail.mailers.smtp.password'       => $mail['mail_password'] ?: null,
             'mail.mailers.smtp.encryption'     => $this->resolveEncryptionForTransport($mail['mail_encryption']),
             'mail.from.address'                => $mail['mail_from_address'] ?: null,
             'mail.from.name'                   => $mail['mail_from_name'] ?: config('app.name', 'CheckTime'),
