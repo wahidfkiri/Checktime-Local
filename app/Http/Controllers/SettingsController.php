@@ -22,8 +22,9 @@ class SettingsController extends Controller
         $hasAccessKey = !empty(Setting::getGroup('company')['api_token'] ?? null);
         $mail = Setting::mailConfig();
         $lateToleranceMinutes = Setting::lateToleranceMinutes();
+        $scheduledJobs = \App\Models\ScheduledNotification::orderBy('id')->get();
 
-        return view('settings.index', compact('settings', 'hasAccessKey', 'mail', 'lateToleranceMinutes'));
+        return view('settings.index', compact('settings', 'hasAccessKey', 'mail', 'lateToleranceMinutes', 'scheduledJobs'));
     }
     
     /**

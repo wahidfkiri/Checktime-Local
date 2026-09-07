@@ -454,9 +454,70 @@
                                         <li><strong>Statut CRON :</strong> <span id="cron-status" class="badge bg-success">Actif</span></li>
                                     </ul>
                                     <div class="mt-2 small text-muted">
-                                        <i class="bi bi-info-circle me-1"></i> 
+                                        <i class="bi bi-info-circle me-1"></i>
                                         Ces plannings sont gérés automatiquement par le système.
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Envoi manuel des rapports -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">📤 Envoi manuel des rapports</h4>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Déclenche immédiatement l'envoi d'un rapport, sans attendre sa planification automatique.
+                                </p>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Rapport</th>
+                                                <th>Dernière exécution</th>
+                                                <th class="text-center" style="width: 160px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($scheduledJobs ?? [] as $job)
+                                                <tr class="report-run-row" data-command="{{ $job->command }}">
+                                                    <td>
+                                                        {{ $job->label ?: $job->command }}
+                                                        @if($job->description)
+                                                            <br><span class="text-muted small">{{ $job->description }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($job->last_run_at)
+                                                            {{ $job->last_run_at->format('d/m/Y H:i') }}
+                                                            <br><span class="text-muted small">{{ $job->last_status }}</span>
+                                                        @else
+                                                            <span class="text-muted">Jamais exécuté</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-primary js-run-report">
+                                                            <i class="bi bi-send me-1"></i> Envoyer
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="3" class="text-center text-muted">Aucun rapport configuré.</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="run-report-output-wrapper" class="d-none">
+                                    <label class="form-label fw-bold">Résultat de l'exécution :</label>
+                                    <pre id="run-report-output" class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow:auto;font-size:12px;"></pre>
                                 </div>
                             </div>
                         </div>
@@ -775,7 +836,55 @@ $(document).ready(function() {
             }
         });
     });
-    
+
+    // Envoyer un rapport manuellement
+    $(document).on('click', '.js-run-report', function() {
+        if (isSaving) return;
+
+        var $btn = $(this);
+        var $row = $btn.closest('.report-run-row');
+        var command = $row.data('command');
+
+        if (isTesting) return;
+        isTesting = true;
+
+        hideAlerts();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+        $.ajax({
+            url: "{{ route('profile.notifications.jobs.run') }}",
+            type: 'POST',
+            data: {
+                _token: "{{ csrf_token() }}",
+                command: command
+            },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessAlert('Rapport envoyé', response.message);
+                } else {
+                    showErrorAlert('Échec de l\'envoi', response.message);
+                }
+                $('#run-report-output-wrapper').removeClass('d-none');
+                $('#run-report-output').text(response.output || '(aucune sortie)');
+            },
+            error: function(xhr) {
+                var errorMsg = 'Erreur lors de l\'envoi du rapport';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                showErrorAlert('Erreur', errorMsg);
+                if (xhr.responseJSON && xhr.responseJSON.output) {
+                    $('#run-report-output-wrapper').removeClass('d-none');
+                    $('#run-report-output').text(xhr.responseJSON.output);
+                }
+            },
+            complete: function() {
+                $btn.prop('disabled', false).html('<i class="bi bi-send me-1"></i> Envoyer');
+                isTesting = false;
+            }
+        });
+    });
+
     // Rétablir les valeurs
     $('#reset-settings').on('click', function() {
         Swal.fire({
