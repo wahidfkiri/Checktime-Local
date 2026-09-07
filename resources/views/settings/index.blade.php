@@ -509,7 +509,9 @@
                                                                 </div>
                                                                 <div class="col-6 js-job-field js-job-field-dom">
                                                                     <input type="number" min="1" max="31" class="form-control form-control-sm js-job-dom"
-                                                                           placeholder="Jour" value="{{ $job->day_of_month ?: '' }}">
+                                                                           placeholder="Jour" value="{{ $job->day_of_month ?: '' }}"
+                                                                           title="29, 30 ou 31 = dernier jour du mois (s'adapte aux mois plus courts)">
+                                                                    <small class="text-muted">29-31 = dernier jour du mois</small>
                                                                 </div>
                                                                 <div class="col-12 js-job-field js-job-field-cron">
                                                                     <input type="text" class="form-control form-control-sm js-job-cron"

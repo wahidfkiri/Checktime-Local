@@ -59,6 +59,16 @@ class Kernel extends ConsoleKernel
                     ->timezone('Africa/Casablanca')
                     ->withoutOverlapping();
 
+                // Mensuel avec un jour configuré à 29+ : le champ cron couvre
+                // 28-31 (voir cronExpression()), on ne retient ici que le
+                // jour effectivement dû — le dernier jour du mois si le jour
+                // configuré n'existe pas ce mois-ci (ex. 31 en février).
+                if ($job->frequency === 'monthly' && ($job->day_of_month ?: 1) >= 29) {
+                    $event->when(function () use ($job) {
+                        return $job->isMonthlyDayDueToday(now('Africa/Casablanca'));
+                    });
+                }
+
                 // Exécution unique : ne se déclenche que l'année prévue et une seule fois,
                 // puis la tâche est désactivée automatiquement.
                 if ($job->frequency === 'once') {

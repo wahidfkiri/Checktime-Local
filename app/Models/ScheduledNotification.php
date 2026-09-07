@@ -61,7 +61,14 @@ class ScheduledNotification extends Model
 
             case 'monthly':
                 $dom = $this->day_of_month ?: 1;
-                return "{$minute} {$hour} {$dom} * *";
+                // Un mois n'a pas toujours 29, 30 ou 31 jours : un jour fixe
+                // à 29+ ne se déclencherait jamais certains mois (ex. jamais
+                // en février pour 31). On élargit alors le champ jour à
+                // 28-31 ; c'est isLastConfiguredDayDue() (voir Kernel) qui
+                // affine ensuite en ne retenant que le dernier jour réel du
+                // mois si $dom dépasse le nombre de jours du mois courant.
+                $domField = $dom >= 29 ? '28-31' : (string) $dom;
+                return "{$minute} {$hour} {$domField} * *";
 
             case 'weekly':
             default:
@@ -70,6 +77,20 @@ class ScheduledNotification extends Model
                 $cron = $iso === 7 ? 0 : $iso;
                 return "{$minute} {$hour} * * {$cron}";
         }
+    }
+
+    /**
+     * Pour une tâche mensuelle : le jour configuré est-il "dû" aujourd'hui ?
+     * Un jour configuré au-delà du nombre de jours du mois courant (ex. 31
+     * un mois de 30 jours, ou 29/30/31 en février) est ramené au dernier
+     * jour réel du mois, plutôt que de ne jamais se déclencher ce mois-là.
+     */
+    public function isMonthlyDayDueToday(\Carbon\Carbon $now): bool
+    {
+        $configured   = $this->day_of_month ?: 1;
+        $effectiveDom = min($configured, $now->daysInMonth);
+
+        return $now->day === $effectiveDom;
     }
 
     /**
@@ -93,7 +114,10 @@ class ScheduledNotification extends Model
             case 'daily':
                 return "Tous les jours à {$this->time}";
             case 'monthly':
-                return "Le {$this->day_of_month} de chaque mois à {$this->time}";
+                $dom = $this->day_of_month ?: 1;
+                return $dom >= 29
+                    ? "Le dernier jour de chaque mois à {$this->time}"
+                    : "Le {$dom} de chaque mois à {$this->time}";
             case 'weekly':
             default:
                 $day = $days[$this->day_of_week] ?? 'Lundi';
