@@ -1930,9 +1930,14 @@ class DailyAttendanceController extends Controller
             $pdf->setOptions([
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => true,
+                // Ce gabarit ne charge aucune image distante : désactivé pour
+                // éviter les requêtes HTTP inutiles pendant le rendu.
+                'isRemoteEnabled' => false,
+                // Réduit la consommation mémoire sur les grosses périodes
+                // (pas d'incorporation de police sous-ensemblée par page).
+                'isFontSubsettingEnabled' => false,
             ]);
-            
+
             // Nom du fichier avec timestamp
             $filename = 'rapport_presences_' . $client->company_name . '_' . 
                        Carbon::parse($startDate)->format('Ymd') . '_' . 
@@ -2087,7 +2092,8 @@ class DailyAttendanceController extends Controller
             $pdf->setOptions([
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => true,
+                'isRemoteEnabled' => false,
+                'isFontSubsettingEnabled' => false,
             ]);
             
             $pdfPath = public_path('storage/pdfs/' . $filename);
@@ -2230,6 +2236,7 @@ class DailyAttendanceController extends Controller
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
+                'isFontSubsettingEnabled' => false,
             ]);
             
             $pdfPath = public_path('storage/pdfs/' . $filename);
@@ -2379,6 +2386,7 @@ class DailyAttendanceController extends Controller
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true,
+                'isFontSubsettingEnabled' => false,
             ]);
             
             $pdfPath = public_path('storage/pdfs/' . $filename);

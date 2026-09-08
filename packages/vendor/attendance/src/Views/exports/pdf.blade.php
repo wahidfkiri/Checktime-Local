@@ -137,7 +137,7 @@
             vertical-align: top;
         }
         
-        table tr:nth-child(even) {
+        table tr.row-even {
             background-color: #f8f9fa;
         }
         
@@ -209,11 +209,6 @@
             right: 15px;
             font-size: 10px;
             color: #666;
-        }
-        
-        /* Pour éviter les coupures de page dans les lignes */
-        tr { 
-            page-break-inside: avoid; 
         }
         
         /* Styles spécifiques pour l'export */
@@ -312,7 +307,7 @@
                     @php $dateCount++; @endphp
                 @endif
             
-            <tr>
+            <tr class="{{ $loop->index % 2 === 1 ? 'row-even' : '' }}">
                 <td>{{ $attendance['date'] }}</td>
                 <td>
                     {{ $attendance['employee_name'] ?? $attendance['full_name'] ?? 'N/A' }}

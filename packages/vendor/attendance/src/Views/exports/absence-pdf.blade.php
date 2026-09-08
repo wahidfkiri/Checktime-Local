@@ -17,7 +17,7 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
         table th { background-color: #dc3545; color: white; padding: 8px 6px; font-weight: bold; border: 1px solid #ddd; }
         table td { padding: 6px; border: 1px solid #ddd; }
-        table tr:nth-child(even) { background-color: #fdf2f2; }
+        table tr.row-even { background-color: #fdf2f2; }
         .status-badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: bold; }
         .status-absent { background-color: #dc3545; color: white; }
         .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 10px; }
@@ -27,7 +27,6 @@
         .stat-number { font-size: 18px; font-weight: bold; color: #dc3545; }
         .stat-label { font-size: 10px; color: #666; }
         .no-data { text-align: center; padding: 30px; color: #666; font-style: italic; }
-        tr { page-break-inside: avoid; }
     </style>
 </head>
 <body>
@@ -97,7 +96,7 @@
         </thead>
         <tbody>
             @foreach($attendances as $a)
-            <tr>
+            <tr class="{{ $loop->index % 2 === 1 ? 'row-even' : '' }}">
                 <td>{{ $a['date'] }}</td>
                 <td>{{ $a['employee_name'] }}</td>
                 <td>{{ $a['emp_code'] }}</td>
