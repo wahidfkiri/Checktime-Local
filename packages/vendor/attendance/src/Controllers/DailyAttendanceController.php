@@ -1830,6 +1830,12 @@ class DailyAttendanceController extends Controller
     public function exportPDF(Request $request)
     {
         try {
+            // Une longue période (ex. un mois complet, plusieurs employés) peut
+            // dépasser la limite d'exécution par défaut de PHP et échouer
+            // silencieusement — voir Kernel/plateforme pour la config globale.
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $client = \App\Models\Setting::company();
             
             if (!$client) {
@@ -1965,6 +1971,9 @@ class DailyAttendanceController extends Controller
     public function exportPresencePdf(Request $request)
     {
         try {
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $client = \App\Models\Setting::company();
             
             if (!$client) {
@@ -2112,6 +2121,9 @@ class DailyAttendanceController extends Controller
     public function exportRetardPdf(Request $request)
     {
         try {
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $client = \App\Models\Setting::company();
             
             if (!$client) {
@@ -2251,6 +2263,9 @@ class DailyAttendanceController extends Controller
     public function exportAbsencePdf(Request $request)
     {
         try {
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $client = \App\Models\Setting::company();
             
             if (!$client) {
@@ -2432,6 +2447,9 @@ class DailyAttendanceController extends Controller
      */
     public function exportPresenceExcel(Request $request)
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
         $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -2485,6 +2503,9 @@ class DailyAttendanceController extends Controller
      */
     public function exportAbsenceExcel(Request $request)
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
         $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -2526,6 +2547,9 @@ class DailyAttendanceController extends Controller
      */
     public function exportRetardExcel(Request $request)
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
         $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
@@ -2583,6 +2607,9 @@ class DailyAttendanceController extends Controller
      */
     public function exportExcel(Request $request)
     {
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
         $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
