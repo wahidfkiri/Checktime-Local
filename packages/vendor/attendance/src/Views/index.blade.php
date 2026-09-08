@@ -121,7 +121,7 @@
                                                         <button type="button" id="exportExcelBtn" class="btn btn-success ms-2">
                                                             <i class="fas fa-file-excel me-1"></i> Exporter Excel
                                                         </button>
-                                                        <button type="button" id="exportPdfBtn" class="btn btn-danger ms-2">
+                                                        <button type="button" id="exportPdfBtn" class="btn btn-danger ms-2 d-none">
                                                             <i class="fas fa-file-pdf me-1"></i> Exporter PDF
                                                         </button>
                                                     </div>
