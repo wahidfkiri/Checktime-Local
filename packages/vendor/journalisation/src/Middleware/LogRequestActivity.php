@@ -214,10 +214,29 @@ class LogRequestActivity
         }
 
         $summary = array_filter([
-            'message' => is_string($payload['message'] ?? null) ? $payload['message'] : null,
+            'message' => is_string($payload['message'] ?? null) ? $this->redact($payload['message']) : null,
             'stats'   => is_array($payload['stats'] ?? null) ? $payload['stats'] : null,
         ]);
 
         return $summary ?: null;
+    }
+
+    /**
+     * Neutralise toute mention de « token » dans un message affiché au client
+     * (le journal est visible côté client, qui ne doit pas savoir que
+     * l'application dépend d'une source d'accès externe). Filet de sécurité
+     * générique : les messages métier eux-mêmes évitent déjà ce mot, mais un
+     * message d'erreur tiers (bibliothèque HTTP, service externe...) peut le
+     * contenir sans qu'on contrôle son texte exact.
+     */
+    private function redact(string $text): string
+    {
+        // Expressions complètes d'abord (résultat plus naturel), puis repli
+        // mot à mot pour tout ce qui n'a pas été anticipé.
+        $text = preg_replace('/token\s+d\'accès\s+non\s+configur[ée]e?/iu', "configuration d'accès manquante", $text) ?? $text;
+        $text = preg_replace('/token\s+d\'accès/iu', "configuration d'accès", $text) ?? $text;
+        $text = preg_replace('/\btoken\b/iu', 'accès', $text) ?? $text;
+
+        return $text !== '' ? mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1) : $text;
     }
 }

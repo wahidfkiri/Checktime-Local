@@ -57,7 +57,7 @@ class EmployeeController extends Controller
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
@@ -110,7 +110,7 @@ class EmployeeController extends Controller
             if ($response->status() === 400) {
                 $errorMessage = $response->json()['detail'] ?? 'Données invalides';
             } elseif ($response->status() === 401) {
-                $errorMessage = 'Non autorisé - Token invalide';
+                $errorMessage = 'Non autorisé - Accès invalide';
             } elseif ($response->status() === 409) {
                 $errorMessage = 'Le code employé existe déjà';
             }
@@ -158,7 +158,7 @@ public function update(Request $request, $id)
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
@@ -230,7 +230,7 @@ public function destroy($id)
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
@@ -288,7 +288,7 @@ public function destroy($id)
             if (!$token) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Token API non configuré'
+                    'message' => 'Configuration d\'accès manquante'
                 ]);
             }
 
@@ -727,7 +727,7 @@ public function destroy($id)
             if (!$token) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Token API non configuré'
+                    'message' => 'Configuration d\'accès manquante'
                 ]);
             }
 
@@ -766,7 +766,7 @@ public function destroy($id)
         if (!$apiUrl || !$apiToken) {
             return response()->json([
                 'success' => false,
-                'message' => 'URL et token API requis'
+                'message' => 'URL et clé d\'accès requis'
             ], 400);
         }
 

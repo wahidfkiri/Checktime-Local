@@ -196,7 +196,7 @@ class BiometricService
             $generalToken = $this->getGeneralToken();
             
             if (!$generalToken) {
-                throw new Exception('No authentication token available');
+                throw new Exception('No access configuration available');
             }
             
             // Essayer d'abord le endpoint des devices/terminaux
@@ -362,7 +362,7 @@ class BiometricService
             $token = $token ?? $this->getGeneralToken();
             
             if (!$token) {
-                throw new Exception('Authentication token required');
+                throw new Exception('Access configuration required');
             }
             
             // Tentative de connexion à l'API

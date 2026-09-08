@@ -475,7 +475,7 @@ class InstallerController extends Controller
         } catch (\GuzzleHttp\Exception\ClientException $e) {
             $statusCode = $e->getResponse()->getStatusCode();
             if ($statusCode === 401 || $statusCode === 403) {
-                return ['success' => false, 'message' => 'Token API invalide.'];
+                return ['success' => false, 'message' => 'Clé d\'accès invalide.'];
             }
             return ['success' => false, 'message' => 'Erreur client: ' . $e->getMessage()];
         } catch (\Exception $e) {

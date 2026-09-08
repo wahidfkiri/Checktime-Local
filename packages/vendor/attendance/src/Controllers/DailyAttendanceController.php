@@ -1656,7 +1656,7 @@ class DailyAttendanceController extends Controller
                 if (!CheckTimeService::getConfigToken()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Token d\'accès non configuré.'
+                        'message' => 'Configuration d\'accès manquante.'
                     ], 400);
                 }
                 
@@ -2899,7 +2899,7 @@ class DailyAttendanceController extends Controller
             if (!CheckTimeService::getConfigToken()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Token d\'accès non configuré. Veuillez contacter l\'administrateur.'
+                    'message' => 'Configuration d\'accès manquante. Veuillez contacter l\'administrateur.'
                 ], 400);
             }
             

@@ -100,7 +100,7 @@ class ReportController extends Controller
             $token = \App\Services\CheckTimeService::getConfigToken();
 
             if (!$token) {
-                return response()->json(['error' => 'Token d\'accès non configuré'], 400);
+                return response()->json(['error' => 'Configuration d\'accès manquante'], 400);
             }
 
             // Récupérer tous les devices
@@ -861,7 +861,7 @@ class ReportController extends Controller
         $token = \App\Services\CheckTimeService::getConfigToken();
 
         if (!$token) {
-            throw new \RuntimeException("Token d'accès non configuré");
+            throw new \RuntimeException("Configuration d'accès manquante");
         }
 
         $devices = Device::all();

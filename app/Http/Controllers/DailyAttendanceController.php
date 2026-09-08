@@ -70,7 +70,7 @@ class DailyAttendanceController extends Controller
                 Log::warning("Token d'accès non configuré");
                 return [
                     'success' => false,
-                    'message' => 'Token d\'accès non configuré',
+                    'message' => 'Configuration d\'accès manquante',
                     'data' => []
                 ];
             }
@@ -212,7 +212,7 @@ class DailyAttendanceController extends Controller
             
             // Récupérer le token d'authentification depuis CheckTimeService
             if (!$this->api->hasToken()) {
-                return response()->json(['error' => 'Token d\'accès non configuré'], 400);
+                return response()->json(['error' => 'Configuration d\'accès manquante'], 400);
             }
 
             $token = $this->api->getGeneralToken();
@@ -845,7 +845,7 @@ private function getAllTransactionsWithRetry($devices, $startTime, $endTime, $to
             if (!$this->api->hasToken()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Token d\'accès non configuré.'
+                    'message' => 'Configuration d\'accès manquante.'
                 ], 400);
             }
 

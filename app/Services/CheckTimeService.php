@@ -68,7 +68,7 @@ class CheckTimeService
             return $response->status() !== 403; // 403 Forbidden pourrait aussi indiquer un problème de token
             
         } catch (\Exception $e) {
-            throw new \Exception('Erreur lors de la validation du token: ' . $e->getMessage());
+            throw new \Exception('Erreur lors de la validation de l\'accès: ' . $e->getMessage());
         }
     }
 
@@ -78,7 +78,7 @@ class CheckTimeService
     public function testStoredToken(): bool
     {
         if (!$this->generalToken) {
-            throw new \Exception('Token non configuré.');
+            throw new \Exception('Configuration d\'accès manquante.');
         }
 
         return $this->testTokenValid($this->generalToken);
@@ -101,7 +101,7 @@ class CheckTimeService
     public function getGeneralToken(): string
     {
         if (!$this->generalToken) {
-            throw new \Exception('Token général non configuré. Veuillez configurer un token d\'accès.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner dans les paramètres.');
         }
 
         return $this->generalToken;
@@ -151,7 +151,7 @@ class CheckTimeService
 
         } catch (\Exception $e) {
             \Log::error('Erreur lors de la mise à jour du token: ' . $e->getMessage());
-            throw new \Exception('Erreur lors de la mise à jour du token: ' . $e->getMessage());
+            throw new \Exception('Erreur lors de la mise à jour de la configuration d\'accès: ' . $e->getMessage());
         }
     }
 
@@ -162,7 +162,7 @@ class CheckTimeService
     {
         // Vérifier que le token est configuré
         if (!$this->hasToken()) {
-            throw new \Exception('Token non configuré. Veuillez configurer un token avant de faire des requêtes.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner avant de faire des requêtes.');
         }
 
         $response = Http::withHeaders([
@@ -187,7 +187,7 @@ class CheckTimeService
     {
         // Vérifier que le token est configuré
         if (!$this->hasToken()) {
-            throw new \Exception('Token non configuré. Veuillez configurer un token avant de faire des requêtes.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner avant de faire des requêtes.');
         }
 
         $response = Http::withHeaders([
@@ -211,7 +211,7 @@ class CheckTimeService
     public function patch(string $endpoint, array $data = []): array
     {
         if (!$this->hasToken()) {
-            throw new \Exception('Token non configuré. Veuillez configurer un token avant de faire des requêtes.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner avant de faire des requêtes.');
         }
 
         $response = Http::withHeaders([
@@ -233,7 +233,7 @@ class CheckTimeService
     public function put(string $endpoint, array $data = []): array
     {
         if (!$this->hasToken()) {
-            throw new \Exception('Token non configuré. Veuillez configurer un token avant de faire des requêtes.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner avant de faire des requêtes.');
         }
 
         $response = Http::withHeaders([
@@ -255,7 +255,7 @@ class CheckTimeService
     public function delete(string $endpoint): array
     {
         if (!$this->hasToken()) {
-            throw new \Exception('Token non configuré. Veuillez configurer un token avant de faire des requêtes.');
+            throw new \Exception('Configuration d\'accès manquante. Veuillez la renseigner avant de faire des requêtes.');
         }
 
         $response = Http::withHeaders([

@@ -113,7 +113,7 @@ class ModelActivityObserver
         $values  = [];
 
         foreach ($fields as $field) {
-            if (in_array($field, self::SENSITIVE, true)) {
+            if ($this->isSensitive($field)) {
                 continue;
             }
 
@@ -167,6 +167,19 @@ class ModelActivityObserver
      */
     private function safeKeys(array $attributes): array
     {
-        return array_values(array_diff(array_keys($attributes), self::SENSITIVE));
+        return array_values(array_filter(
+            array_keys($attributes),
+            fn ($field) => !$this->isSensitive($field)
+        ));
+    }
+
+    /**
+     * Une colonne est sensible si elle est explicitement listée, ou si son
+     * nom contient « token » — attrape aussi les colonnes futures ou celles
+     * non anticipées (ex. general_token) sans devoir toutes les énumérer.
+     */
+    private function isSensitive(string $field): bool
+    {
+        return in_array($field, self::SENSITIVE, true) || stripos($field, 'token') !== false;
     }
 }

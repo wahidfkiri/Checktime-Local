@@ -46,7 +46,7 @@ class AreaController extends Controller
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
@@ -94,7 +94,7 @@ class AreaController extends Controller
             if ($response->status() === 400) {
                 $errorMessage = $response->json()['detail'] ?? 'Données invalides';
             } elseif ($response->status() === 401) {
-                $errorMessage = 'Non autorisé - Token invalide';
+                $errorMessage = 'Non autorisé - Accès invalide';
             } elseif ($response->status() === 409) {
                 $errorMessage = 'Le code de zone existe déjà';
             }
@@ -141,7 +141,7 @@ public function update(Request $request, $id)
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
@@ -207,7 +207,7 @@ public function destroy($id)
         if (!$token) {
             return response()->json([
                 'success' => false,
-                'message' => 'Token API non configuré'
+                'message' => 'Configuration d\'accès manquante'
             ], 401);
         }
 
