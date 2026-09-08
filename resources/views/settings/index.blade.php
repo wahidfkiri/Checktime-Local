@@ -619,21 +619,30 @@ $(document).ready(function() {
         }
     }
     
+    // Fait défiler la page jusqu'à l'alerte : sur une page aussi longue
+    // (SMTP, planification...), l'alerte tout en haut passerait sinon
+    // inaperçue si l'action vient d'une section plus bas.
+    function scrollToAlert($alert) {
+        $('html, body').animate({ scrollTop: $alert.offset().top - 100 }, 300);
+    }
+
     function showSuccessAlert(title, message) {
         $('#success-title').text(title);
         $('#success-message').text(message);
         $('#success-alert').removeClass('d-none');
-        
+        scrollToAlert($('#success-alert'));
+
         // Auto-hide after 5 seconds
         setTimeout(function() {
             $('#success-alert').addClass('d-none');
         }, 5000);
     }
-    
+
     function showErrorAlert(title, message) {
         $('#error-title').text(title);
         $('#error-message').text(message);
         $('#error-alert').removeClass('d-none');
+        scrollToAlert($('#error-alert'));
     }
     
     function hideAlerts() {
