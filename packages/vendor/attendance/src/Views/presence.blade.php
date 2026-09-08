@@ -96,7 +96,7 @@
                                                         <option value="late">En retard</option>
                                                         <option value="early_leave">Départ anticipé</option>
                                                         <option value="overtime">Heures sup</option>
-                                                        <option value="half_day">Demi-journée</option>
+                                                        <option value="half_day">Incomplet</option>
                                                     </select>
                                                 </div>
                                             </div>

@@ -673,7 +673,7 @@ class DailyAttendanceController extends Controller
             $observations[] = 'Départ anticipé';
         }
         if ($status === 'HALF_DAY') {
-            $observations[] = 'Demi-journée';
+            $observations[] = 'Incomplet';
         }
         if (!empty($attendance->is_overtime) || $status === 'OVERTIME') {
             $observations[] = 'Heures supplémentaires';
@@ -1481,7 +1481,7 @@ class DailyAttendanceController extends Controller
             'ABSENT' => 'Absent',
             'LATE' => 'Retard',
             'EARLY_LEAVE' => 'Départ anticipé',
-            'HALF_DAY' => 'Demi-journée',
+            'HALF_DAY' => 'Incomplet',
             'OVERTIME' => 'Heures supplémentaires',
             'SHORT_WORK' => 'Présent',
             'LEAVE' => 'En congé',
@@ -2810,7 +2810,7 @@ class DailyAttendanceController extends Controller
                 'late' => 'Retard',
                 'early_leave' => 'Départ anticipé',
                 'overtime' => 'Heures supplémentaires',
-                'half_day' => 'Demi-journée'
+                'half_day' => 'Incomplet'
             ];
             $filters['statut'] = $statusLabels[$request->status] ?? $request->status;
         }
