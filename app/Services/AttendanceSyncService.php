@@ -8,6 +8,7 @@ use App\Models\DailyAttendance;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -381,6 +382,25 @@ class AttendanceSyncService
      * Mettre à jour le résumé quotidien d'un employé
      */
     private function updateEmployeeDailySummary(Employee $employee, Carbon $date)
+    {
+        // Verrou par employé+date : la mise à jour ci-dessous fait un
+        // updateOrCreate (lecture puis écriture, non atomique) sur
+        // daily_attendance. Sans verrou, deux requêtes concurrentes (deux
+        // onglets, rechargements rapides des 4 pages daily-attendance qui
+        // déclenchent chacune une synchro à l'ouverture...) peuvent toutes
+        // les deux rater la lecture et insérer chacune leur ligne, d'où des
+        // doublons visibles dans le tableau et les exports. La contrainte
+        // d'unicité (migration dedupe_and_unique_daily_attendance) est le
+        // filet de sécurité final ; ce verrou évite l'erreur qu'elle
+        // provoquerait sinon en cas de concurrence.
+        $lockKey = 'daily-attendance-sync:' . $employee->id . ':' . $date->format('Y-m-d');
+
+        return Cache::lock($lockKey, 30)->block(15, function () use ($employee, $date) {
+            return $this->doUpdateEmployeeDailySummary($employee, $date);
+        });
+    }
+
+    private function doUpdateEmployeeDailySummary(Employee $employee, Carbon $date)
     {
         $startOfDay = $date->copy()->startOfDay();
         $endOfDay = $date->copy()->endOfDay();
