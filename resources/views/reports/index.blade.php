@@ -49,7 +49,7 @@
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label for="report_emp_code" class="form-label">Employé</label>
-                                                    <select class="form-control" id="report_emp_code">
+                                                    <select class="form-control search_utilisateur" id="report_emp_code">
                                                         <option value="all">Tous les employés</option>
                                                         @foreach($employees as $employee)
                                                             <option value="{{ $employee['emp_code'] }}">
@@ -223,10 +223,19 @@
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/sumoselect.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.sumoselect/3.0.2/jquery.sumoselect.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css">
 <script>
 $(document).ready(function() {
+    // Recherche par code ou nom dans la liste des employés.
+    $('#report_emp_code').SumoSelect({
+        search: true,
+        searchText: 'Rechercher un employé...',
+        placeholder: 'Tous les employés'
+    });
+
     // Variables
     var reportTable;
     var isGeneratingPDF = false;
