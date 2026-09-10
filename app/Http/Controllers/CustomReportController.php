@@ -346,16 +346,12 @@ class CustomReportController extends Controller
                 }
             }
 
-            foreach ($leaveDates as $dateStr => $leave) {
-                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
-                    && !isset($holidayDates[$dateStr])
-                    && !isset($missionDates[$dateStr])) {
-                    $totalPresent++;
-                }
-            }
+            // Un congé approuvé reste une absence au poste. Il est conservé
+            // dans les observations, mais n'augmente ni la présence ni le
+            // taux de présence ; il est donc inclus dans $totalAbsent ci-dessous.
 
             // Une autorisation d'absence ne compte pas comme une absence
-            // (même traitement que mission / congé), sans double comptage.
+            // (même traitement que mission), sans double comptage.
             foreach ($permissionDates as $dateStr => $permission) {
                 if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
                     && !isset($holidayDates[$dateStr])
@@ -731,7 +727,9 @@ class CustomReportController extends Controller
                     }
                 }
 
-                $totalPresent += $totalMission + $totalLeave;
+                // Le congé est une absence au poste : seul le jour de mission
+                // est comptabilisé comme présence.
+                $totalPresent += $totalMission;
                 $totalAbsent   = $workingDays - $totalPresent;
                 $presenceRate  = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
                 $ponctualiteRate = $totalPresent > 0 ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;

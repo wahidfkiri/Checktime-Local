@@ -615,7 +615,7 @@
                             $dayPresent = 0;
                             foreach ($department['employees'] as $emp) {
                                 $c = $emp['daily_checks'][$day['date_str']] ?? null;
-                                if ($c && strtoupper($c['status']) !== 'ABSENT') {
+                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE'], true)) {
                                     $dayPresent++;
                                 }
                             }
@@ -658,7 +658,7 @@
             1. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
             @endif
             2. Les heures affichées sont les heures d'arrivée et de départ enregistrées.<br>
-            3. Mission et Congé comptent comme présents dans le calcul du taux de présence.
+            3. Les missions comptent comme présence ; les congés approuvés sont indiqués dans les observations et comptés comme absences au poste.
         </p>
     </div>
 
