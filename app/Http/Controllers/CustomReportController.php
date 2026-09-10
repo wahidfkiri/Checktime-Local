@@ -317,8 +317,10 @@ class CustomReportController extends Controller
                     continue;
                 }
 
-                if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])
-                    || isset($permissionDates[$dateKey])) {
+                // Une mission reste assimilée à une présence. En revanche un
+                // congé ou une permission ne vaut présence que s'il y a un
+                // pointage réel ce jour-là.
+                if (isset($missionDates[$dateKey])) {
                     continue;
                 }
 
@@ -346,20 +348,8 @@ class CustomReportController extends Controller
                 }
             }
 
-            // Un congé approuvé reste une absence au poste. Il est conservé
-            // dans les observations, mais n'augmente ni la présence ni le
-            // taux de présence ; il est donc inclus dans $totalAbsent ci-dessous.
-
-            // Une autorisation d'absence ne compte pas comme une absence
-            // (même traitement que mission), sans double comptage.
-            foreach ($permissionDates as $dateStr => $permission) {
-                if (($includeWeekends || Carbon::parse($dateStr)->dayOfWeekIso <= 5)
-                    && !isset($holidayDates[$dateStr])
-                    && !isset($missionDates[$dateStr])
-                    && !isset($leaveDates[$dateStr])) {
-                    $totalPresent++;
-                }
-            }
+            // Un congé ou une permission sans pointage reste une absence au
+            // poste. La justification est néanmoins conservée en observation.
 
             $totalAbsent = $workingDays - $totalPresent;
             $totalOnTime = $totalPresent - $totalLate - $totalEarlyLeave;
@@ -524,6 +514,10 @@ class CustomReportController extends Controller
                 })
                 ->get();
 
+            $permissions = EmployeePermission::where('status', 'approved')
+                ->overlappingPeriod($startDate, $endDate)
+                ->get();
+
             $employeesQuery = Employee::query();
 
             if ($empCode && $empCode !== 'all') {
@@ -553,6 +547,11 @@ class CustomReportController extends Controller
                 $leavesByEmployee[$leave->employee_id][] = $leave;
             }
 
+            $permissionsByEmployee = [];
+            foreach ($permissions as $permission) {
+                $permissionsByEmployee[$permission->employee_id][] = $permission;
+            }
+
             $departmentData = [];
 
             foreach ($employees as $employee) {
@@ -568,6 +567,7 @@ class CustomReportController extends Controller
                 $employeeAttendances = $attendanceByEmployee[$employee->id] ?? [];
                 $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
                 $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
+                $employeePermissions = $permissionsByEmployee[$employee->id] ?? [];
 
                 // Bornée à [$periodStart, $periodEnd] : la requête remonte aussi
                 // les missions/congés qui débordent de la période (voir plus
@@ -600,6 +600,19 @@ class CustomReportController extends Controller
                     }
                 }
 
+                $permissionDates = [];
+                foreach ($employeePermissions as $permission) {
+                    $permissionStart = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
+                    $permissionEnd   = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                    $current         = $permissionStart->copy();
+                    while ($current <= $permissionEnd) {
+                        $permissionDates[$current->format('Y-m-d')] = [
+                            'raison' => $permission->raison,
+                        ];
+                        $current->addDay();
+                    }
+                }
+
                 $dailyChecks = [];
                 $currentDate = Carbon::parse($startDate);
                 $endDateObj  = Carbon::parse($endDate);
@@ -620,6 +633,7 @@ class CustomReportController extends Controller
 
                     $isMission = isset($missionDates[$dateStr]);
                     $isLeave   = isset($leaveDates[$dateStr]);
+                    $isPermission = isset($permissionDates[$dateStr]);
 
                     $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateStr);
                     $isLateByPlanning = $lateData['is_late'];
@@ -638,20 +652,10 @@ class CustomReportController extends Controller
                             'is_leave'       => false,
                             'leave_info'     => null,
                         ];
-                    } elseif ($isLeave) {
-                        $dailyChecks[$dateStr] = [
-                            'check_in'       => null,
-                            'check_out'      => null,
-                            'status'         => 'CONGE',
-                            'is_late'        => false,
-                            'late_minutes'   => 0,
-                            'is_early_leave' => false,
-                            'is_mission'     => false,
-                            'mission_info'   => null,
-                            'is_leave'       => true,
-                            'leave_info'     => $leaveDates[$dateStr],
-                        ];
                     } elseif ($attendance && strtoupper($attendance->status) !== 'ABSENT') {
+                        // Un pointage réel prévaut sur le congé : l'agent est
+                        // physiquement présent, tandis que « Congé » reste
+                        // visible dans les observations.
                         $checkIn = null;
                         if ($attendance->check_in) {
                             $checkIn = $attendance->check_in instanceof Carbon
@@ -673,8 +677,40 @@ class CustomReportController extends Controller
                             'is_early_leave' => (bool) $attendance->is_early_leave,
                             'is_mission'     => false,
                             'mission_info'   => null,
+                            'is_leave'       => $isLeave,
+                            'leave_info'     => $isLeave ? $leaveDates[$dateStr] : null,
+                            'is_permission'  => $isPermission,
+                            'permission_info'=> $isPermission ? $permissionDates[$dateStr] : null,
+                        ];
+                    } elseif ($isLeave) {
+                        $dailyChecks[$dateStr] = [
+                            'check_in'       => null,
+                            'check_out'      => null,
+                            'status'         => 'CONGE',
+                            'is_late'        => false,
+                            'late_minutes'   => 0,
+                            'is_early_leave' => false,
+                            'is_mission'     => false,
+                            'mission_info'   => null,
+                            'is_leave'       => true,
+                            'leave_info'     => $leaveDates[$dateStr],
+                            'is_permission'  => false,
+                            'permission_info'=> null,
+                        ];
+                    } elseif ($isPermission) {
+                        $dailyChecks[$dateStr] = [
+                            'check_in'       => null,
+                            'check_out'      => null,
+                            'status'         => 'PERMISSION',
+                            'is_late'        => false,
+                            'late_minutes'   => 0,
+                            'is_early_leave' => false,
+                            'is_mission'     => false,
+                            'mission_info'   => null,
                             'is_leave'       => false,
                             'leave_info'     => null,
+                            'is_permission'  => true,
+                            'permission_info'=> $permissionDates[$dateStr],
                         ];
                     } else {
                         $dailyChecks[$dateStr] = null;
@@ -702,7 +738,7 @@ class CustomReportController extends Controller
                         || isset($holidayDates[$dateKey])) {
                         continue;
                     }
-                    if ($status !== 'ABSENT' && !isset($missionDates[$dateKey]) && !isset($leaveDates[$dateKey])) {
+                    if ($status !== 'ABSENT' && !isset($missionDates[$dateKey])) {
                         $totalPresent++;
                         $lateData = $this->calculateLateFromPlanning($employee, $att, $dateKey);
                         if ($lateData['is_late']) {
@@ -726,9 +762,8 @@ class CustomReportController extends Controller
                         $totalLeave++;
                     }
                 }
-
-                // Le congé est une absence au poste : seul le jour de mission
-                // est comptabilisé comme présence.
+                // Un congé n'est présent que s'il possède un pointage réel ;
+                // seul le jour de mission est automatiquement présent.
                 $totalPresent += $totalMission;
                 $totalAbsent   = $workingDays - $totalPresent;
                 $presenceRate  = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
@@ -765,6 +800,15 @@ class CustomReportController extends Controller
                     if (!isset($missionDates[$dateStr])) {
                         $observations[] = [$dateStr, $leave['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
                     }
+                }
+                foreach ($permissionDates as $dateStr => $permission) {
+                    if (isset($missionDates[$dateStr]) || isset($leaveDates[$dateStr])) {
+                        continue;
+                    }
+                    $raison = trim((string) ($permission['raison'] ?? ''));
+                    $observations[] = [$dateStr, "Autorisation d'absence"
+                        . ($raison !== '' ? ' (' . $raison . ')' : '')
+                        . ' le ' . Carbon::parse($dateStr)->format('d/m'), self::OBS_JUSTIFICATION];
                 }
 
                 $departmentData[$deptName]['employees'][] = [

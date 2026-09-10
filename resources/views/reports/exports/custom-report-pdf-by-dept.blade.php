@@ -572,6 +572,12 @@
                                 {{ $check['leave_info']['type_name'] ?? 'Congé' }}
                             </td>
 
+                        {{-- ── PERMISSION : absence justifiée sans pointage ── --}}
+                        @elseif($status === 'PERMISSION')
+                            <td colspan="2" class="conge-cell">
+                                Autorisation d'absence
+                            </td>
+
                         {{-- ── PRÉSENT avec pointage ── --}}
                         @elseif($check && $status !== 'ABSENT')
                             <td class="check-time">
@@ -615,7 +621,7 @@
                             $dayPresent = 0;
                             foreach ($department['employees'] as $emp) {
                                 $c = $emp['daily_checks'][$day['date_str']] ?? null;
-                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE'], true)) {
+                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE', 'PERMISSION'], true)) {
                                     $dayPresent++;
                                 }
                             }
@@ -658,7 +664,7 @@
             1. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
             @endif
             2. Les heures affichées sont les heures d'arrivée et de départ enregistrées.<br>
-            3. Les missions comptent comme présence ; les congés approuvés sont indiqués dans les observations et comptés comme absences au poste.
+            3. Les missions comptent comme présence. Un congé ou une permission est une absence au poste, sauf si un pointage réel est enregistré ce jour-là ; la justification reste alors dans les observations.
         </p>
     </div>
 
