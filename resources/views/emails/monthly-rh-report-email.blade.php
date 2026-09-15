@@ -113,7 +113,7 @@
         <ul>
             <li><strong>Période analysée :</strong> {{ $data['start_date'] }} au {{ $data['end_date'] }}</li>
             <li><strong>Nombre de jours :</strong> {{ $data['period_days'] ?? 0 }} jours ouvrables</li>
-            <li><strong>Généré le :</strong> {{ $data['generated_at']->format('d/m/Y à H:i') }} par le système CHECKTIME - Tél: 0141555592.</li>
+            <li><strong>Généré le :</strong> {{ $data['generated_at']->format('d/m/Y à H:i') }} par le système {{ config('app.name') }} - Tél: 0141555592.</li>
             <li><strong>Format :</strong> PDF avec tableau détaillé et analyses</li>
         </ul>
         
@@ -137,7 +137,7 @@
     
     <div class="footer">
         <p>📧 Ceci est un email automatique, merci de ne pas y répondre directement.</p>
-        <p>© {{ date('Y') }} {{ $data['client']->name }}. Tous droits réservés.</p>
+        <p>© {{ date('Y') }} {{ config('app.name') }} - {{ $data['client']->name }}. Tous droits réservés.</p>
         <p style="font-size: 10px; color: #95a5a6;">
             Confidentialité : Ce rapport contient des informations confidentielles.
         </p>

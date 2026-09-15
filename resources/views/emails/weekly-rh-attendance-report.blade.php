@@ -170,7 +170,7 @@
         <div class="footer">
             <p>
                 Cet email a été généré automatiquement. Merci de ne pas y répondre.<br>
-                © {{ date('Y') }} - Rapport de présence hebdomadaire
+                © {{ date('Y') }} {{ config('app.name') }} - Rapport de présence hebdomadaire
             </p>
         </div>
     </div>
