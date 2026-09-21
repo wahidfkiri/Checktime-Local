@@ -75,7 +75,7 @@
 <body>
     <div class="header">
         <h1>💾 SAUVEGARDE DE LA BASE DE DONNÉES</h1>
-        <p>{{ $appName }} • {{ now()->format('d/m/Y à H:i') }}</p>
+        <p>{{ now()->format('d/m/Y à H:i') }}</p>
     </div>
 
     <div class="content">
@@ -119,7 +119,7 @@
 
         <p style="margin-top: 25px;">
             Cordialement,<br>
-            <strong>{{ $appName }}</strong>
+            <strong>Service RH APB</strong>
         </p>
 
         <p><em>Cet email est généré automatiquement par la planification des sauvegardes.</em></p>

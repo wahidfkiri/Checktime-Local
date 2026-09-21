@@ -174,15 +174,14 @@
         {{-- FORMULE DE POLITESSE --}}
         <p>
             Cordialement,<br>
-            <strong>Service RH</strong><br>
-            <span style="color: #888; font-size: 12px;">{{ $clientName }}</span>
+            <strong>Service RH APB</strong>
         </p>
 
         {{-- FOOTER --}}
         <div class="footer">
             <p>
                 Cet email a été généré automatiquement. Merci de ne pas y répondre.<br>
-                © {{ date('Y') }} {{ config('app.name') }} - Rapport de présence hebdomadaire
+                © {{ date('Y') }} - Rapport de présence hebdomadaire
             </p>
         </div>
     </div>

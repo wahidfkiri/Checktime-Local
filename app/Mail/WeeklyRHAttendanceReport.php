@@ -46,7 +46,7 @@ class WeeklyRHAttendanceReport extends Mailable
         $pdfFileName  = "rapport_presence_rh_{$this->exportDate->format('Y-m-d')}.pdf";
         $xlsxFileName = "rapport_presence_rh_{$this->exportDate->format('Y-m-d')}.xlsx";
 
-        $clientName = $this->client->raison_sociale ?? config('app.name', 'CheckTime');
+        $clientName = $this->client->raison_sociale ?? 'APB';
 
         return $this
             ->subject("Rapport de présence hebdomadaire — {$this->startDate} au {$this->endDate}")

@@ -22,13 +22,10 @@ class DatabaseBackupMail extends Mailable
 
     public function build(): static
     {
-        $appName = config('app.name', 'CheckTime');
-
         return $this
-            ->subject('💾 Sauvegarde de la base de données — ' . now()->format('d/m/Y H:i') . ' - ' . $appName)
+            ->subject('💾 Sauvegarde de la base de données — ' . now()->format('d/m/Y H:i'))
             ->view('emails.database-backup')
             ->with([
-                'appName'           => $appName,
                 'backup'            => $this->backup,
                 'attachmentOmitted' => $this->attachmentOmitted,
             ]);

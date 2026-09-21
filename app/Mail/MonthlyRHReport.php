@@ -30,7 +30,7 @@ class MonthlyRHReport extends Mailable
     public function envelope(): Envelope
     {
         $monthYear = $this->data['month_name'] . ' ' . $this->data['year'];
-        $clientName = $this->data['client']->raison_sociale ?? config('app.name', 'CheckTime');
+        $clientName = $this->data['client']->raison_sociale ?? 'APB';
         
         return new Envelope(
             subject: '📊 Rapport Mensuel RH - ' . $monthYear . ' - ' . $clientName,

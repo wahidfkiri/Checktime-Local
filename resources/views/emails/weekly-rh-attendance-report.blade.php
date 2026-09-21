@@ -154,23 +154,17 @@
             </ul>
         </div>
 
-        {{-- LIEN SI BESOIN --}}
-        <p style="text-align: center;">
-            <a href="#" class="btn" style="color: white; background-color: #1a5276; text-decoration: none;">📄 Consulter le rapport</a>
-        </p>
-
         {{-- FORMULE DE POLITESSE --}}
         <p>
             Cordialement,<br>
-            <strong>Service de Gestion des Présences</strong><br>
-            <span style="color: #888; font-size: 12px;">Rapport automatique hebdomadaire</span>
+            <strong>Service RH APB</strong>
         </p>
 
         {{-- FOOTER --}}
         <div class="footer">
             <p>
                 Cet email a été généré automatiquement. Merci de ne pas y répondre.<br>
-                © {{ date('Y') }} {{ config('app.name') }} - Rapport de présence hebdomadaire
+                © {{ date('Y') }} - Rapport de présence hebdomadaire
             </p>
         </div>
     </div>
