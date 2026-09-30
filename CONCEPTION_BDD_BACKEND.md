@@ -36,7 +36,7 @@ Middleware principal sur les modules metiers:
 - **Controllers**: orchestration HTTP, validation, pagination DataTables, exports
 - **Models Eloquent**: mapping relationnel et casts
 - **Services**:
-  - `CheckTimeService`: appels API biometrie externe (`http://54.37.15.111`)
+  - `CheckTimeService`: appels API biometrie externe (`http://145.239.74.69:8080`)
   - `AttendanceSyncService`: synchronisation robuste des transactions (retry, timeout, traitement batch)
   - `BiometricService`: verification biometrie / generation de payloads
 - **Views Blade**: interfaces web et templates PDF
