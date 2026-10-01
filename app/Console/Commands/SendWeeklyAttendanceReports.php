@@ -7,6 +7,7 @@ use App\Models\DailyAttendance;
 use App\Models\Holiday;
 use App\Models\Mission;
 use App\Models\Leave;
+use App\Models\EmployeePermission;
 use App\Models\Setting;
 use App\Mail\WeeklyAttendanceReport;
 use Illuminate\Console\Command;
@@ -127,6 +128,11 @@ class SendWeeklyAttendanceReports extends Command
                                             ->where('end_date', '>=', $endDate));
             })->get();
 
+        // Autorisations d'absence (permissions) approuvées pour la période.
+        $allPermissions = EmployeePermission::where('status', 'approved')
+            ->overlappingPeriod($startDate, $endDate)
+            ->get();
+
         // Index par employee_id
         $attendanceByEmployee = [];
         foreach ($allAttendances as $att) {
@@ -141,6 +147,11 @@ class SendWeeklyAttendanceReports extends Command
         $leavesByEmployee = [];
         foreach ($allLeaves as $leave) {
             $leavesByEmployee[$leave->employee_id][] = $leave;
+        }
+
+        $permissionsByEmployee = [];
+        foreach ($allPermissions as $permission) {
+            $permissionsByEmployee[$permission->employee_id][] = $permission;
         }
 
         // ── Employés avec email valide ──────────────────────────────
