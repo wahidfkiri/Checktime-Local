@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\EmailTemplateRenderer;
 
 class WeeklyAttendanceReport extends Mailable
 {
@@ -48,17 +49,22 @@ class WeeklyAttendanceReport extends Mailable
 
         $employeeName = trim($employee->first_name . ' ' . $employee->last_name);
 
-        return $this
-            ->subject("Votre rapport de présence — {$startDate} au {$endDate}")
-            ->view('emails.weekly-attendance-employee-pdf')
-            ->with([
+        $html = EmailTemplateRenderer::render(
+            'attendance:send-weekly-reports',
+            'emails.weekly-attendance-employee-pdf',
+            [
                 'employeeName' => $employeeName,
                 'clientName'   => $clientName,
                 'startDate'    => $startDate,
                 'endDate'      => $endDate,
                 'stats'        => $this->emailData['employee_data']['stats'],
                 'observations' => $this->emailData['employee_data']['observations'],
-            ])
+            ]
+        );
+
+        return $this
+            ->subject("Votre rapport de présence — {$startDate} au {$endDate}")
+            ->html($html)
             ->attachData($pdf->output(), $pdfFileName, [
                 'mime' => 'application/pdf',
             ]);

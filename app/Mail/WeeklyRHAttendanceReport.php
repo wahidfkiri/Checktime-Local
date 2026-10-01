@@ -8,6 +8,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\SimpleXlsxWriter;
+use App\Support\EmailTemplateRenderer;
 
 class WeeklyRHAttendanceReport extends Mailable
 {
@@ -48,17 +49,22 @@ class WeeklyRHAttendanceReport extends Mailable
 
         $clientName = $this->client->raison_sociale ?? 'APB';
 
-        return $this
-            ->subject("Rapport de présence hebdomadaire — {$this->startDate} au {$this->endDate}")
-            ->view('emails.weekly-rh-attendance-report')
-            ->with([
+        $html = EmailTemplateRenderer::render(
+            'attendance:send-weekly-rh-reports',
+            'emails.weekly-rh-attendance-report',
+            [
                 'clientName'    => $clientName,
                 'startDate'     => $this->startDate,
                 'endDate'       => $this->endDate,
                 'totalEmployees'=> $this->reportData['totals']['total_employees'] ?? 0,
                 'avgPresenceRate'=> $this->reportData['totals']['avg_presence_rate'] ?? 0,
                 'totalDepartments'=> $this->reportData['total_departments'] ?? 0,
-            ])
+            ]
+        );
+
+        return $this
+            ->subject("Rapport de présence hebdomadaire — {$this->startDate} au {$this->endDate}")
+            ->html($html)
             ->attachData($pdf->output(), $pdfFileName, [
                 'mime' => 'application/pdf',
             ])

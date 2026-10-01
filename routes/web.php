@@ -28,6 +28,7 @@ use App\Http\Controllers\EmployeePermissionController;
 use App\Http\Controllers\CustomReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SignataireController;
+use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\BiometricController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\NotificationSettingsController;
@@ -257,6 +258,18 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::delete('/signataires/postes/{id}', [SignataireController::class, 'destroyPoste'])->name('settings.signataires.postes.destroy');
         Route::post('/signataires/responsables', [SignataireController::class, 'storeSignataire'])->name('settings.signataires.responsables.store');
         Route::delete('/signataires/responsables/{id}', [SignataireController::class, 'destroySignataire'])->name('settings.signataires.responsables.destroy');
+
+        // Éditeur visuel (Vvveb) du contenu des emails envoyés par les tâches
+        // planifiées. {command} est le nom de la commande Artisan (ex.
+        // "attendance:send-weekly-reports"), autorisé par défaut par la regex
+        // de paramètre de route (seul "/" est exclu).
+        Route::prefix('email-templates/{command}')->name('settings.email-templates.')->group(function () {
+            Route::get('/edit', [EmailTemplateController::class, 'edit'])->name('edit');
+            Route::post('/save', [EmailTemplateController::class, 'save'])->name('save');
+            Route::post('/reset', [EmailTemplateController::class, 'reset'])->name('reset');
+            Route::get('/scan-media', [EmailTemplateController::class, 'scanMedia'])->name('scan-media');
+            Route::post('/upload-media', [EmailTemplateController::class, 'uploadMedia'])->name('upload-media');
+        });
     });
 
     // Modèles d'édition PDF (colonnes à cocher) du rapport présence-ponctualité

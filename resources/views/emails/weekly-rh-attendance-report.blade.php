@@ -106,9 +106,11 @@
     <div class="container">
         {{-- HEADER --}}
         <div class="header">
+            <img src="{{ $appLogo }}" alt="{{ config('app.name') }}" style="max-height:50px;margin-bottom:10px;"><br>
             <h1>📊 Rapport de présence hebdomadaire</h1>
         </div>
 
+        <div id="vvveb-report-content">
         {{-- SALUTATION --}}
         <p>Bonjour <strong>Service RH</strong>,</p>
 
@@ -159,9 +161,11 @@
             Cordialement,<br>
             <strong>Service RH APB</strong>
         </p>
+        </div>
 
         {{-- FOOTER --}}
         <div class="footer">
+            <img src="{{ $appLogo }}" alt="" style="max-height:30px;opacity:0.7;margin-bottom:8px;"><br>
             <p>
                 Cet email a été généré automatiquement. Merci de ne pas y répondre.<br>
                 © {{ date('Y') }} - Rapport de présence hebdomadaire

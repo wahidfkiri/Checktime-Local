@@ -9,6 +9,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Queue\SerializesModels;
+use App\Support\EmailTemplateRenderer;
 
 class MonthlyRHReport extends Mailable
 {
@@ -42,9 +43,13 @@ class MonthlyRHReport extends Mailable
      */
     public function content(): Content
     {
-        return new Content(
-            view: 'emails.monthly-rh-report-email', // Vue séparée pour l'email
+        $html = EmailTemplateRenderer::render(
+            'reports:send-monthly-rh',
+            'emails.monthly-rh-report-email',
+            ['data' => $this->data]
         );
+
+        return new Content(htmlString: $html);
     }
 
     /**

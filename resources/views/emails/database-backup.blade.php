@@ -74,11 +74,13 @@
 </head>
 <body>
     <div class="header">
+        <img src="{{ $appLogo }}" alt="{{ config('app.name') }}" style="max-height:50px;margin-bottom:10px;"><br>
         <h1>💾 SAUVEGARDE DE LA BASE DE DONNÉES</h1>
         <p>{{ now()->format('d/m/Y à H:i') }}</p>
     </div>
 
     <div class="content">
+    <div id="vvveb-report-content">
         <p>Bonjour,</p>
 
         <p>Une sauvegarde automatique de la base de données a été générée.</p>
@@ -124,8 +126,10 @@
 
         <p><em>Cet email est généré automatiquement par la planification des sauvegardes.</em></p>
     </div>
+    </div>
 
     <div class="footer">
+        <img src="{{ $appLogo }}" alt="" style="max-height:30px;opacity:0.7;margin-bottom:8px;"><br>
         <p>📧 Ceci est un email automatique, merci de ne pas y répondre directement.</p>
         <p style="font-size: 10px; color: #95a5a6;">
             Confidentialité : cette archive contient l'intégralité des données de l'application. Conservez-la en lieu sûr.

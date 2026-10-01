@@ -66,12 +66,14 @@
 </head>
 <body>
     <div class="header">
+        <img src="{{ $appLogo }}" alt="{{ config('app.name') }}" style="max-height:50px;margin-bottom:10px;"><br>
         <h1>📊 RAPPORT MENSUEL RH</h1>
         <h2>Présence & Ponctualité</h2>
         <p>{{ $data['month_name'] }} {{ $data['year'] }} • {{ $data['client']->name }}</p>
     </div>
-    
+
     <div class="content">
+    <div id="vvveb-report-content">
         <p>Bonjour,</p>
         
         <p>Veuillez trouver ci-joint le <strong>rapport mensuel de présence et ponctualité</strong> pour le mois de <strong>{{ $data['month_name'] }} {{ $data['year'] }}</strong>.</p>
@@ -134,8 +136,10 @@
         
         <p><em>Cet email est généré automatiquement par le système de gestion des présences.</em></p>
     </div>
-    
+    </div>
+
     <div class="footer">
+        <img src="{{ $appLogo }}" alt="" style="max-height:30px;opacity:0.7;margin-bottom:8px;"><br>
         <p>📧 Ceci est un email automatique, merci de ne pas y répondre directement.</p>
         <p>© {{ date('Y') }} APB. Tous droits réservés.</p>
         <p style="font-size: 10px; color: #95a5a6;">

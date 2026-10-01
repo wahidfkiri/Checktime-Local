@@ -460,7 +460,7 @@
                                                     <th style="min-width:280px;">Planification</th>
                                                     <th style="min-width:200px;">Destinataires</th>
                                                     <th>Dernière exécution</th>
-                                                    <th class="text-center" style="width: 110px;">Action</th>
+                                                    <th class="text-center" style="width: 150px;">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -540,6 +540,14 @@
                                                             <button type="button" class="btn btn-sm btn-primary js-run-report" title="Envoyer maintenant">
                                                                 <i class="bi bi-send"></i>
                                                             </button>
+                                                            @if(\App\Http\Controllers\EmailTemplateController::isEditable($job->command))
+                                                                <a href="{{ route('settings.email-templates.edit', $job->command) }}"
+                                                                   target="_blank" rel="noopener"
+                                                                   class="btn btn-sm btn-outline-secondary"
+                                                                   title="Personnaliser le contenu et le visuel de cet email">
+                                                                    <i class="bi bi-palette"></i>
+                                                                </a>
+                                                            @endif
                                                         </td>
                                                     </tr>
                                                 @empty
