@@ -18,7 +18,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class SendMonthlyRHReport extends Command
 {
-    protected $signature = 'reports:send-monthly-rh {--test : Mode test} {--date= : Date spécifique}';
+    protected $signature = 'reports:send-monthly-rh {--test : Mode test} {--date= : Date spécifique}
+                            {--start-date= : Début de période personnalisée (format Y-m-d)}
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
     protected $description = 'Envoyer les rapports mensuels RH par email le dernier jour du mois';
 
     /**
@@ -45,11 +47,20 @@ class SendMonthlyRHReport extends Command
 
         $this->info('🚀 Début de l\'envoi du rapport mensuel RH...');
 
-        $today        = $this->option('date')
-            ? Carbon::parse($this->option('date'))
-            : Carbon::now();
-        $startOfMonth = $today->copy()->startOfMonth();
-        $endOfMonth   = $today->copy()->endOfMonth();
+        $startDateOpt = $this->option('start-date');
+        $endDateOpt   = $this->option('end-date');
+
+        if ($startDateOpt && $endDateOpt) {
+            // Période personnalisée choisie manuellement (modal d'envoi depuis /settings).
+            $startOfMonth = Carbon::parse($startDateOpt)->startOfDay();
+            $endOfMonth   = Carbon::parse($endDateOpt)->startOfDay();
+        } else {
+            $today        = $this->option('date')
+                ? Carbon::parse($this->option('date'))
+                : Carbon::now();
+            $startOfMonth = $today->copy()->startOfMonth();
+            $endOfMonth   = $today->copy()->endOfMonth();
+        }
 
         $this->info("📊 Période du rapport: " . $startOfMonth->format('d/m/Y') . " au " . $endOfMonth->format('d/m/Y'));
 

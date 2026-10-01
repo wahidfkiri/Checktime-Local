@@ -573,6 +573,40 @@
     </div>
 </div>
 
+<!-- Modal : choix de la période avant envoi manuel d'un rapport -->
+<div class="modal fade" id="runReportDateRangeModal" tabindex="-1" aria-labelledby="runReportDateRangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="runReportDateRangeModalLabel">Envoyer le rapport</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="runReportDateRangeForm">
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Choisissez une période personnalisée, ou laissez les deux champs vides pour utiliser la période automatique habituelle de ce rapport.
+                    </p>
+                    <div class="mb-3">
+                        <label for="run_report_start_date" class="form-label">Date de début</label>
+                        <input type="date" class="form-control" id="run_report_start_date">
+                    </div>
+                    <div class="mb-3">
+                        <label for="run_report_end_date" class="form-label">Date de fin</label>
+                        <input type="date" class="form-control" id="run_report_end_date">
+                    </div>
+                    <div class="text-danger small d-none" id="run_report_date_error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i> Envoyer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -933,27 +967,25 @@ $(document).ready(function() {
         });
     });
 
-    // Envoyer un rapport manuellement
-    $(document).on('click', '.js-run-report', function() {
-        if (isSaving) return;
+    // Envoyer un rapport manuellement (avec choix de période pour les rapports qui le permettent)
+    var REPORT_COMMANDS_WITH_RANGE = [
+        'attendance:send-weekly-reports',
+        'attendance:send-weekly-rh-reports',
+        'reports:send-monthly-rh'
+    ];
 
-        var $btn = $(this);
-        var $row = $btn.closest('.settings-job-row');
-        var command = $row.data('command');
-
-        if (isTesting) return;
+    function sendReportNow(command, $btn, extraData) {
         isTesting = true;
-
         hideAlerts();
         $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
         $.ajax({
             url: "{{ route('profile.notifications.jobs.run') }}",
             type: 'POST',
-            data: {
+            data: $.extend({
                 _token: "{{ csrf_token() }}",
                 command: command
-            },
+            }, extraData || {}),
             success: function(response) {
                 if (response.success) {
                     showSuccessAlert('Rapport envoyé', response.message);
@@ -979,6 +1011,55 @@ $(document).ready(function() {
                 isTesting = false;
             }
         });
+    }
+
+    $(document).on('click', '.js-run-report', function() {
+        if (isSaving || isTesting) return;
+
+        var $btn = $(this);
+        var $row = $btn.closest('.settings-job-row');
+        var command = $row.data('command');
+
+        if (REPORT_COMMANDS_WITH_RANGE.indexOf(command) !== -1) {
+            $('#runReportDateRangeForm').data('command', command).data('btn', $btn);
+            $('#run_report_start_date').val('');
+            $('#run_report_end_date').val('');
+            $('#run_report_date_error').addClass('d-none').text('');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('runReportDateRangeModal')).show();
+            return;
+        }
+
+        sendReportNow(command, $btn, {});
+    });
+
+    $('#runReportDateRangeForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var command   = $(this).data('command');
+        var $btn      = $(this).data('btn');
+        var startDate = $('#run_report_start_date').val();
+        var endDate   = $('#run_report_end_date').val();
+        var $error    = $('#run_report_date_error');
+
+        if ((startDate && !endDate) || (!startDate && endDate)) {
+            $error.removeClass('d-none').text('Renseignez la date de début et la date de fin, ou laissez les deux vides.');
+            return;
+        }
+        if (startDate && endDate && endDate < startDate) {
+            $error.removeClass('d-none').text('La date de fin doit être égale ou postérieure à la date de début.');
+            return;
+        }
+        $error.addClass('d-none').text('');
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('runReportDateRangeModal')).hide();
+
+        var extraData = {};
+        if (startDate && endDate) {
+            extraData.start_date = startDate;
+            extraData.end_date   = endDate;
+        }
+
+        sendReportNow(command, $btn, extraData);
     });
 
     // ---- Affichage conditionnel des champs de planification ----

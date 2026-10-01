@@ -16,7 +16,9 @@ use Carbon\Carbon;
 
 class SendWeeklyAttendanceReports extends Command
 {
-    protected $signature = 'attendance:send-weekly-reports';
+    protected $signature = 'attendance:send-weekly-reports
+                            {--start-date= : Début de période personnalisée (format Y-m-d)}
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
 
     protected $description = 'Envoyer les rapports de présence hebdomadaires aux employés chaque vendredi à 9h';
 
@@ -44,22 +46,30 @@ class SendWeeklyAttendanceReports extends Command
 
         $this->info('🚀 Début de l\'envoi des rapports de présence hebdomadaires...');
 
-        $today = Carbon::now();
-        $currentDayOfWeek = $today->dayOfWeekIso;
+        $startDateOpt = $this->option('start-date');
+        $endDateOpt   = $this->option('end-date');
 
-        // Calcul de la période : toujours Lundi → Vendredi (5 jours)
-        if ($currentDayOfWeek == 6 || $currentDayOfWeek == 7) {
-            $startOfWeek = $today->copy()->previous(Carbon::MONDAY);
+        if ($startDateOpt && $endDateOpt) {
+            // Période personnalisée choisie manuellement (modal d'envoi depuis /settings).
+            $startOfWeek = Carbon::parse($startDateOpt)->startOfDay();
+            $endOfWeek   = Carbon::parse($endDateOpt)->startOfDay();
         } else {
-            $startOfWeek = $today->copy()->startOfWeek(Carbon::MONDAY);
+            $today = Carbon::now();
+            $currentDayOfWeek = $today->dayOfWeekIso;
+
+            // Calcul de la période : toujours Lundi → Vendredi (5 jours)
+            if ($currentDayOfWeek == 6 || $currentDayOfWeek == 7) {
+                $startOfWeek = $today->copy()->previous(Carbon::MONDAY);
+            } else {
+                $startOfWeek = $today->copy()->startOfWeek(Carbon::MONDAY);
+            }
+            $endOfWeek = $startOfWeek->copy()->addDays(4); // Vendredi
         }
-        $endOfWeek = $startOfWeek->copy()->addDays(4); // Vendredi
 
         $startDate = $startOfWeek->toDateString();
         $endDate   = $endOfWeek->toDateString();
 
         $this->info("📊 Période du rapport: {$startOfWeek->format('d/m/Y')} au {$endOfWeek->format('d/m/Y')}");
-        $this->info("📆 Jours ouvrés (Lun-Ven): 5 jours");
 
         // ── Jours ouvrés + liste pour la vue (jours fériés chômés exclus) ──
         $periodStart  = Carbon::parse($startDate)->startOfDay();

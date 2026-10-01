@@ -17,8 +17,10 @@ use Carbon\Carbon;
 
 class SendWeeklyRHReports extends Command
 {
-    protected $signature = 'attendance:send-weekly-rh-reports 
-                            {--date= : Date de référence pour le rapport (format Y-m-d)}';
+    protected $signature = 'attendance:send-weekly-rh-reports
+                            {--date= : Date de référence pour le rapport (format Y-m-d)}
+                            {--start-date= : Début de période personnalisée (format Y-m-d)}
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
     
     protected $description = 'Envoyer les rapports de présence hebdomadaires aux RH (email settings)';
 
@@ -46,20 +48,29 @@ class SendWeeklyRHReports extends Command
 
         $this->info('🚀 Début de l\'envoi des rapports RH hebdomadaires...');
 
-        $referenceDate = $this->option('date') 
-            ? Carbon::parse($this->option('date'))
-            : Carbon::now();
+        $startDateOpt = $this->option('start-date');
+        $endDateOpt   = $this->option('end-date');
 
-        $this->info("📅 Date de référence: " . $referenceDate->format('d/m/Y'));
-
-        $currentDayOfWeek = $referenceDate->dayOfWeekIso;
-
-        if ($currentDayOfWeek == 7 || $currentDayOfWeek == 6) {
-            $startOfWeek = $referenceDate->copy()->previous(Carbon::MONDAY);
-            $endOfWeek   = $startOfWeek->copy()->addDays(4);
+        if ($startDateOpt && $endDateOpt) {
+            // Période personnalisée choisie manuellement (modal d'envoi depuis /settings).
+            $startOfWeek = Carbon::parse($startDateOpt)->startOfDay();
+            $endOfWeek   = Carbon::parse($endDateOpt)->startOfDay();
         } else {
-            $startOfWeek = $referenceDate->copy()->startOfWeek(Carbon::MONDAY);
-            $endOfWeek   = $startOfWeek->copy()->addDays(4);
+            $referenceDate = $this->option('date')
+                ? Carbon::parse($this->option('date'))
+                : Carbon::now();
+
+            $this->info("📅 Date de référence: " . $referenceDate->format('d/m/Y'));
+
+            $currentDayOfWeek = $referenceDate->dayOfWeekIso;
+
+            if ($currentDayOfWeek == 7 || $currentDayOfWeek == 6) {
+                $startOfWeek = $referenceDate->copy()->previous(Carbon::MONDAY);
+                $endOfWeek   = $startOfWeek->copy()->addDays(4);
+            } else {
+                $startOfWeek = $referenceDate->copy()->startOfWeek(Carbon::MONDAY);
+                $endOfWeek   = $startOfWeek->copy()->addDays(4);
+            }
         }
 
         $startDate = $startOfWeek->toDateString();

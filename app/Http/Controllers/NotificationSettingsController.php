@@ -24,6 +24,16 @@ class NotificationSettingsController extends Controller
     ];
 
     /**
+     * Commandes de rapport acceptant une période personnalisée (--start-date/--end-date)
+     * pour l'envoi manuel depuis le modal de /settings.
+     */
+    private const COMMANDS_WITH_DATE_RANGE = [
+        'attendance:send-weekly-reports',
+        'attendance:send-weekly-rh-reports',
+        'reports:send-monthly-rh',
+    ];
+
+    /**
      * Enregistrer la configuration SMTP dans la table settings.
      */
     public function smtp(Request $request)
@@ -383,10 +393,34 @@ class NotificationSettingsController extends Controller
             ], 403);
         }
 
+        $params = [];
+
+        if (in_array($command, self::COMMANDS_WITH_DATE_RANGE, true)) {
+            $startDate = $request->input('start_date');
+            $endDate   = $request->input('end_date');
+
+            if ($startDate || $endDate) {
+                $validator = Validator::make($request->all(), [
+                    'start_date' => 'required|date',
+                    'end_date'   => 'required|date|after_or_equal:start_date',
+                ]);
+
+                if ($validator->fails()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $validator->errors()->first(),
+                    ], 422);
+                }
+
+                $params['--start-date'] = $startDate;
+                $params['--end-date']   = $endDate;
+            }
+        }
+
         try {
             @set_time_limit(0);
 
-            Artisan::call($command);
+            Artisan::call($command, $params);
             $output = trim(Artisan::output());
 
             ScheduledNotification::where('command', $command)->update([
