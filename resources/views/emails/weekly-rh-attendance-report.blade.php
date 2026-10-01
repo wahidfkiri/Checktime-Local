@@ -110,21 +110,20 @@
             <h1>📊 Rapport de présence hebdomadaire</h1>
         </div>
 
-        <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         {{-- SALUTATION --}}
         <p>Bonjour <strong>Service RH</strong>,</p>
 
         <p>Veuillez trouver ci-joint le rapport de présence pour la période du <strong>{{ $startDate }}</strong> au <strong>{{ $endDate }}</strong>.</p>
 
-        {{-- PÉRIODE RÉCAP --}}
-        <div class="period">
+        {{-- PÉRIODE RÉCAP — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-period-recap" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="period">
             📅 <strong>Période :</strong> {{ $startDate }} au {{ $endDate }}<br>
             🏢 <strong>Client :</strong> {{ $clientName }}<br>
             📊 <strong>Départements :</strong> {{ $totalDepartments }} | 👥 <strong>Employés :</strong> {{ $totalEmployees }}
         </div>
 
-        {{-- STATS RAPIDES --}}
-        <div class="stats-grid">
+        {{-- STATS RAPIDES — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-stats-grid" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="stats-grid">
             <div class="stat-item">
                 <div class="stat-value">{{ $totalEmployees }}</div>
                 <div class="stat-label">Employés actifs</div>
@@ -134,7 +133,7 @@
                 <div class="stat-label">Départements</div>
             </div>
             <div class="stat-item">
-                <div class="stat-value 
+                <div class="stat-value
                     @if($avgPresenceRate >= 90) rate-high
                     @elseif($avgPresenceRate >= 80) rate-medium
                     @else rate-low
@@ -161,7 +160,6 @@
             Cordialement,<br>
             <strong>Service RH APB</strong>
         </p>
-        </div>
 
         {{-- FOOTER --}}
         <div class="footer">

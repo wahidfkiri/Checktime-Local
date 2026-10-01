@@ -80,12 +80,12 @@
     </div>
 
     <div class="content">
-    <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         <p>Bonjour,</p>
 
         <p>Une sauvegarde automatique de la base de données a été générée.</p>
 
-        <div class="stats-grid">
+        {{-- dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-stats-grid" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="stats-grid">
             <div class="stat-card">
                 <div>Tables</div>
                 <div class="stat-value">{{ $backup->tables_count }}</div>
@@ -101,7 +101,8 @@
         </div>
 
         @if($attachmentOmitted)
-            <div class="warning-box">
+            {{-- dynamique, verrouillé dans l'éditeur --}}
+            <div id="vvveb-warning-box" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="warning-box">
                 <h3>⚠️ Archive non jointe</h3>
                 <p>
                     L'archive ({{ $backup->size_human }}) dépasse la taille acceptée en pièce jointe email.<br>
@@ -110,7 +111,8 @@
                 </p>
             </div>
         @else
-            <div class="attachment-box">
+            {{-- dynamique, verrouillé dans l'éditeur --}}
+            <div id="vvveb-attachment-box" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="attachment-box">
                 <h3>📎 Pièce jointe</h3>
                 <p>
                     <strong>{{ $backup->filename }}</strong><br>
@@ -125,7 +127,6 @@
         </p>
 
         <p><em>Cet email est généré automatiquement par la planification des sauvegardes.</em></p>
-    </div>
     </div>
 
     <div class="footer">

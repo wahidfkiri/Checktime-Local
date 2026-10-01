@@ -73,13 +73,12 @@
     </div>
 
     <div class="content">
-    <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         <p>Bonjour,</p>
-        
+
         <p>Veuillez trouver ci-joint le <strong>rapport mensuel de présence et ponctualité</strong> pour le mois de <strong>{{ $data['month_name'] }} {{ $data['year'] }}</strong>.</p>
-        
-        <!-- Résumé rapide -->
-        <div class="stats-grid">
+
+        {{-- Résumé rapide — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-stats-grid" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="stats-grid">
             <div class="stat-card">
                 <div>Employés analysés</div>
                 <div class="stat-value">{{ $data['global_stats']['total_employees'] ?? 0 }}</div>
@@ -97,9 +96,9 @@
                 <div class="stat-value">{{ $data['global_stats']['total_presence_absent'] ?? 0 }}</div>
             </div>
         </div>
-        
-        <!-- Boîte de pièce jointe -->
-        <div class="attachment-box">
+
+        {{-- Boîte de pièce jointe — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-attachment-box" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="attachment-box">
             <h3>📎 Pièce jointe</h3>
             <p>
                 <strong>{{ $data['pdf_filename'] ?? 'rapport_mensuel.pdf' }}</strong><br>
@@ -109,18 +108,20 @@
                 <em>📄 Format : PDF ({{ $data['period_days'] ?? 0 }} pages)</em>
             </p>
         </div>
-        
-        <!-- Informations du rapport -->
-        <h3>📋 Informations du rapport</h3>
-        <ul>
-            <li><strong>Période analysée :</strong> {{ $data['start_date'] }} au {{ $data['end_date'] }}</li>
-            <li><strong>Nombre de jours :</strong> {{ $data['period_days'] ?? 0 }} jours ouvrables</li>
-            <li><strong>Généré le :</strong> {{ $data['generated_at']->format('d/m/Y à H:i') }} - Tél: 0141555592.</li>
-            <li><strong>Format :</strong> PDF avec tableau détaillé et analyses</li>
-        </ul>
-        
-        <!-- Accès au système -->
-        <div style="background-color: #f1f2f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+
+        {{-- Informations du rapport — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-report-info" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
+            <h3>📋 Informations du rapport</h3>
+            <ul>
+                <li><strong>Période analysée :</strong> {{ $data['start_date'] }} au {{ $data['end_date'] }}</li>
+                <li><strong>Nombre de jours :</strong> {{ $data['period_days'] ?? 0 }} jours ouvrables</li>
+                <li><strong>Généré le :</strong> {{ $data['generated_at']->format('d/m/Y à H:i') }} - Tél: 0141555592.</li>
+                <li><strong>Format :</strong> PDF avec tableau détaillé et analyses</li>
+            </ul>
+        </div>
+
+        {{-- Accès au système — dynamique (nom client), verrouillé dans l'éditeur --}}
+        <div id="vvveb-system-access" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" style="background-color: #f1f2f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3>🔗 Accès au système</h3>
             <p>Pour plus de détails ou pour consulter les rapports individuels :</p>
             <p>
@@ -128,14 +129,13 @@
                 <strong>Client :</strong> {{ $data['client']->name }}
             </p>
         </div>
-        
+
         <p style="margin-top: 25px;">
             Cordialement,<br>
             <strong>Service RH APB</strong>
         </p>
-        
+
         <p><em>Cet email est généré automatiquement par le système de gestion des présences.</em></p>
-    </div>
     </div>
 
     <div class="footer">

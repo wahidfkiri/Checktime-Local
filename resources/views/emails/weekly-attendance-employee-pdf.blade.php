@@ -113,20 +113,19 @@
             <h1>📊 Rapport de présence hebdomadaire</h1>
         </div>
 
-        <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         {{-- SALUTATION --}}
         <p>Bonjour <strong>{{ $employeeName }}</strong>,</p>
 
         <p>Veuillez trouver ci-joint votre rapport de présence pour la période du <strong>{{ $startDate }}</strong> au <strong>{{ $endDate }}</strong>.</p>
 
-        {{-- PÉRIODE RÉCAP --}}
-        <div class="period">
+        {{-- PÉRIODE RÉCAP — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-period-recap" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="period">
             📅 <strong>Période :</strong> {{ $startDate }} au {{ $endDate }}<br>
             🏢 <strong>Client :</strong> {{ $clientName }}
         </div>
 
-        {{-- STATS RAPIDES --}}
-        <div class="stats-grid">
+        {{-- STATS RAPIDES — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-stats-grid" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="stats-grid">
             <div class="stat-item">
                 <div class="stat-value">{{ $stats['present'] ?? 0 }}</div>
                 <div class="stat-label">Jours présents</div>
@@ -141,8 +140,8 @@
             </div>
         </div>
 
-        {{-- DÉTAILS SUPPLÉMENTAIRES --}}
-        <div style="margin: 15px 0;">
+        {{-- DÉTAILS SUPPLÉMENTAIRES — dynamique, verrouillé dans l'éditeur --}}
+        <div id="vvveb-stats-details" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" style="margin: 15px 0;">
             <p><strong>📈 Détails :</strong></p>
             <ul style="margin: 0; padding-left: 20px;">
                 <li>🔹 Retards : <strong>{{ $stats['late'] ?? 0 }}</strong></li>
@@ -155,9 +154,9 @@
             </ul>
         </div>
 
-        {{-- OBSERVATIONS --}}
+        {{-- OBSERVATIONS — dynamique, verrouillé dans l'éditeur --}}
         @if(!empty($observations) && $observations !== 'Aucune observation')
-        <div class="observations">
+        <div id="vvveb-observations" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="observations">
             <strong>📝 Observations :</strong><br>
             {{ $observations }}
         </div>
@@ -179,7 +178,6 @@
             Cordialement,<br>
             <strong>Service RH APB</strong>
         </p>
-        </div>
 
         {{-- FOOTER --}}
         <div class="footer">

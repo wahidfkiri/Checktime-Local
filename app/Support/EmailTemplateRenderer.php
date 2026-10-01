@@ -7,19 +7,25 @@ use App\Models\EmailTemplate;
 /**
  * Permet à chaque rapport envoyé par email d'avoir un template personnalisé
  * (édité via l'éditeur Vvveb, bouton "Template" de /settings) tout en gardant
- * les données réelles (stats, tableaux) toujours à jour au moment de l'envoi.
+ * les données réelles (stats, observations…) toujours à jour au moment de
+ * l'envoi, sans perdre le texte libre que l'administrateur a réécrit autour.
  *
- * Le template personnalisé est un document HTML complet dans lequel
- * l'administrateur place un bloc <div id="vvveb-report-content">…</div> :
- * son contenu est remplacé, à l'envoi, par le rendu live du rapport. S'il
- * n'y a pas de template personnalisé (ou si ce bloc a été retiré), le
- * comportement par défaut (ou l'absence de données) s'applique — c'est le
- * risque accepté du mode "HTML libre".
+ * Principe : dans les vues par défaut, chaque bloc dont le contenu vient de
+ * la base (grille de stats, liste "Détails", observations…) est marqué
+ * `data-vvveb-disabled` avec un id unique — Vvveb l'affiche verrouillé dans
+ * l'éditeur (voir vvvebjs-editor-helpers.css). Tout le reste (salutation,
+ * paragraphe d'intro, bouton, signature…) est du texte normal, librement
+ * éditable et conservé tel quel.
+ *
+ * À l'envoi : on prend le template personnalisé de l'administrateur tel
+ * quel, puis pour chaque bloc verrouillé qu'il contient, on régénère son
+ * contenu à partir d'un rendu frais de la vue par défaut avec les données
+ * réelles du destinataire — en le retrouvant par son id. Un bloc verrouillé
+ * absent du rendu frais (ex. observations vides cette semaine, caché par un
+ * @if) est retiré plutôt que de laisser un ancien contenu figé visible.
  */
 class EmailTemplateRenderer
 {
-    public const PLACEHOLDER_ID = 'vvveb-report-content';
-
     /**
      * Rend l'email pour $command : le template personnalisé s'il existe,
      * sinon la vue Blade par défaut.
@@ -32,15 +38,15 @@ class EmailTemplateRenderer
             return view($defaultView, $viewData)->render();
         }
 
-        $liveContent = self::extractContentBlock(view($defaultView, $viewData)->render());
+        $liveZones = self::extractDisabledZones(view($defaultView, $viewData)->render());
 
-        return self::injectContent($template->html, $liveContent);
+        return self::injectZones($template->html, $liveZones);
     }
 
     /**
      * HTML de départ proposé dans l'éditeur : la vue par défaut telle
-     * qu'elle est réellement envoyée aujourd'hui (avec le bloc de contenu
-     * déjà repéré par son id), pour que personnaliser un template parte
+     * qu'elle est réellement envoyée aujourd'hui (avec ses blocs dynamiques
+     * déjà marqués verrouillés), pour que personnaliser un template parte
      * toujours d'un rendu fidèle à l'email actuel.
      */
     public static function seed(string $defaultView, array $viewData): string
@@ -49,55 +55,65 @@ class EmailTemplateRenderer
     }
 
     /**
-     * Extrait le HTML interne du bloc #vvveb-report-content d'un document
-     * rendu, pour l'injecter tel quel dans un template personnalisé.
+     * Repère chaque bloc `[data-vvveb-disabled][id]` d'un document rendu et
+     * renvoie son HTML interne, indexé par id.
      */
-    private static function extractContentBlock(string $html): string
+    private static function extractDisabledZones(string $html): array
     {
         $doc = self::parseHtml($html);
         $xpath = new \DOMXPath($doc);
-        $nodes = $xpath->query('//*[@id="' . self::PLACEHOLDER_ID . '"]');
+        $nodes = $xpath->query('//*[@data-vvveb-disabled][@id]');
 
-        if ($nodes->length === 0) {
-            return '';
+        $zones = [];
+        foreach ($nodes as $node) {
+            $id = $node->getAttribute('id');
+            if ($id === '') {
+                continue;
+            }
+
+            $inner = '';
+            foreach ($node->childNodes as $child) {
+                $inner .= $doc->saveHTML($child);
+            }
+            $zones[$id] = $inner;
         }
 
-        $inner = '';
-        foreach ($nodes->item(0)->childNodes as $child) {
-            $inner .= $doc->saveHTML($child);
-        }
-
-        return $inner;
+        return $zones;
     }
 
     /**
-     * Remplace le contenu du bloc #vvveb-report-content du template
-     * personnalisé par le HTML live donné. Si le bloc a été retiré par
-     * l'administrateur, le template est renvoyé tel quel (sans données).
+     * Dans le template personnalisé, remplace le contenu de chaque bloc
+     * verrouillé trouvé dans $zones (par id) ; retire les blocs verrouillés
+     * dont l'id n'a pas de correspondance dans $zones (donnée absente de ce
+     * rendu, ex. observations vides).
      */
-    private static function injectContent(string $customHtml, string $liveContentHtml): string
+    private static function injectZones(string $customHtml, array $zones): string
     {
         $doc = self::parseHtml($customHtml);
         $xpath = new \DOMXPath($doc);
-        $nodes = $xpath->query('//*[@id="' . self::PLACEHOLDER_ID . '"]');
+        $lockedNodes = $xpath->query('//*[@data-vvveb-disabled][@id]');
 
-        if ($nodes->length === 0) {
-            return $customHtml;
-        }
+        foreach (iterator_to_array($lockedNodes) as $node) {
+            $id = $node->getAttribute('id');
 
-        $target = $nodes->item(0);
-        while ($target->firstChild) {
-            $target->removeChild($target->firstChild);
-        }
+            if (!array_key_exists($id, $zones)) {
+                $node->parentNode?->removeChild($node);
+                continue;
+            }
 
-        $fragmentDoc = self::parseHtml('<div id="__wrap">' . $liveContentHtml . '</div>');
-        $fragmentXpath = new \DOMXPath($fragmentDoc);
-        $wrapperNodes = $fragmentXpath->query('//*[@id="__wrap"]');
-        $wrapper = $wrapperNodes->length > 0 ? $wrapperNodes->item(0) : null;
+            while ($node->firstChild) {
+                $node->removeChild($node->firstChild);
+            }
 
-        if ($wrapper) {
-            foreach (iterator_to_array($wrapper->childNodes) as $child) {
-                $target->appendChild($doc->importNode($child, true));
+            $fragmentDoc = self::parseHtml('<div id="__wrap">' . $zones[$id] . '</div>');
+            $fragmentXpath = new \DOMXPath($fragmentDoc);
+            $wrapperNodes = $fragmentXpath->query('//*[@id="__wrap"]');
+            $wrapper = $wrapperNodes->length > 0 ? $wrapperNodes->item(0) : null;
+
+            if ($wrapper) {
+                foreach (iterator_to_array($wrapper->childNodes) as $child) {
+                    $node->appendChild($doc->importNode($child, true));
+                }
             }
         }
 
