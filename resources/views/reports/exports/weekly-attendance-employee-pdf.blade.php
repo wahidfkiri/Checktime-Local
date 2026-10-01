@@ -259,6 +259,9 @@
                         {{ $check['leave_info']['type_name'] ?? 'Congé' }}
                     </td>
 
+                @elseif($status === 'PERMISSION')
+                    <td colspan="2" class="conge-cell">Autorisation</td>
+
                 @elseif($check && $status !== 'ABSENT')
                     <td class="check-time">
                         @if(!empty($check['check_in']))

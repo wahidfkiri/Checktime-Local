@@ -150,6 +150,7 @@
                 <li>🔹 Demi-journées : <strong>{{ $stats['half_day'] ?? 0 }}</strong></li>
                 <li>🔹 Missions : <strong>{{ $stats['mission'] ?? 0 }}</strong></li>
                 <li>🔹 Congés : <strong>{{ $stats['leave'] ?? 0 }}</strong></li>
+                <li>🔹 Autorisations d'absence : <strong>{{ $stats['permission'] ?? 0 }}</strong></li>
                 <li>🔹 Ponctualité : <strong>{{ $stats['ponctualite_rate'] ?? 0 }}%</strong></li>
             </ul>
         </div>

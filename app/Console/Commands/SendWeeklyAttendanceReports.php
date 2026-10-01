@@ -178,9 +178,10 @@ class SendWeeklyAttendanceReports extends Command
             }
 
             try {
-                $employeeAttendances = $attendanceByEmployee[$employee->id] ?? [];
-                $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
-                $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
+                $employeeAttendances = $attendanceByEmployee[$employee->id]  ?? [];
+                $employeeMissions    = $missionsByEmployee[$employee->id]    ?? [];
+                $employeeLeaves      = $leavesByEmployee[$employee->id]      ?? [];
+                $employeePermissions = $permissionsByEmployee[$employee->id] ?? [];
 
                 // ── Dates de mission (Lun-Ven uniquement, jours fériés chômés
                 // exclus), bornées à [$periodStart, $periodEnd] : la requête
@@ -215,6 +216,24 @@ class SendWeeklyAttendanceReports extends Command
                     }
                 }
 
+                // ── Dates d'autorisation d'absence (Lun-Ven uniquement, jours
+                // fériés chômés exclus), idem bornées. Une mission ou un congé
+                // déjà présent ce jour-là est prioritaire (pas de double
+                // comptage), même règle que le rapport /rapport/presence-ponctualite. ─────
+                $permissionDates = [];
+                foreach ($employeePermissions as $permission) {
+                    $cur = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
+                    $end = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                    while ($cur->lte($end)) {
+                        $dateStr = $cur->format('Y-m-d');
+                        if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$dateStr])
+                            && !isset($missionDates[$dateStr]) && !isset($leaveDates[$dateStr])) {
+                            $permissionDates[$dateStr] = ['raison' => $permission->raison];
+                        }
+                        $cur->addDay();
+                    }
+                }
+
                 // ── Boucle journalière (Lun-Ven uniquement, jours fériés chômés exclus) ──
                 $dailyChecks = [];
                 $cur         = Carbon::parse($startDate);
@@ -239,35 +258,56 @@ class SendWeeklyAttendanceReports extends Command
                         }
                     }
 
-                    $isMission = isset($missionDates[$dateStr]);
-                    $isLeave   = isset($leaveDates[$dateStr]);
+                    $isMission    = isset($missionDates[$dateStr]);
+                    $isLeave      = isset($leaveDates[$dateStr]);
+                    $isPermission = isset($permissionDates[$dateStr]);
 
                     if ($isMission) {
                         $dailyChecks[$dateStr] = [
-                            'check_in'       => null,
-                            'check_out'      => null,
-                            'status'         => 'MISSION',
-                            'is_late'        => false,
-                            'late_minutes'   => 0,
-                            'is_early_leave' => false,
-                            'is_mission'     => true,
-                            'mission_info'   => $missionDates[$dateStr],
-                            'is_leave'       => false,
-                            'leave_info'     => null,
+                            'check_in'        => null,
+                            'check_out'       => null,
+                            'status'          => 'MISSION',
+                            'is_late'         => false,
+                            'late_minutes'    => 0,
+                            'is_early_leave'  => false,
+                            'is_mission'      => true,
+                            'mission_info'    => $missionDates[$dateStr],
+                            'is_leave'        => false,
+                            'leave_info'      => null,
+                            'is_permission'   => false,
+                            'permission_info' => null,
                         ];
 
                     } elseif ($isLeave) {
                         $dailyChecks[$dateStr] = [
-                            'check_in'       => null,
-                            'check_out'      => null,
-                            'status'         => 'CONGE',
-                            'is_late'        => false,
-                            'late_minutes'   => 0,
-                            'is_early_leave' => false,
-                            'is_mission'     => false,
-                            'mission_info'   => null,
-                            'is_leave'       => true,
-                            'leave_info'     => $leaveDates[$dateStr],
+                            'check_in'        => null,
+                            'check_out'       => null,
+                            'status'          => 'CONGE',
+                            'is_late'         => false,
+                            'late_minutes'    => 0,
+                            'is_early_leave'  => false,
+                            'is_mission'      => false,
+                            'mission_info'    => null,
+                            'is_leave'        => true,
+                            'leave_info'      => $leaveDates[$dateStr],
+                            'is_permission'   => false,
+                            'permission_info' => null,
+                        ];
+
+                    } elseif ($isPermission) {
+                        $dailyChecks[$dateStr] = [
+                            'check_in'        => null,
+                            'check_out'       => null,
+                            'status'          => 'PERMISSION',
+                            'is_late'         => false,
+                            'late_minutes'    => 0,
+                            'is_early_leave'  => false,
+                            'is_mission'      => false,
+                            'mission_info'    => null,
+                            'is_leave'        => false,
+                            'leave_info'      => null,
+                            'is_permission'   => true,
+                            'permission_info' => $permissionDates[$dateStr],
                         ];
 
                     } elseif ($attendance && strtoupper($attendance->status) !== 'ABSENT') {
@@ -285,16 +325,18 @@ class SendWeeklyAttendanceReports extends Command
                         }
 
                         $dailyChecks[$dateStr] = [
-                            'check_in'       => $checkIn,
-                            'check_out'      => $checkOut,
-                            'status'         => $attendance->status,
-                            'is_late'        => (bool) $attendance->is_late,
-                            'late_minutes'   => (int) ($attendance->late_minutes ?? 0),
-                            'is_early_leave' => (bool) $attendance->is_early_leave,
-                            'is_mission'     => false,
-                            'mission_info'   => null,
-                            'is_leave'       => false,
-                            'leave_info'     => null,
+                            'check_in'        => $checkIn,
+                            'check_out'       => $checkOut,
+                            'status'          => $attendance->status,
+                            'is_late'         => (bool) $attendance->is_late,
+                            'late_minutes'    => (int) ($attendance->late_minutes ?? 0),
+                            'is_early_leave'  => (bool) $attendance->is_early_leave,
+                            'is_mission'      => false,
+                            'mission_info'    => null,
+                            'is_leave'        => false,
+                            'leave_info'      => null,
+                            'is_permission'   => false,
+                            'permission_info' => null,
                         ];
 
                     } else {
@@ -311,10 +353,18 @@ class SendWeeklyAttendanceReports extends Command
                 $totalHalfDay    = 0;
                 $totalMission    = 0;
                 $totalLeave      = 0;
+                $totalPermission = 0;
 
                 foreach ($employeeAttendances as $att) {
                     $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
                     if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
+
+                    // Jour déjà couvert par une mission/congé/autorisation :
+                    // ne pas compter en plus l'éventuel pointage du même jour
+                    // (sinon double comptage avec les totaux ci-dessous).
+                    if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) {
+                        continue;
+                    }
 
                     $status = strtoupper($att->status);
                     if ($status !== 'ABSENT') {
@@ -335,7 +385,13 @@ class SendWeeklyAttendanceReports extends Command
                     }
                 }
 
-                $totalPresent   += $totalMission + $totalLeave;
+                foreach ($permissionDates as $dateStr => $p) {
+                    if (!isset($missionDates[$dateStr]) && !isset($leaveDates[$dateStr])) {
+                        $totalPermission++;
+                    }
+                }
+
+                $totalPresent   += $totalMission + $totalLeave + $totalPermission;
                 $totalAbsent     = max(0, $workingDays - $totalPresent);
                 $presenceRate    = $workingDays > 0
                     ? round(($totalPresent / $workingDays) * 100, 1) : 0;
@@ -343,26 +399,53 @@ class SendWeeklyAttendanceReports extends Command
                     ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
 
                 // ── Observations ──────────────────────────────
+                // Chaque entrée porte sa date et une priorité : les
+                // justifications (mission/congé/autorisation) passent devant
+                // les retards/absences lors de la troncature à 5 entrées
+                // ci-dessous, sinon elles pouvaient être évincées par de
+                // simples retards alors qu'elles sont l'information la plus
+                // importante du rapport.
                 $observations = [];
                 foreach ($employeeAttendances as $att) {
                     $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
                     if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
 
+                    // Jour déjà justifié par une mission/congé/autorisation :
+                    // la justification est ajoutée plus bas, ne pas la
+                    // contredire avec un « Absent le … ».
+                    if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) {
+                        continue;
+                    }
+
                     $status = strtoupper($att->status);
                     $date   = Carbon::parse($att->attendance_date)->format('d/m');
-                    if ($status === 'HALF_DAY')         $observations[] = 'Demi-journée le ' . $date;
-                    elseif ($status === 'LATE')         $observations[] = 'Retard ' . ($att->late_minutes ?? 0) . ' min le ' . $date;
-                    elseif ($status === 'EARLY_LEAVE')  $observations[] = 'Départ anticipé le ' . $date;
-                    elseif ($status === 'ABSENT')       $observations[] = 'Absent le ' . $date;
+                    if ($status === 'HALF_DAY')         $observations[] = [$attDateStr, 'Demi-journée le ' . $date, 1];
+                    elseif ($status === 'LATE')         $observations[] = [$attDateStr, 'Retard ' . ($att->late_minutes ?? 0) . ' min le ' . $date, 1];
+                    elseif ($status === 'EARLY_LEAVE')  $observations[] = [$attDateStr, 'Départ anticipé le ' . $date, 1];
+                    elseif ($status === 'ABSENT')       $observations[] = [$attDateStr, 'Absent le ' . $date, 1];
                 }
                 foreach ($missionDates as $dateStr => $m) {
-                    $observations[] = 'Mission: ' . $m['title'] . ' (' . $m['destination'] . ') le ' . Carbon::parse($dateStr)->format('d/m');
+                    $observations[] = [$dateStr, 'Mission: ' . $m['title'] . ' (' . $m['destination'] . ') le ' . Carbon::parse($dateStr)->format('d/m'), 0];
                 }
                 foreach ($leaveDates as $dateStr => $l) {
                     if (!isset($missionDates[$dateStr])) {
-                        $observations[] = $l['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m');
+                        $observations[] = [$dateStr, $l['type_name'] . ' le ' . Carbon::parse($dateStr)->format('d/m'), 0];
                     }
                 }
+                foreach ($permissionDates as $dateStr => $p) {
+                    if (!isset($missionDates[$dateStr]) && !isset($leaveDates[$dateStr])) {
+                        $raison = trim((string) ($p['raison'] ?? ''));
+                        $observations[] = [$dateStr, "Autorisation d'absence"
+                            . ($raison !== '' ? ' (' . $raison . ')' : '')
+                            . ' le ' . Carbon::parse($dateStr)->format('d/m'), 0];
+                    }
+                }
+
+                usort($observations, function ($a, $b) {
+                    $priorite = $a[2] <=> $b[2];
+                    return $priorite !== 0 ? $priorite : strcmp($a[0], $b[0]);
+                });
+                $observations = array_column($observations, 1);
 
                 // ── Données formatées pour le Mailable ────────
                 $employeeData = [
@@ -377,6 +460,7 @@ class SendWeeklyAttendanceReports extends Command
                         'half_day'         => $totalHalfDay,
                         'mission'          => $totalMission,
                         'leave'            => $totalLeave,
+                        'permission'       => $totalPermission,
                         'presence_rate'    => $presenceRate,
                         'ponctualite_rate' => $ponctualiteRate,
                     ],
@@ -418,7 +502,7 @@ class SendWeeklyAttendanceReports extends Command
         $this->info("═══════════════════════════════════════════");
         $this->info("📋  RÉSUMÉ DE L'EXÉCUTION HEBDOMADAIRE");
         $this->info("═══════════════════════════════════════════");
-        $this->info("Date d'exécution : " . $today->format('d/m/Y H:i'));
+        $this->info("Date d'exécution : " . Carbon::now()->format('d/m/Y H:i'));
         $this->info("Période analysée : {$startOfWeek->format('d/m/Y')} au {$endOfWeek->format('d/m/Y')}");
         $this->info("Employés traités : {$employees->count()}");
         $this->info("Emails envoyés   : {$totalEmailsSent}");
@@ -430,7 +514,7 @@ class SendWeeklyAttendanceReports extends Command
             $this->warn("⚠️  Aucun email n'a été envoyé");
         }
 
-        Log::info("Rapports hebdomadaires terminés: {$totalEmailsSent} emails, Date: " . $today->format('Y-m-d'));
+        Log::info("Rapports hebdomadaires terminés: {$totalEmailsSent} emails, Date: " . Carbon::now()->format('Y-m-d'));
     }
 
     // =========================================================================
