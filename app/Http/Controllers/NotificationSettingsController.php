@@ -20,6 +20,7 @@ class NotificationSettingsController extends Controller
         'attendance:send-weekly-rh-reports',
         'reports:send-monthly-rh',
         'backup:send',
+        'attendance:sync',
     ];
 
     /**
