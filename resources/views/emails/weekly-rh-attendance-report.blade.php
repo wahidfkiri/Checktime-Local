@@ -110,7 +110,7 @@
             <h1>📊 Rapport de présence hebdomadaire</h1>
         </div>
 
-        <div id="vvveb-report-content">
+        <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         {{-- SALUTATION --}}
         <p>Bonjour <strong>Service RH</strong>,</p>
 

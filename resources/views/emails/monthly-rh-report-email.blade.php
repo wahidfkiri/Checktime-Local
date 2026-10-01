@@ -73,7 +73,7 @@
     </div>
 
     <div class="content">
-    <div id="vvveb-report-content">
+    <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         <p>Bonjour,</p>
         
         <p>Veuillez trouver ci-joint le <strong>rapport mensuel de présence et ponctualité</strong> pour le mois de <strong>{{ $data['month_name'] }} {{ $data['year'] }}</strong>.</p>

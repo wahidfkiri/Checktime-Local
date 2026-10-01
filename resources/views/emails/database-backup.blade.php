@@ -80,7 +80,7 @@
     </div>
 
     <div class="content">
-    <div id="vvveb-report-content">
+    <div id="vvveb-report-content" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici">
         <p>Bonjour,</p>
 
         <p>Une sauvegarde automatique de la base de données a été générée.</p>
