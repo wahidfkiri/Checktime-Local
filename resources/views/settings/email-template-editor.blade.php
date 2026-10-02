@@ -1661,7 +1661,7 @@
 
 	<div>
 		<img id="thumb-{%=key%}" class="img-thumbnail p-0" data-target-input="#input-{%=key%}" data-target-thumb="#thumb-{%=key%}" style="cursor:pointer" src="" width="225" height="225">
-		<input name="{%=key%}" type="text" class="form-control mt-1" id="input-{%=key%}"/>
+		<input name="{%=key%}" type="text" class="form-control mt-1" placeholder="Coller une URL https://… puis Entrée" id="input-{%=key%}"/>
 		<button name="button" class="btn btn-outline-primary btn-sm btn-icon mt-2 w-100" data-target-input="#input-{%=key%}" data-target-thumb="#thumb-{%=key%}"><i class="la la-image la-lg me-1"></i><span>Set image</span></button>
 	</div>
 	

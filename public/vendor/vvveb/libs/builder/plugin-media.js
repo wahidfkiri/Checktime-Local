@@ -46,7 +46,16 @@ ImageInput = { ...ImageInput, ...{
 		let tag = input.tag;
 
 		let img = node.querySelector(tag);
-		if (img.src) {
+
+		// URL saisie à la main dans le champ (https://…) : on la prend telle
+		// quelle. Sans ça, la valeur était écrasée par la miniature (qui garde
+		// l'ancienne image tant que le gestionnaire de médias n'a pas été
+		// utilisé), donc seules les images choisies en local étaient prises.
+		let typed = (self.value || '').trim();
+		if (/^(https?:)?\/\//i.test(typed)) {
+			src = typed;
+			if (img) img.setAttribute("src", src);
+		} else if (img && img.src) {
 			src = img.getAttribute("src");
 		}
 		
