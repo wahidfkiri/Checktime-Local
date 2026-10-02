@@ -48,6 +48,7 @@ Route::middleware(['web', 'auth', 'client.active'])->group(function () {
         Route::post('/', [EmployeeController::class, 'store'])->name('store');
         Route::put('/{id}', [EmployeeController::class, 'update'])->name('update');
         Route::delete('/{id}', [EmployeeController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/status', [EmployeeController::class, 'setStatus'])->name('set-status');
         Route::get('/local', [EmployeeController::class, 'getLocalEmployees'])->name('local');
         Route::post('/sync', [EmployeeController::class, 'sync'])->name('sync');
         Route::post('/force-sync', [EmployeeController::class, 'forceSync'])->name('force-sync');

@@ -27,6 +27,21 @@ class Employee extends Model
 ];
 
 
+    /**
+     * Employés actifs uniquement. À utiliser dans toute liste, rapport,
+     * statistique ou synchronisation : un employé désactivé
+     * (status = 'inactive') doit y être masqué.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where($query->getModel()->getTable() . '.status', 'active');
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
     public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);

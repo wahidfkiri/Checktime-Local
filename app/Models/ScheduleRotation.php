@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScheduleRotation extends Model
 {
+    use \App\Models\Concerns\FiltersActiveEmployees;
     protected $fillable = [
         'employee_id',
         'start_datetime',

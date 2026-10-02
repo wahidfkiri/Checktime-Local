@@ -60,7 +60,7 @@ class SuiviPonctualiteReport
         }
 
         // --- Employés ---
-        $employeesQuery = Employee::whereNotNull('emp_code')->where('emp_code', '!=', '');
+        $employeesQuery = Employee::active()->whereNotNull('emp_code')->where('emp_code', '!=', '');
         if ($empCode && $empCode !== 'all') {
             $employeesQuery->where('emp_code', $empCode);
         }
@@ -70,7 +70,7 @@ class SuiviPonctualiteReport
         );
 
         // --- Sources annexes, chargées en une fois pour toute la période ---
-        $attendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $attendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->get()
             ->groupBy('employee_id');
 

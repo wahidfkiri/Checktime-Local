@@ -30,7 +30,7 @@ class CustomReportController extends Controller
         $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -98,7 +98,7 @@ class CustomReportController extends Controller
     private function getPresencePonctualiteData($client, $startDate, $endDate, $empCode = 'all', $departmentId = 'all')
     {
         // Récupérer les employés selon les filtres
-        $employeesQuery = Employee::whereNotNull('emp_code')
+        $employeesQuery = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -501,7 +501,7 @@ class CustomReportController extends Controller
     {
         $index = [];
 
-        $rows = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $rows = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->whereNotNull('employee_id')
             ->get();
 
@@ -881,10 +881,10 @@ class CustomReportController extends Controller
             
             $workingDays = $this->countWorkingDays($startDate, $endDate);
             
-            $dailyAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+            $dailyAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
                 ->count();
             
-            $employees = Employee::count();
+            $employees = Employee::active()->count();
             
             return response()->json([
                 'success' => true,

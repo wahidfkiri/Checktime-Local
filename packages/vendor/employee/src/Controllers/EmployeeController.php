@@ -519,7 +519,10 @@ public function destroy($id)
                             'phone' => $data['phone'],
                             'area_id' => $data['area_id'],
                             'department_id' => $data['department_id'],
-                            'status' => $data['status'],
+                            // Le statut actif/inactif n'est PAS repris de l'appareil : c'est
+                            // une décision locale (bouton dans /employees) qu'une synchro ne
+                            // doit jamais écraser. Un nouvel employé est actif par défaut
+                            // (valeur par défaut de la colonne).
                             'metadata' => $data['metadata'],
                             'updated_at' => $data['updated_at']
                         ]
@@ -604,13 +607,19 @@ public function destroy($id)
             })
             ->addColumn('status_badge', function($employee) {
                 $status = strtolower($employee->status ?? 'active');
-                $statusClass = [
-                    'active' => 'badge bg-success',
-                    'inactive' => 'badge bg-danger',
-                    'suspended' => 'badge bg-warning'
-                ][$status] ?? 'badge bg-secondary';
-                
-                return '<span class="' . $statusClass . '">' . ucfirst($status) . '</span>';
+                $isActive = $status === 'active';
+
+                // Interrupteur actif/inactif (décision locale, voir setStatus()) :
+                // un employé inactif est masqué de tous les rapports, stats et synchros.
+                return '<div class="d-flex align-items-center gap-2">'
+                    . '<div class="form-check form-switch m-0">'
+                    . '<input class="form-check-input js-employee-status-toggle" type="checkbox" role="switch"'
+                    . ' data-id="' . $employee->id . '"' . ($isActive ? ' checked' : '') . ''
+                    . ' title="' . ($isActive ? 'Désactiver cet employé' : 'Activer cet employé') . '">'
+                    . '</div>'
+                    . '<span class="badge ' . ($isActive ? 'bg-success' : 'bg-danger') . '">'
+                    . ($isActive ? 'Actif' : 'Inactif') . '</span>'
+                    . '</div>';
             })
             ->addColumn('last_sync', function($employee) {
                 return $employee->updated_at ? $employee->updated_at->diffForHumans() : 'N/A';
@@ -657,6 +666,31 @@ public function destroy($id)
             ->make(true);
     }
 }
+
+    /**
+     * Active ou désactive un employé (local uniquement, aucun appel à l'API
+     * de l'appareil). Un employé inactif est masqué de tous les rapports,
+     * statistiques, plannings et de la synchronisation des pointages.
+     * $id est l'id local (employees.id).
+     */
+    public function setStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $employee = Employee::findOrFail($id);
+        $employee->status = $validated['status'];
+        $employee->save();
+
+        return response()->json([
+            'success' => true,
+            'status'  => $employee->status,
+            'message' => $employee->status === 'active'
+                ? 'Employé activé : il réapparaît dans les rapports et la synchronisation.'
+                : 'Employé désactivé : il est masqué des rapports, statistiques et synchronisations.',
+        ]);
+    }
 
     /**
      * Applique les filtres

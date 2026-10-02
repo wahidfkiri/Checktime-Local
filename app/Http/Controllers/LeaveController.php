@@ -25,7 +25,7 @@ class LeaveController extends Controller
 
     public function datatable(Request $request)
     {
-        $query = Leave::with(['employee', 'type']);
+        $query = Leave::forActiveEmployees()->with(['employee', 'type']);
         
         if ($request->employee_filter) {
             $query->where('employee_id', $request->employee_filter);

@@ -24,7 +24,7 @@ class ScheduleAssignmentController extends Controller
         $client = \App\Models\Setting::company();
         
         // Récupérer les données pour le calendrier
-        $employees = Employee::with(['department', 'area'])
+        $employees = Employee::active()->with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
@@ -53,7 +53,7 @@ class ScheduleAssignmentController extends Controller
     {
         $client = \App\Models\Setting::company();
         
-        $employees = Employee::with(['department', 'area'])
+        $employees = Employee::active()->with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
@@ -279,7 +279,7 @@ public function getCellData(Request $request)
             //     'area_id' => 'nullable|exists:areas,id'
             // ]);
             
-            $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType']);
+            $query = EmployeeSchedule::forActiveEmployees()->with(['employee.department', 'employee.area', 'workHourType']);
                 // ->whereBetween('schedule_date', [
                 //     $validated['start_date'],
                 //     $validated['end_date']
@@ -597,7 +597,7 @@ public function getCellData(Request $request)
                 'format' => 'required|in:pdf,excel,csv'
             ]);
             
-            $query = Employee::with(['department', 'area'])
+            $query = Employee::active()->with(['department', 'area'])
                 ->where('is_active', true);
             
             if ($request->filled('department_id')) {
@@ -745,7 +745,7 @@ public function exportPdf(Request $request)
             $employeeIds = is_array($decoded) ? array_map('intval', $decoded) : [];
         }
         
-        $employees = Employee::when(!empty($employeeIds), function($query) use ($employeeIds) {
+        $employees = Employee::active()->when(!empty($employeeIds), function($query) use ($employeeIds) {
                 return $query->whereIn('id', $employeeIds);
             })
             ->with(['department', 'area'])

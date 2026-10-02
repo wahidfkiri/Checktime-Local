@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class DailyAttendance extends Model
 {
+    use \App\Models\Concerns\FiltersActiveEmployees;
     use HasFactory;
 
     protected $table = 'daily_attendance';

@@ -24,19 +24,20 @@ class DashboardController extends Controller
         $this->syncDevicesIfNeeded();
         
         // Statistiques Principales
-        $totalEmployees = Employee::count();
+        $totalEmployees = Employee::active()->count();
         $activeEmployees = Employee::where('status', 'active')->count();
-        $inactiveEmployees = Employee::where('status', 'inactive')->count();
-        $suspendedEmployees = Employee::where('status', 'suspended')->count();
+        // Les employés inactifs sont masqués de toutes les statistiques.
+        $inactiveEmployees = 0;
+        $suspendedEmployees = 0;
         
         // Statistiques de présence du jour
-        $totalPresentToday = DailyAttendance::whereDate('attendance_date', $today)
+        $totalPresentToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
             ->whereNotNull('check_in')
             ->count();
         
         $totalAbsentToday = $activeEmployees - $totalPresentToday;
         
-        $totalRetardToday = DailyAttendance::whereDate('attendance_date', $today)
+        $totalRetardToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
             ->where('late_minutes', '>', 0)
             ->count();
         
@@ -64,7 +65,7 @@ class DashboardController extends Controller
         ];
         
         // Top départements par nombre d'employés
-        $topDepartments = Employee::select('dept_name', DB::raw('COUNT(*) as count'))
+        $topDepartments = Employee::active()->select('dept_name', DB::raw('COUNT(*) as count'))
             ->whereNotNull('dept_name')
             ->groupBy('dept_name')
             ->orderBy('count', 'desc')
@@ -75,7 +76,7 @@ class DashboardController extends Controller
         $topDepartmentsCountData = $topDepartments->pluck('count')->toArray();
         
         // Top zones par nombre d'employés
-        $topZones = Employee::select('area_name', DB::raw('COUNT(*) as count'))
+        $topZones = Employee::active()->select('area_name', DB::raw('COUNT(*) as count'))
             ->whereNotNull('area_name')
             ->groupBy('area_name')
             ->orderBy('count', 'desc')
@@ -94,12 +95,12 @@ class DashboardController extends Controller
         $weeklyAttendance = $this->getWeeklyAttendanceStats();
         
         // Derniers employés ajoutés
-        $recentEmployees = Employee::orderBy('created_at', 'desc')
+        $recentEmployees = Employee::active()->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
         
         // Dernières présences enregistrées
-        $recentAttendances = DailyAttendance::with('employee')
+        $recentAttendances = DailyAttendance::forActiveEmployees()->with('employee')
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
@@ -354,7 +355,7 @@ class DashboardController extends Controller
             
             $labels[] = $date->format('M Y');
             
-            $newEmployees[] = Employee::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+            $newEmployees[] = Employee::active()->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
         }
 
         return [
@@ -371,15 +372,15 @@ class DashboardController extends Controller
         for ($i = 0; $i < 7; $i++) {
             $date = $startOfWeek->copy()->addDays($i);
             
-            $present = DailyAttendance::whereDate('attendance_date', $date)
+            $present = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
                 ->whereNotNull('check_in')
                 ->count();
             
-            $retard = DailyAttendance::whereDate('attendance_date', $date)
+            $retard = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
                 ->where('late_minutes', '>', 0)
                 ->count();
 
-            $absent = DailyAttendance::whereDate('attendance_date', $date)
+            $absent = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
                 ->whereNull('check_in')
                 ->count();
             
@@ -402,7 +403,7 @@ class DashboardController extends Controller
         $this->syncDevicesIfNeeded();
         
         $activeEmployees = Employee::where('status', 'active')->count();
-        $totalPresentToday = DailyAttendance::whereDate('attendance_date', $today)
+        $totalPresentToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
             ->whereNotNull('check_in')
             ->count();
         
@@ -419,11 +420,11 @@ class DashboardController extends Controller
             ->count();
         
         return response()->json([
-            'totalEmployees' => Employee::count(),
+            'totalEmployees' => Employee::active()->count(),
             'activeEmployees' => $activeEmployees,
             'totalPresentToday' => $totalPresentToday,
             'totalAbsentToday' => $activeEmployees - $totalPresentToday,
-            'totalRetardToday' => DailyAttendance::whereDate('attendance_date', $today)
+            'totalRetardToday' => DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
                 ->where('late_minutes', '>', 0)
                 ->count(),
             'totalDepartments' => Department::count(),

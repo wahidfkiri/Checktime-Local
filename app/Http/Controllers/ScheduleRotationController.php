@@ -16,7 +16,7 @@ class ScheduleRotationController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $query = ScheduleRotation::with([
+            $query = ScheduleRotation::forActiveEmployees()->with([
                 'employee:id,emp_code,first_name,last_name,dept_name,area_name',
                 'employee.department:id,name',
                 'employee.area:id,name'
@@ -95,7 +95,7 @@ class ScheduleRotationController extends Controller
                 ->make(true);
         }
         
-        $employees = Employee::orderBy('first_name')->get();
+        $employees = Employee::active()->orderBy('first_name')->get();
             
         return view('rotations.index', compact('employees'));
     }

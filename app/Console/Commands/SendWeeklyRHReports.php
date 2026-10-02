@@ -112,7 +112,7 @@ class SendWeeklyRHReports extends Command
         $this->info("\n--- Rapport RH pour: {$rhEmail} ---");
 
         // Récupération des données pour la période
-        $allAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])->get();
+        $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])->get();
         $this->info("📊 Pointages trouvés: " . $allAttendances->count());
 
         $allMissions = Mission::where(function ($q) use ($startDate, $endDate) {
@@ -158,7 +158,7 @@ class SendWeeklyRHReports extends Command
         }
 
         // Employés
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('dept_name')
             ->orderBy('first_name')

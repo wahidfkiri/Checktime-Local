@@ -19,7 +19,7 @@ class EmployeePermissionController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $query = EmployeePermission::with(['employee'])
+            $query = EmployeePermission::forActiveEmployees()->with(['employee'])
                 ->select('employee_permissions.*');
 
             return DataTables::eloquent($query)
@@ -101,7 +101,7 @@ class EmployeePermissionController extends Controller
                 ->toJson();
         }
 
-        $employees = Employee::orderBy('first_name')->get();
+        $employees = Employee::active()->orderBy('first_name')->get();
 
         return view('employee-permissions.index', compact('employees'));
     }
@@ -124,10 +124,10 @@ class EmployeePermissionController extends Controller
 
         // "all" = tous les employés, sinon une sélection (un ou plusieurs ids).
         $employeeIds = $request->employee_ids === 'all'
-            ? Employee::pluck('id')->toArray()
+            ? Employee::active()->pluck('id')->toArray()
             : array_filter((array) $request->employee_ids);
 
-        $employeeIds = Employee::whereIn('id', $employeeIds)->pluck('id')->toArray();
+        $employeeIds = Employee::active()->whereIn('id', $employeeIds)->pluck('id')->toArray();
 
         if (empty($employeeIds)) {
             return response()->json([
@@ -359,7 +359,7 @@ class EmployeePermissionController extends Controller
      */
     public function statistics(Request $request)
     {
-        $query = EmployeePermission::query();
+        $query = EmployeePermission::forActiveEmployees();
 
         if ($request->start_date) {
             $query->whereRaw('COALESCE(date_fin, `date`) >= ?', [$request->start_date]);
@@ -409,7 +409,7 @@ class EmployeePermissionController extends Controller
     public function export(Request $request)
     {
         try {
-            $query = EmployeePermission::with(['employee']);
+            $query = EmployeePermission::forActiveEmployees()->with(['employee']);
             
             if ($request->filled('employee_id')) {
                 $query->where('employee_id', $request->employee_id);

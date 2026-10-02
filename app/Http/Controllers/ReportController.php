@@ -56,7 +56,7 @@ class ReportController extends Controller
 
     public function absencesDelays(Request $request)
     {
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -117,7 +117,7 @@ class ReportController extends Controller
             }
             
             // Récupérer les employés selon le filtre
-            $employeesQuery = Employee::whereNotNull('emp_code')
+            $employeesQuery = Employee::active()->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '');
             
             if ($empCode && $empCode !== 'all') {
@@ -870,7 +870,7 @@ class ReportController extends Controller
             throw new \RuntimeException('Aucun device trouvé.');
         }
 
-        $employeesQuery = Employee::whereNotNull('emp_code')
+        $employeesQuery = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
 
         if ($empCode && $empCode !== 'all') {

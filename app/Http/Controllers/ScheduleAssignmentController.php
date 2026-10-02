@@ -21,7 +21,7 @@ class ScheduleAssignmentController extends Controller
     public function calendar(Request $request)
     {
         // Récupérer les données pour le calendrier
-        $employees = Employee::with(['department', 'area'])
+        $employees = Employee::active()->with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
@@ -48,7 +48,7 @@ class ScheduleAssignmentController extends Controller
      */
     public function massAssignForm(Request $request)
     {
-        $employees = Employee::with(['department', 'area'])
+        $employees = Employee::active()->with(['department', 'area'])
             ->orderBy('first_name')
             ->get();
             
@@ -171,7 +171,7 @@ class ScheduleAssignmentController extends Controller
     public function getSchedules(Request $request)
     {
         try {
-            $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType']);
+            $query = EmployeeSchedule::forActiveEmployees()->with(['employee.department', 'employee.area', 'workHourType']);
             
             $schedules = $query->get()->map(function($schedule) {
                 return [
@@ -458,7 +458,7 @@ class ScheduleAssignmentController extends Controller
                 'format' => 'required|in:pdf,excel,csv'
             ]);
             
-            $query = Employee::with(['department', 'area'])
+            $query = Employee::active()->with(['department', 'area'])
                 ->where('is_active', true);
             
             if ($request->filled('department_id')) {

@@ -55,7 +55,7 @@ class DailyAttendanceController extends Controller
             ->get();
         
         // Récupérer les employés avec leurs codes pour le filtre
-        $employees = Employee::whereRaw('1 = 1')
+        $employees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -109,7 +109,7 @@ class DailyAttendanceController extends Controller
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::whereRaw('1 = 1')
+        $employees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -128,7 +128,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::whereRaw('1 = 1')
+        $allEmployees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -150,14 +150,14 @@ class DailyAttendanceController extends Controller
         };
         $retardStats = [
             'today' => $applyTolerance(
-                DailyAttendance::whereRaw('1 = 1')->where('attendance_date', $today)
+                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')->where('attendance_date', $today)
             )->count(),
             'week' => $applyTolerance(
-                DailyAttendance::whereRaw('1 = 1')
+                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                     ->whereBetween('attendance_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
             )->count(),
             'month' => $applyTolerance(
-                DailyAttendance::whereRaw('1 = 1')
+                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                     ->whereBetween('attendance_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
             )->count(),
         ];
@@ -189,7 +189,7 @@ class DailyAttendanceController extends Controller
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::whereRaw('1 = 1')
+        $employees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -208,7 +208,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::whereRaw('1 = 1')
+        $allEmployees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -248,7 +248,7 @@ class DailyAttendanceController extends Controller
             ->get();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::whereRaw('1 = 1')
+        $employees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
@@ -267,7 +267,7 @@ class DailyAttendanceController extends Controller
             });
         
         // Récupérer les départements uniques
-        $allEmployees = Employee::whereRaw('1 = 1')
+        $allEmployees = Employee::active()->whereRaw('1 = 1')
             ->whereNotNull('dept_name')
             ->get(['dept_name']);
         
@@ -314,7 +314,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee');
@@ -333,7 +333,7 @@ class DailyAttendanceController extends Controller
 
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -763,7 +763,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données " . implode(',', $statuses) . " pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', $statuses)
                 ->with('employee');
@@ -775,7 +775,7 @@ class DailyAttendanceController extends Controller
             
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -860,7 +860,7 @@ class DailyAttendanceController extends Controller
         $workingDays = $this->countWorkingDays($startDate, $endDate);
         
         // Nombre total d'employés
-        $totalEmployees = Employee::whereRaw('1 = 1')->count();
+        $totalEmployees = Employee::active()->whereRaw('1 = 1')->count();
         
         // Calculer le taux d'absence
         $totalPossiblePresences = $totalEmployees * $workingDays;
@@ -901,21 +901,21 @@ class DailyAttendanceController extends Controller
     {
         $today = Carbon::today()->format('Y-m-d');
         
-        $total = DailyAttendance::whereRaw('1 = 1')
+        $total = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->count();
         
-        $present = DailyAttendance::whereRaw('1 = 1')
+        $present = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
             ->count();
         
-        $absent = DailyAttendance::whereRaw('1 = 1')
+        $absent = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->where('status', 'ABSENT')
             ->count();
         
-        $totalEmployees = Employee::whereRaw('1 = 1')->count();
+        $totalEmployees = Employee::active()->whereRaw('1 = 1')->count();
         
         return [
             'total' => $total,
@@ -939,7 +939,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données pour aujourd'hui depuis DB: " . $today);
             
             // Récupérer toutes les présences d'aujourd'hui
-            $attendances = DailyAttendance::whereRaw('1 = 1')
+            $attendances = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->where('attendance_date', $today)
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -1028,7 +1028,7 @@ class DailyAttendanceController extends Controller
                      ", department: " . ($department ?: 'all'));
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee');
             
@@ -1038,7 +1038,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -1600,7 +1600,7 @@ class DailyAttendanceController extends Controller
             }
             
             // Dernière synchronisation depuis les données
-            $lastSync = DailyAttendance::whereRaw('1 = 1')
+            $lastSync = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereNotNull('last_sync_at')
                 ->orderBy('last_sync_at', 'desc')
                 ->first();
@@ -1666,7 +1666,7 @@ class DailyAttendanceController extends Controller
                 Log::info("Resynchronisation manuelle pour {$empCode} le {$date}");
                 
                 // Récupérer la présence mise à jour
-                $attendance = DailyAttendance::whereRaw('1 = 1')
+                $attendance = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                     ->where('emp_code', $empCode)
                     ->where('attendance_date', $date)
                     ->first();
@@ -1862,14 +1862,14 @@ class DailyAttendanceController extends Controller
                      ", department: " . ($department ?: 'all'));
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::whereRaw('1 = 1')
+            $employees = Employee::active()->whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête pour les présences journalières
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -1881,7 +1881,7 @@ class DailyAttendanceController extends Controller
             
             // Filtrer par département
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2006,14 +2006,14 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Présences pour: " . $startDate . " à " . $endDate);
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::whereRaw('1 = 1')
+            $employees = Employee::active()->whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
                 ->with('employee')
@@ -2026,7 +2026,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2157,7 +2157,7 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee')
@@ -2177,7 +2177,7 @@ class DailyAttendanceController extends Controller
             }
 
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2299,14 +2299,14 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Absences pour: " . $startDate . " à " . $endDate);
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::whereRaw('1 = 1')
+            $employees = Employee::active()->whereRaw('1 = 1')
                 ->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('status', 'ABSENT')
                 ->with('employee')
@@ -2319,7 +2319,7 @@ class DailyAttendanceController extends Controller
             }
             
             if ($department && $department !== '' && $department !== 'all') {
-                $allEmployees = Employee::whereRaw('1 = 1')->get();
+                $allEmployees = Employee::active()->whereRaw('1 = 1')->get();
                 $filteredEmployees = $allEmployees->filter(function($emp) use ($department) {
                     return $emp->dept_name === $department;
                 })->pluck('id')->toArray();
@@ -2347,7 +2347,7 @@ class DailyAttendanceController extends Controller
             $totalAbsences = $attendances->count();
             $uniqueEmployees = $attendances->pluck('employee_id')->filter()->unique()->count();
             $workingDays = $this->countWorkingDays($startDate, $endDate);
-            $totalEmployees = Employee::whereRaw('1 = 1')->count();
+            $totalEmployees = Employee::active()->whereRaw('1 = 1')->count();
             $absenceRate = $totalEmployees > 0 ? round(($totalAbsences / ($totalEmployees * $workingDays)) * 100, 1) : 0;
             
             $statistics = [
@@ -2441,7 +2441,7 @@ class DailyAttendanceController extends Controller
         }
 
         if ($department && $department !== '' && $department !== 'all') {
-            $ids = Employee::whereRaw('1 = 1')->get()
+            $ids = Employee::active()->whereRaw('1 = 1')->get()
                 ->filter(fn ($emp) => $emp->dept_name === $department)
                 ->pluck('id')->toArray();
             $query->whereIn('employee_id', !empty($ids) ? $ids : [-1]);
@@ -2460,7 +2460,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2516,7 +2516,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->where('status', 'ABSENT')
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2560,7 +2560,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->where('is_late', true)
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2620,7 +2620,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
             ->orderBy('emp_code');
@@ -2817,7 +2817,7 @@ class DailyAttendanceController extends Controller
         }
         
         if ($request->has('emp_code') && $request->emp_code && $request->emp_code !== 'all') {
-            $employee = Employee::whereRaw('1 = 1')
+            $employee = Employee::active()->whereRaw('1 = 1')
                 ->where('emp_code', $request->emp_code)
                 ->first();
                 
@@ -2869,7 +2869,7 @@ class DailyAttendanceController extends Controller
             return response()->json(null);
         }
         
-        $employee = Employee::whereRaw('1 = 1')
+        $employee = Employee::active()->whereRaw('1 = 1')
             ->where('emp_code', $request->emp_code)
             ->first();
             

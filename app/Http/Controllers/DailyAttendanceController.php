@@ -30,7 +30,7 @@ class DailyAttendanceController extends Controller
         $devices = Device::orderBy('terminal_name')->get();
         
         // Récupérer les employés avec leurs codes pour le filtre
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -119,7 +119,7 @@ class DailyAttendanceController extends Controller
             Log::info("Tous les emp_code de l'API (" . $uniqueEmpCodes->count() . "): " . $uniqueEmpCodes->implode(', '));
             
             // Récupérer tous les employés pour la correspondance
-            $allEmployees = Employee::whereNotNull('emp_code')
+            $allEmployees = Employee::active()->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get();
             
@@ -231,7 +231,7 @@ class DailyAttendanceController extends Controller
             }
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::whereNotNull('emp_code')
+            $employees = Employee::active()->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');
@@ -868,7 +868,7 @@ private function getAllTransactionsWithRetry($devices, $startTime, $endTime, $to
             }
             
             // Récupérer tous les employés pour la correspondance
-            $employees = Employee::whereNotNull('emp_code')
+            $employees = Employee::active()->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '')
                 ->get()
                 ->keyBy('emp_code');

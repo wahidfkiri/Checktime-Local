@@ -269,7 +269,7 @@ class SettingsController extends Controller
                 ], 400);
             }
             
-            $employee = \App\Models\Employee::whereNotNull('email')
+            $employee = \App\Models\Employee::active()->whereNotNull('email')
                 ->where('email', '!=', '')
                 ->first();
             
@@ -326,7 +326,7 @@ class SettingsController extends Controller
                 ];
             }
             
-            $employeesWithEmail = \App\Models\Employee::whereNotNull('email')
+            $employeesWithEmail = \App\Models\Employee::active()->whereNotNull('email')
                 ->where('email', '!=', '')
                 ->count();
             
@@ -335,7 +335,7 @@ class SettingsController extends Controller
                 'settings' => $settings,
                 'stats' => [
                     'employees_with_email' => $employeesWithEmail,
-                    'total_employees' => \App\Models\Employee::count()
+                    'total_employees' => \App\Models\Employee::active()->count()
                 ]
             ]);
             

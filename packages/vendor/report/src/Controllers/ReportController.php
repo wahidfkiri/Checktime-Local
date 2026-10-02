@@ -29,7 +29,7 @@ class ReportController extends Controller
         $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -168,7 +168,7 @@ class ReportController extends Controller
              ->get();
         
         // Récupérer les employés concernés
-        $employeesQuery = Employee::whereNotNull('emp_code')
+        $employeesQuery = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -182,7 +182,7 @@ class ReportController extends Controller
         }
         
         // Récupérer TOUTES les données de daily_attendances (sans limit)
-        $query = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate]);
+        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate]);
         
         if ($empCode && $empCode !== 'all') {
             $query->where('emp_code', $empCode);
@@ -797,8 +797,8 @@ if ($isOnMission) {
                 'total_records_available' => $totalData,
                 'records_returned_in_pagination' => count($data['data'] ?? []),
                 'message' => 'Test réussi',
-                'daily_attendances_count' => DailyAttendance::count(),
-                'employees_count' => Employee::count()
+                'daily_attendances_count' => DailyAttendance::forActiveEmployees()->count(),
+                'employees_count' => Employee::active()->count()
             ]);
             
         } catch (\Exception $e) {

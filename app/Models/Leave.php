@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Leave extends Model
 {
+    use \App\Models\Concerns\FiltersActiveEmployees;
     protected $fillable = ['employee_id','type_id','start_date','end_date','reason','status'];
 
     public function employee(): BelongsTo

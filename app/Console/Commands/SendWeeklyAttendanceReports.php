@@ -112,7 +112,7 @@ class SendWeeklyAttendanceReports extends Command
         $client = Setting::company();
 
         // ── Données pour la semaine ─────────────────────────────────
-        $allAttendances = DailyAttendance::whereBetween('attendance_date', [$startDate, $endDate])->get();
+        $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])->get();
 
         $allMissions = Mission::where(function ($q) use ($startDate, $endDate) {
             $q->whereBetween('start_date', [$startDate, $endDate])
@@ -167,7 +167,7 @@ class SendWeeklyAttendanceReports extends Command
             return 1;
         }
 
-        $employeesQuery = Employee::whereNotNull('emp_code')->where('emp_code', '!=', '');
+        $employeesQuery = Employee::active()->whereNotNull('emp_code')->where('emp_code', '!=', '');
 
         // Sans adresse de test, seuls les employés ayant un email reçoivent le rapport.
         if (empty($overrideTo)) {

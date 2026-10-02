@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AttendanceTransaction extends Model
 {
+    use \App\Models\Concerns\FiltersActiveEmployees;
     use HasFactory;
 
     protected $fillable = [

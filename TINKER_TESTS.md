@@ -143,3 +143,25 @@ config('mail.default'); config('mail.mailers.smtp.host'); config('mail.mailers.s
 # Derniers envois et erreurs dans le journal applicatif
 grep -E "Message accepté|Erreur envoi|Rapports|SMTP" /var/www/Checktime-Local/storage/logs/laravel.log | tail -30
 ```
+
+## 10. Employés actifs / inactifs
+
+Un employé inactif (`employees.status = 'inactive'`) est masqué de tous les rapports,
+statistiques, plannings, listes de sélection et de la synchronisation des pointages.
+Le statut se change avec l'interrupteur de la colonne « Statut » de `/employees`
+(décision locale : la synchronisation avec l'appareil ne l'écrase plus).
+
+```php
+// Combien d'actifs / inactifs
+App\Models\Employee::selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status');
+
+// Désactiver / réactiver un employé par son code
+App\Models\Employee::where('emp_code', '1010')->update(['status' => 'inactive']);
+App\Models\Employee::where('emp_code', '1010')->update(['status' => 'active']);
+
+// Tout remettre actif
+App\Models\Employee::where('status', '!=', 'active')->update(['status' => 'active']);
+
+// Vérifier qu'un employé inactif est bien exclu du rapport 1 (doit afficher « Aucun employé correspondant »)
+Artisan::call('attendance:send-weekly-reports', ['--employee' => 12, '--to' => 'wahidfkiri5@gmail.com']); echo Artisan::output();
+```

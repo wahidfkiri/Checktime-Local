@@ -13,10 +13,10 @@ class MissionController extends Controller
 {
     public function index(Request $request)
     {
-        $employees = Employee::orderBy('first_name')
+        $employees = Employee::active()->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'emp_code', 'dept_name']);
 
-        $departments = Employee::whereNotNull('dept_name')
+        $departments = Employee::active()->whereNotNull('dept_name')
             ->where('dept_name', '!=', '')
             ->select('dept_name')
             ->distinct()
@@ -32,7 +32,7 @@ class MissionController extends Controller
 
     private function getMissionsData(Request $request)
     {
-        $query = Mission::with('employee')->select('missions.*');
+        $query = Mission::forActiveEmployees()->with('employee')->select('missions.*');
 
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);

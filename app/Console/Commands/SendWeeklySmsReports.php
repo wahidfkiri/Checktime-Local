@@ -219,7 +219,7 @@ class SendWeeklySmsReports extends Command
      */
     private function calculateEmployeeStats(Carbon $startOfWeek, Carbon $endOfWeek): array
     {
-        $employees = Employee::whereNotNull('emp_code')
+        $employees = Employee::active()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->whereNotNull('phone')
             ->where('phone', '!=', '')

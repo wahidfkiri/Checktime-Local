@@ -24,7 +24,7 @@ class EmployeeScheduleController extends Controller
             
             if ($request->ajax()) {
                 // Construire la requête
-                $query = EmployeeSchedule::with(['employee', 'workHourType']);
+                $query = EmployeeSchedule::forActiveEmployees()->with(['employee', 'workHourType']);
                 
                 // Filtres
                 if ($request->filled('employee_id')) {
@@ -235,7 +235,7 @@ class EmployeeScheduleController extends Controller
             }
             
             // Pour les requêtes non-AJAX (affichage initial)
-            $employees = Employee::orderBy('first_name')
+            $employees = Employee::active()->orderBy('first_name')
                 ->get();
                 
             $workHourTypes = WorkHourType::where('is_active', true)
@@ -301,10 +301,10 @@ class EmployeeScheduleController extends Controller
             
             // Récupérer les employés
             $employeeIds = $validated['employee_ids'] === 'all' 
-                ? Employee::pluck('id')->toArray()
+                ? Employee::active()->pluck('id')->toArray()
                 : (array)$validated['employee_ids'];
             
-            $employees = Employee::whereIn('id', $employeeIds)
+            $employees = Employee::active()->whereIn('id', $employeeIds)
                 ->get();
             
             if ($employees->isEmpty()) {
@@ -1091,7 +1091,7 @@ class EmployeeScheduleController extends Controller
             $validated = $validator->validated();
             
             // Récupérer les plannings
-            $query = EmployeeSchedule::with(['employee.department', 'employee.area', 'workHourType'])
+            $query = EmployeeSchedule::forActiveEmployees()->with(['employee.department', 'employee.area', 'workHourType'])
                 ->whereBetween('schedule_date', [
                     $validated['start_date'],
                     $validated['end_date']

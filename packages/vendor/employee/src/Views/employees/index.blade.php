@@ -49,7 +49,6 @@
                                         <option value="">Tous</option>
                                         <option value="active">Actif</option>
                                         <option value="inactive">Inactif</option>
-                                        <option value="suspended">Suspendu</option>
                                     </select>
                                 </div>
                             </div>
@@ -1600,6 +1599,33 @@ function selectByText(selectId, text) {
         $('#delete-employee-spinner').addClass('d-none');
     });
     
+    // Activer / désactiver un employé (interrupteur dans la colonne Statut)
+    $(document).on('change', '.js-employee-status-toggle', function() {
+        var $toggle = $(this);
+        var newStatus = $toggle.is(':checked') ? 'active' : 'inactive';
+        var url = "{{ route('employees.set-status', ['id' => '__ID__']) }}".replace('__ID__', $toggle.data('id'));
+
+        $toggle.prop('disabled', true);
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: { _token: "{{ csrf_token() }}", status: newStatus },
+            success: function(response) {
+                showSweetAlert('success', newStatus === 'active' ? 'Employé activé' : 'Employé désactivé', response.message, 2500);
+                table.ajax.reload(null, false);
+            },
+            error: function(xhr) {
+                $toggle.prop('checked', newStatus !== 'active');
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossible de modifier le statut.';
+                showSweetAlert('error', 'Erreur', msg);
+            },
+            complete: function() {
+                $toggle.prop('disabled', false);
+            }
+        });
+    });
+
     function showSweetAlert(icon, title, text, timer = null) {
         const Toast = Swal.mixin({
             toast: true,

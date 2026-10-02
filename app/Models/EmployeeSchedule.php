@@ -8,6 +8,7 @@ use Carbon\Carbon;
 
 class EmployeeSchedule extends Model
 {
+    use \App\Models\Concerns\FiltersActiveEmployees;
     protected $fillable = [
         'employee_id',
         'schedule_type',
