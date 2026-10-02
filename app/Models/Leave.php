@@ -19,4 +19,15 @@ class Leave extends Model
     {
         return $this->belongsTo(LeaveType::class, 'type_id');
     }
+
+    /**
+     * Congés dont la plage [start_date, end_date] chevauche la période.
+     * Même test de chevauchement que pour les missions (comparaison par date).
+     */
+    public function scopeOverlappingPeriod($query, $startDate, $endDate)
+    {
+        return $query
+            ->whereDate('start_date', '<=', $endDate)
+            ->whereDate('end_date', '>=', $startDate);
+    }
 }

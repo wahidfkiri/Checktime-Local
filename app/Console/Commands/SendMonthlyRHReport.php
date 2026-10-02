@@ -148,28 +148,10 @@ class SendMonthlyRHReport extends Command
             ->get();
 
         // ── Missions ───────────────────────────────────────────────
-        $missions = Mission::where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('end_date', [$startDate, $endDate])
-                  ->orWhere(function ($q2) use ($startDate, $endDate) {
-                      $q2->where('start_date', '<=', $startDate)
-                         ->where('end_date', '>=', $endDate);
-                  });
-            })
-            ->get();
+        $missions = Mission::overlappingPeriod($startDate, $endDate)->get();
 
         // ── Congés approuvés ───────────────────────────────────────
-        $leaves = Leave::with('type')
-            ->where('status', 'approved')
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('end_date', [$startDate, $endDate])
-                  ->orWhere(function ($q2) use ($startDate, $endDate) {
-                      $q2->where('start_date', '<=', $startDate)
-                         ->where('end_date', '>=', $endDate);
-                  });
-            })
-            ->get();
+        $leaves = Leave::with('type')->where('status', 'approved')->overlappingPeriod($startDate, $endDate)->get();
 
         // ── Autorisations d'absence approuvées ─────────────────────
         $permissions = EmployeePermission::where('status', 'approved')
@@ -223,8 +205,8 @@ class SendMonthlyRHReport extends Command
             // négative).
             $missionDates = [];
             foreach ($employeeMissions as $mission) {
-                $current = Carbon::parse($mission->start_date)->max($periodStart);
-                $end     = Carbon::parse($mission->end_date)->min($periodEnd);
+                $current = Carbon::parse($mission->start_date)->startOfDay()->max($periodStart)->copy();
+                $end     = Carbon::parse($mission->end_date)->startOfDay()->min($periodEnd)->copy();
                 while ($current <= $end) {
                     $missionDates[$current->format('Y-m-d')] = [
                         'title'       => $mission->title,
@@ -237,8 +219,8 @@ class SendMonthlyRHReport extends Command
             // Dates de congé — idem, bornées à la période.
             $leaveDates = [];
             foreach ($employeeLeaves as $leave) {
-                $current  = Carbon::parse($leave->start_date)->max($periodStart);
-                $end      = Carbon::parse($leave->end_date)->min($periodEnd);
+                $current  = Carbon::parse($leave->start_date)->startOfDay()->max($periodStart)->copy();
+                $end      = Carbon::parse($leave->end_date)->startOfDay()->min($periodEnd)->copy();
                 $typeName = $leave->type ? $leave->type->name : 'Congé';
                 while ($current <= $end) {
                     $leaveDates[$current->format('Y-m-d')] = ['type_name' => $typeName];
@@ -250,8 +232,8 @@ class SendMonthlyRHReport extends Command
             // congé le même jour est prioritaire (pas de double comptage).
             $permissionDates = [];
             foreach ($employeePermissions as $permission) {
-                $current = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
-                $end     = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                $current = Carbon::parse($permission->getEffectiveStartDate())->startOfDay()->max($periodStart)->copy();
+                $end     = Carbon::parse($permission->getEffectiveEndDate())->startOfDay()->min($periodEnd)->copy();
                 while ($current <= $end) {
                     $d = $current->format('Y-m-d');
                     if (!isset($missionDates[$d]) && !isset($leaveDates[$d])) {

@@ -29,4 +29,17 @@ class Mission extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    /**
+     * Missions dont la plage [start_date, end_date] chevauche la période.
+     * start_date/end_date sont des DATETIME : on compare par date (whereDate),
+     * sinon une mission commençant ou finissant le dernier jour de la période
+     * avec une heure > 00:00 était écartée.
+     */
+    public function scopeOverlappingPeriod($query, $startDate, $endDate)
+    {
+        return $query
+            ->whereDate('start_date', '<=', $endDate)
+            ->whereDate('end_date', '>=', $startDate);
+    }
 }

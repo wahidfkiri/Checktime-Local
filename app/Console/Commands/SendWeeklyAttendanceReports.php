@@ -114,21 +114,9 @@ class SendWeeklyAttendanceReports extends Command
         // ── Données pour la semaine ─────────────────────────────────
         $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])->get();
 
-        $allMissions = Mission::where(function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('start_date', [$startDate, $endDate])
-              ->orWhereBetween('end_date', [$startDate, $endDate])
-              ->orWhere(fn ($q2) => $q2->where('start_date', '<=', $startDate)
-                                        ->where('end_date', '>=', $endDate));
-        })->get();
+        $allMissions = Mission::overlappingPeriod($startDate, $endDate)->get();
 
-        $allLeaves = Leave::with('type')
-            ->where('status', 'approved')
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('start_date', [$startDate, $endDate])
-                  ->orWhereBetween('end_date', [$startDate, $endDate])
-                  ->orWhere(fn ($q2) => $q2->where('start_date', '<=', $startDate)
-                                            ->where('end_date', '>=', $endDate));
-            })->get();
+        $allLeaves = Leave::with('type')->where('status', 'approved')->overlappingPeriod($startDate, $endDate)->get();
 
         // Autorisations d'absence (permissions) approuvées pour la période.
         $allPermissions = EmployeePermission::where('status', 'approved')
@@ -209,8 +197,8 @@ class SendWeeklyAttendanceReports extends Command
                 // faut pas compter leurs jours hors période. ────
                 $missionDates = [];
                 foreach ($employeeMissions as $mission) {
-                    $cur = Carbon::parse($mission->start_date)->max($periodStart);
-                    $end = Carbon::parse($mission->end_date)->min($periodEnd);
+                    $cur = Carbon::parse($mission->start_date)->startOfDay()->max($periodStart)->copy();
+                    $end = Carbon::parse($mission->end_date)->startOfDay()->min($periodEnd)->copy();
                     while ($cur->lte($end)) {
                         if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$cur->format('Y-m-d')])) {
                             $missionDates[$cur->format('Y-m-d')] = [
@@ -225,8 +213,8 @@ class SendWeeklyAttendanceReports extends Command
                 // ── Dates de congé (Lun-Ven uniquement, jours fériés chômés exclus), idem bornées ─────
                 $leaveDates = [];
                 foreach ($employeeLeaves as $leave) {
-                    $cur      = Carbon::parse($leave->start_date)->max($periodStart);
-                    $end      = Carbon::parse($leave->end_date)->min($periodEnd);
+                    $cur      = Carbon::parse($leave->start_date)->startOfDay()->max($periodStart)->copy();
+                    $end      = Carbon::parse($leave->end_date)->startOfDay()->min($periodEnd)->copy();
                     $typeName = $leave->type ? $leave->type->name : 'Congé';
                     while ($cur->lte($end)) {
                         if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$cur->format('Y-m-d')])) {
@@ -242,8 +230,8 @@ class SendWeeklyAttendanceReports extends Command
                 // comptage), même règle que le rapport /rapport/presence-ponctualite. ─────
                 $permissionDates = [];
                 foreach ($employeePermissions as $permission) {
-                    $cur = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
-                    $end = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                    $cur = Carbon::parse($permission->getEffectiveStartDate())->startOfDay()->max($periodStart)->copy();
+                    $end = Carbon::parse($permission->getEffectiveEndDate())->startOfDay()->min($periodEnd)->copy();
                     while ($cur->lte($end)) {
                         $dateStr = $cur->format('Y-m-d');
                         if ($cur->dayOfWeekIso <= 5 && !isset($holidayDates[$dateStr])

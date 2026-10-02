@@ -201,28 +201,11 @@ class CustomReportController extends Controller
             ->get();
 
         // Récupérer les congés approuvés pour la période
-        $leaves = Leave::where('status', 'approved')
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('end_date', [$startDate, $endDate])
-                      ->orWhere(function ($q) use ($startDate, $endDate) {
-                          $q->where('start_date', '<=', $startDate)
-                            ->where('end_date', '>=', $endDate);
-                      });
-            })
-            ->get()
+        $leaves = Leave::where('status', 'approved')->overlappingPeriod($startDate, $endDate)->get()
             ->groupBy('employee_id');
 
         // Récupérer toutes les missions pour la période
-        $allMissions = Mission::where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('start_date', [$startDate, $endDate])
-                      ->orWhereBetween('end_date', [$startDate, $endDate])
-                      ->orWhere(function ($q) use ($startDate, $endDate) {
-                          $q->where('start_date', '<=', $startDate)
-                            ->where('end_date', '>=', $endDate);
-                      });
-            })
-            ->get()
+        $allMissions = Mission::overlappingPeriod($startDate, $endDate)->get()
             ->groupBy('employee_id');
 
         // Récupérer les autorisations d'absence approuvées pour la période.
@@ -253,8 +236,8 @@ class CustomReportController extends Controller
             // --- Dates de mission ---
             $missionDates = [];
             foreach ($employeeMissions as $mission) {
-                $missionStart = Carbon::parse($mission->start_date)->max($periodStart);
-                $missionEnd   = Carbon::parse($mission->end_date)->min($periodEnd);
+                $missionStart = Carbon::parse($mission->start_date)->startOfDay()->max($periodStart);
+                $missionEnd   = Carbon::parse($mission->end_date)->startOfDay()->min($periodEnd);
                 $current      = $missionStart->copy();
                 while ($current <= $missionEnd) {
                     $missionDates[$current->format('Y-m-d')] = [
@@ -268,8 +251,8 @@ class CustomReportController extends Controller
             // --- Dates de congé ---
             $leaveDates = [];
             foreach ($employeeLeaves as $leave) {
-                $leaveStart = Carbon::parse($leave->start_date)->max($periodStart);
-                $leaveEnd   = Carbon::parse($leave->end_date)->min($periodEnd);
+                $leaveStart = Carbon::parse($leave->start_date)->startOfDay()->max($periodStart);
+                $leaveEnd   = Carbon::parse($leave->end_date)->startOfDay()->min($periodEnd);
                 $current    = $leaveStart->copy();
                 $typeName   = $leave->type ? $leave->type->name : 'Congé';
                 while ($current <= $leaveEnd) {
@@ -283,8 +266,8 @@ class CustomReportController extends Controller
             // --- Dates d'autorisation d'absence ---
             $permissionDates = [];
             foreach ($employeePermissions as $permission) {
-                $permStart = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
-                $permEnd   = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                $permStart = Carbon::parse($permission->getEffectiveStartDate())->startOfDay()->max($periodStart);
+                $permEnd   = Carbon::parse($permission->getEffectiveEndDate())->startOfDay()->min($periodEnd);
                 $current   = $permStart->copy();
                 while ($current <= $permEnd) {
                     $permissionDates[$current->format('Y-m-d')] = [
@@ -492,27 +475,9 @@ class CustomReportController extends Controller
             $attendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
                 ->get();
 
-            $missions = Mission::where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('start_date', [$startDate, $endDate])
-                          ->orWhereBetween('end_date', [$startDate, $endDate])
-                          ->orWhere(function ($q) use ($startDate, $endDate) {
-                              $q->where('start_date', '<=', $startDate)
-                                ->where('end_date', '>=', $endDate);
-                          });
-                })
-                ->get();
+            $missions = Mission::overlappingPeriod($startDate, $endDate)->get();
 
-            $leaves = Leave::with('type')
-                ->where('status', 'approved')
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('start_date', [$startDate, $endDate])
-                          ->orWhereBetween('end_date', [$startDate, $endDate])
-                          ->orWhere(function ($q) use ($startDate, $endDate) {
-                              $q->where('start_date', '<=', $startDate)
-                                ->where('end_date', '>=', $endDate);
-                          });
-                })
-                ->get();
+            $leaves = Leave::with('type')->where('status', 'approved')->overlappingPeriod($startDate, $endDate)->get();
 
             $permissions = EmployeePermission::where('status', 'approved')
                 ->overlappingPeriod($startDate, $endDate)
@@ -574,8 +539,8 @@ class CustomReportController extends Controller
                 // haut), il ne faut pas compter leurs jours hors période.
                 $missionDates = [];
                 foreach ($employeeMissions as $mission) {
-                    $missionStart = Carbon::parse($mission->start_date)->max($periodStart);
-                    $missionEnd   = Carbon::parse($mission->end_date)->min($periodEnd);
+                    $missionStart = Carbon::parse($mission->start_date)->startOfDay()->max($periodStart);
+                    $missionEnd   = Carbon::parse($mission->end_date)->startOfDay()->min($periodEnd);
                     $current      = $missionStart->copy();
                     while ($current <= $missionEnd) {
                         $missionDates[$current->format('Y-m-d')] = [
@@ -588,8 +553,8 @@ class CustomReportController extends Controller
 
                 $leaveDates = [];
                 foreach ($employeeLeaves as $leave) {
-                    $leaveStart = Carbon::parse($leave->start_date)->max($periodStart);
-                    $leaveEnd   = Carbon::parse($leave->end_date)->min($periodEnd);
+                    $leaveStart = Carbon::parse($leave->start_date)->startOfDay()->max($periodStart);
+                    $leaveEnd   = Carbon::parse($leave->end_date)->startOfDay()->min($periodEnd);
                     $current    = $leaveStart->copy();
                     $typeName   = $leave->type ? $leave->type->name : 'Congé';
                     while ($current <= $leaveEnd) {
@@ -602,8 +567,8 @@ class CustomReportController extends Controller
 
                 $permissionDates = [];
                 foreach ($employeePermissions as $permission) {
-                    $permissionStart = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
-                    $permissionEnd   = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                    $permissionStart = Carbon::parse($permission->getEffectiveStartDate())->startOfDay()->max($periodStart);
+                    $permissionEnd   = Carbon::parse($permission->getEffectiveEndDate())->startOfDay()->min($periodEnd);
                     $current         = $permissionStart->copy();
                     while ($current <= $permissionEnd) {
                         $permissionDates[$current->format('Y-m-d')] = [
