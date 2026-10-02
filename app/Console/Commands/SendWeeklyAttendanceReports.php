@@ -19,7 +19,9 @@ class SendWeeklyAttendanceReports extends Command
 {
     protected $signature = 'attendance:send-weekly-reports
                             {--start-date= : Début de période personnalisée (format Y-m-d)}
-                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}
+                            {--employee= : Id de l employé : envoie uniquement son rapport}
+                            {--to= : Adresse(s) de test séparées par des virgules, à la place de l email de l employé (ignore le drapeau d activation emails employés)}';
 
     protected $description = 'Envoyer les rapports de présence hebdomadaires aux employés chaque vendredi à 9h';
 
@@ -99,7 +101,7 @@ class SendWeeklyAttendanceReports extends Command
             return;
         }
 
-        if (!$settings->email_employees_is_active) {
+        if (!$this->option('to') && !$settings->email_employees_is_active) {
             $this->warn("❌  Emails désactivés pour les employés");
             Log::info("Emails employés désactivés");
             return;
@@ -155,13 +157,31 @@ class SendWeeklyAttendanceReports extends Command
         }
 
         // ── Employés avec email valide ──────────────────────────────
-        $employees = Employee::whereNotNull('emp_code')->where('emp_code', '!=', '')
-            ->whereNotNull('email')->where('email', '!=', '')
-            ->orderBy('dept_name')->orderBy('first_name')
-            ->get();
+        $overrideTo = array_values(array_filter(
+            array_map('trim', explode(',', (string) $this->option('to'))),
+            fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL)
+        ));
+
+        if ($this->option('to') && empty($overrideTo)) {
+            $this->error('❌  --to ne contient aucune adresse email valide.');
+            return 1;
+        }
+
+        $employeesQuery = Employee::whereNotNull('emp_code')->where('emp_code', '!=', '');
+
+        // Sans adresse de test, seuls les employés ayant un email reçoivent le rapport.
+        if (empty($overrideTo)) {
+            $employeesQuery->whereNotNull('email')->where('email', '!=', '');
+        }
+
+        if ($this->option('employee')) {
+            $employeesQuery->where('id', (int) $this->option('employee'));
+        }
+
+        $employees = $employeesQuery->orderBy('dept_name')->orderBy('first_name')->get();
 
         if ($employees->isEmpty()) {
-            $this->warn("⚠️  Aucun employé avec email");
+            $this->warn("⚠️  Aucun employé correspondant (vérifiez l id et l email)");
             return;
         }
 
@@ -172,7 +192,7 @@ class SendWeeklyAttendanceReports extends Command
 
         foreach ($employees as $employee) {
 
-            if (!filter_var($employee->email, FILTER_VALIDATE_EMAIL)) {
+            if (empty($overrideTo) && !filter_var($employee->email, FILTER_VALIDATE_EMAIL)) {
                 Log::warning("Email invalide ignoré: {$employee->email} (Code: {$employee->emp_code})");
                 continue;
             }
@@ -482,7 +502,7 @@ class SendWeeklyAttendanceReports extends Command
                     'client_name'   => $client->name,
                 ];
 
-                Mail::to($employee->email)->send(new WeeklyAttendanceReport($emailData));
+                Mail::to($overrideTo ?: $employee->email)->send(new WeeklyAttendanceReport($emailData));
 
                 $totalEmailsSent++;
 

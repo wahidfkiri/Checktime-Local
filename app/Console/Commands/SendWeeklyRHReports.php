@@ -20,7 +20,8 @@ class SendWeeklyRHReports extends Command
     protected $signature = 'attendance:send-weekly-rh-reports
                             {--date= : Date de référence pour le rapport (format Y-m-d)}
                             {--start-date= : Début de période personnalisée (format Y-m-d)}
-                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}
+                            {--to= : Destinataire(s) de test, séparés par des virgules (remplace la liste configurée, ignore le drapeau d activation email RH)}';
     
     protected $description = 'Envoyer les rapports de présence hebdomadaires aux RH (email settings)';
 
@@ -94,7 +95,7 @@ class SendWeeklyRHReports extends Command
         // Récupérer les paramètres globaux
         $settings = Setting::first();
         
-        if (!$settings || !$settings->email_is_active) {
+        if (!$this->option('to') && (!$settings || !$settings->email_is_active)) {
             $this->warn("⚠️  Email RH non activé dans les paramètres");
             return 0;
         }
@@ -359,6 +360,13 @@ class SendWeeklyRHReports extends Command
      */
     private function resolveRecipients($settings): array
     {
+        if ($to = $this->option('to')) {
+            // Envoi de test : destinataires imposés en ligne de commande.
+            return array_values(array_filter(array_map('trim', explode(',', $to)), function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+        }
+
         $job = \App\Models\ScheduledNotification::where('command', 'attendance:send-weekly-rh-reports')->first();
         $recipients = $job && is_array($job->recipients) ? $job->recipients : [];
 

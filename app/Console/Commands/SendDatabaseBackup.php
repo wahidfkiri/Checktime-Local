@@ -14,7 +14,8 @@ use Vendor\BackupData\Services\DatabaseBackupService;
 
 class SendDatabaseBackup extends Command
 {
-    protected $signature = 'backup:send';
+    protected $signature = 'backup:send
+                            {--to= : Destinataire(s) de test, séparés par des virgules (remplace la liste configurée)}';
 
     protected $description = 'Générer une sauvegarde de la base de données et l\'envoyer par email';
 
@@ -135,6 +136,13 @@ class SendDatabaseBackup extends Command
      */
     private function resolveRecipients($settings): array
     {
+        if ($to = $this->option('to')) {
+            // Envoi de test : destinataires imposés en ligne de commande.
+            return array_values(array_filter(array_map('trim', explode(',', $to)), function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+        }
+
         $job = ScheduledNotification::where('command', 'backup:send')->first();
         $recipients = $job && is_array($job->recipients) ? $job->recipients : [];
 

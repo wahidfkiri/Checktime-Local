@@ -20,7 +20,8 @@ class SendMonthlyRHReport extends Command
 {
     protected $signature = 'reports:send-monthly-rh {--test : Mode test} {--date= : Date spécifique}
                             {--start-date= : Début de période personnalisée (format Y-m-d)}
-                            {--end-date= : Fin de période personnalisée (format Y-m-d)}';
+                            {--end-date= : Fin de période personnalisée (format Y-m-d)}
+                            {--to= : Destinataire(s) de test, séparés par des virgules (remplace la liste configurée, ignore le drapeau d activation email RH)}';
     protected $description = 'Envoyer les rapports mensuels RH par email le dernier jour du mois';
 
     /**
@@ -73,7 +74,7 @@ class SendMonthlyRHReport extends Command
             return;
         }
 
-        if (!$settings->email_is_active) {
+        if (!$this->option('to') && !$settings->email_is_active) {
             $this->warn("❌  Emails désactivés dans les paramètres");
             Log::info('Emails désactivés');
             return;
@@ -503,6 +504,13 @@ class SendMonthlyRHReport extends Command
      */
     private function resolveRecipients($settings): array
     {
+        if ($to = $this->option('to')) {
+            // Envoi de test : destinataires imposés en ligne de commande.
+            return array_values(array_filter(array_map('trim', explode(',', $to)), function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+        }
+
         $job = \App\Models\ScheduledNotification::where('command', 'reports:send-monthly-rh')->first();
         $recipients = $job && is_array($job->recipients) ? $job->recipients : [];
 
