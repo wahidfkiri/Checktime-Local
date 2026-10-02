@@ -69,13 +69,13 @@
         <img src="{{ $appLogo }}" alt="{{ config('app.name') }}" style="max-height:50px;margin-bottom:10px;"><br>
         <h1>📊 RAPPORT MENSUEL RH</h1>
         <h2>Présence & Ponctualité</h2>
-        <p>{{ $data['month_name'] }} {{ $data['year'] }} • {{ $data['client']->name }}</p>
+        <p><span id="vvveb-month-label" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ $data['month_name'] }} {{ $data['year'] }}</span> • <span id="vvveb-client-name" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ $data['client']->name }}</span></p>
     </div>
 
     <div class="content">
         <p>Bonjour,</p>
 
-        <p>Veuillez trouver ci-joint le <strong>rapport mensuel de présence et ponctualité</strong> pour le mois de <strong>{{ $data['month_name'] }} {{ $data['year'] }}</strong>.</p>
+        <p>Veuillez trouver ci-joint le <strong>rapport mensuel de présence et ponctualité</strong> pour le mois de <strong><span id="vvveb-month-label-intro" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ $data['month_name'] }} {{ $data['year'] }}</span></strong>.</p>
 
         {{-- Résumé rapide — dynamique, verrouillé dans l'éditeur --}}
         <div id="vvveb-stats-grid" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="stats-grid">
@@ -141,7 +141,7 @@
     <div class="footer">
         <img src="{{ $appLogo }}" alt="" style="max-height:30px;opacity:0.7;margin-bottom:8px;"><br>
         <p>📧 Ceci est un email automatique, merci de ne pas y répondre directement.</p>
-        <p>© {{ date('Y') }} APB. Tous droits réservés.</p>
+        <p>© <span id="vvveb-year" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ date('Y') }}</span> APB. Tous droits réservés.</p>
         <p style="font-size: 10px; color: #95a5a6;">
             Confidentialité : Ce rapport contient des informations confidentielles.
         </p>

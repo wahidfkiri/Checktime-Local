@@ -113,7 +113,7 @@
         {{-- SALUTATION --}}
         <p>Bonjour <strong>Service RH</strong>,</p>
 
-        <p>Veuillez trouver ci-joint le rapport de présence pour la période du <strong>{{ $startDate }}</strong> au <strong>{{ $endDate }}</strong>.</p>
+        <p>Veuillez trouver ci-joint le rapport de présence pour la période du <strong><span id="vvveb-start-date" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ $startDate }}</span></strong> au <strong><span id="vvveb-end-date" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ $endDate }}</span></strong>.</p>
 
         {{-- PÉRIODE RÉCAP — dynamique, verrouillé dans l'éditeur --}}
         <div id="vvveb-period-recap" data-vvveb-disabled title="Contenu dynamique (données en base) — non éditable ici" class="period">
@@ -166,7 +166,7 @@
             <img src="{{ $appLogo }}" alt="" style="max-height:30px;opacity:0.7;margin-bottom:8px;"><br>
             <p>
                 Cet email a été généré automatiquement. Merci de ne pas y répondre.<br>
-                © {{ date('Y') }} - Rapport de présence hebdomadaire
+                © <span id="vvveb-year" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ date('Y') }}</span> - Rapport de présence hebdomadaire
             </p>
         </div>
     </div>

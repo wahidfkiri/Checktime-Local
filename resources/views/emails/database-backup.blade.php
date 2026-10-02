@@ -76,7 +76,7 @@
     <div class="header">
         <img src="{{ $appLogo }}" alt="{{ config('app.name') }}" style="max-height:50px;margin-bottom:10px;"><br>
         <h1>💾 SAUVEGARDE DE LA BASE DE DONNÉES</h1>
-        <p>{{ now()->format('d/m/Y à H:i') }}</p>
+        <p><span id="vvveb-generated-at" data-vvveb-dynamic title="Valeur dynamique (base de données) — remplacée à chaque envoi">{{ now()->format('d/m/Y à H:i') }}</span></p>
     </div>
 
     <div class="content">

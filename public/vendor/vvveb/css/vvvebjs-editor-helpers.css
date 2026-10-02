@@ -186,3 +186,10 @@ section:hover .container-fluid > .row > .col {
   #vvvebjs-new-section .col {
     padding: 1rem;
     justify-content: center; }
+
+/* Valeur dynamique en ligne (remplacée à chaque envoi par la donnée réelle). */
+[data-vvveb-dynamic] {
+  background: rgba(13, 110, 253, 0.15);
+  border-bottom: 1px dashed #0d6efd;
+  border-radius: 2px;
+  padding: 0 2px; }

@@ -10,12 +10,15 @@ use App\Models\EmailTemplate;
  * les données réelles (stats, observations…) toujours à jour au moment de
  * l'envoi, sans perdre le texte libre que l'administrateur a réécrit autour.
  *
- * Principe : dans les vues par défaut, chaque bloc dont le contenu vient de
- * la base (grille de stats, liste "Détails", observations…) est marqué
- * `data-vvveb-disabled` avec un id unique — Vvveb l'affiche verrouillé dans
- * l'éditeur (voir vvvebjs-editor-helpers.css). Tout le reste (salutation,
- * paragraphe d'intro, bouton, signature…) est du texte normal, librement
- * éditable et conservé tel quel.
+ * Principe : dans les vues par défaut, chaque élément dont le contenu vient de
+ * la base porte un id unique et l'un de ces deux marqueurs :
+ *  - `data-vvveb-disabled` : bloc (grille de stats, "Détails", observations…)
+ *    affiché verrouillé dans l'éditeur (voir vvvebjs-editor-helpers.css) ;
+ *  - `data-vvveb-dynamic` : valeur en ligne dans une phrase (nom de
+ *    l'employé, dates de période, année…), surlignée dans l'éditeur mais
+ *    laissée dans le fil du texte pour que la phrase reste éditable.
+ * Tout le reste (salutation, intro, bouton, signature…) est du texte normal,
+ * librement éditable et conservé tel quel.
  *
  * À l'envoi : on prend le template personnalisé de l'administrateur tel
  * quel, puis pour chaque bloc verrouillé qu'il contient, on régénère son
@@ -62,7 +65,7 @@ class EmailTemplateRenderer
     {
         $doc = self::parseHtml($html);
         $xpath = new \DOMXPath($doc);
-        $nodes = $xpath->query('//*[@data-vvveb-disabled][@id]');
+        $nodes = $xpath->query('//*[@id][@data-vvveb-disabled or @data-vvveb-dynamic]');
 
         $zones = [];
         foreach ($nodes as $node) {
@@ -91,7 +94,7 @@ class EmailTemplateRenderer
     {
         $doc = self::parseHtml($customHtml);
         $xpath = new \DOMXPath($doc);
-        $lockedNodes = $xpath->query('//*[@data-vvveb-disabled][@id]');
+        $lockedNodes = $xpath->query('//*[@id][@data-vvveb-disabled or @data-vvveb-dynamic]');
 
         foreach (iterator_to_array($lockedNodes) as $node) {
             $id = $node->getAttribute('id');

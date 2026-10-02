@@ -3,14 +3,11 @@
 
 <head>
   <script>
-	// Mode sombre par défaut ; un choix manuel via le bouton de thème de
-	// l'éditeur (stocké dans localStorage par builder.js) est respecté.
-	try {
-		var savedTheme = localStorage.getItem('theme');
-		if (savedTheme === 'light' || savedTheme === 'dark') {
-			document.documentElement.setAttribute('data-bs-theme', savedTheme);
-		}
-	} catch (e) {}
+	// Éditeur toujours en mode sombre : on écrase aussi un ancien choix
+	// "light" mémorisé par le bouton de thème (builder.js l'écrit dans
+	// localStorage mais ne le relit pas, d'où ce forçage explicite).
+	document.documentElement.setAttribute('data-bs-theme', 'dark');
+	try { localStorage.setItem('theme', 'dark'); } catch (e) {}
   </script>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -199,7 +196,7 @@
 
               <button class="btn btn-light btn-dark-mode" data-vvveb-action="darkMode">
                 <!-- i class="la la-adjust la-lg"></i -->
-                <i class="la la-sun"></i>
+                <i class="la la-moon"></i>
               </button>
 
               <a href="#" class="btn btn-light px-1 btn-preview-url" target="_blank" title="View page">
