@@ -1,7 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="auto">
+<html lang="en" data-bs-theme="dark">
 
 <head>
+  <script>
+	// Mode sombre par défaut ; un choix manuel via le bouton de thème de
+	// l'éditeur (stocké dans localStorage par builder.js) est respecté.
+	try {
+		var savedTheme = localStorage.getItem('theme');
+		if (savedTheme === 'light' || savedTheme === 'dark') {
+			document.documentElement.setAttribute('data-bs-theme', savedTheme);
+		}
+	} catch (e) {}
+  </script>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
