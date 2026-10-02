@@ -7,6 +7,7 @@ use App\Models\DailyAttendance;
 use App\Models\Holiday;
 use App\Models\Mission;
 use App\Models\Leave;
+use App\Models\EmployeePermission;
 use App\Models\Setting;
 use App\Mail\MonthlyRHReport;
 use App\Reports\SuiviPonctualiteReport;
@@ -170,6 +171,11 @@ class SendMonthlyRHReport extends Command
             })
             ->get();
 
+        // ── Autorisations d'absence approuvées ─────────────────────
+        $permissions = EmployeePermission::where('status', 'approved')
+            ->overlappingPeriod($startDate, $endDate)
+            ->get();
+
         // ── Employés ───────────────────────────────────────────────
         $employees = Employee::orderBy('dept_name')
             ->orderBy('first_name')
@@ -191,6 +197,11 @@ class SendMonthlyRHReport extends Command
             $leavesByEmployee[$leave->employee_id][] = $leave;
         }
 
+        $permissionsByEmployee = [];
+        foreach ($permissions as $permission) {
+            $permissionsByEmployee[$permission->employee_id][] = $permission;
+        }
+
         // ── Construction par département ───────────────────────────
         $departmentData = [];
 
@@ -204,6 +215,7 @@ class SendMonthlyRHReport extends Command
             $employeeAttendances = $attendanceByEmployee[$employee->id] ?? [];
             $employeeMissions    = $missionsByEmployee[$employee->id]   ?? [];
             $employeeLeaves      = $leavesByEmployee[$employee->id]     ?? [];
+            $employeePermissions = $permissionsByEmployee[$employee->id] ?? [];
 
             // Dates de mission — bornées à [$periodStart, $periodEnd] : la requête
             // remonte aussi les missions qui débordent de la période, il ne faut
@@ -234,6 +246,21 @@ class SendMonthlyRHReport extends Command
                 }
             }
 
+            // Autorisations d'absence — bornées à la période ; une mission ou un
+            // congé le même jour est prioritaire (pas de double comptage).
+            $permissionDates = [];
+            foreach ($employeePermissions as $permission) {
+                $current = Carbon::parse($permission->getEffectiveStartDate())->max($periodStart);
+                $end     = Carbon::parse($permission->getEffectiveEndDate())->min($periodEnd);
+                while ($current <= $end) {
+                    $d = $current->format('Y-m-d');
+                    if (!isset($missionDates[$d]) && !isset($leaveDates[$d])) {
+                        $permissionDates[$d] = ['raison' => $permission->raison];
+                    }
+                    $current->addDay();
+                }
+            }
+
             // Stats employé
             $totalPresent    = 0;
             $totalLate       = 0;
@@ -241,6 +268,7 @@ class SendMonthlyRHReport extends Command
             $totalHalfDay    = 0;
             $totalMission    = 0;
             $totalLeave      = 0;
+            $totalPermission = 0;
 
             foreach ($employeeAttendances as $att) {
                 $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
@@ -248,6 +276,12 @@ class SendMonthlyRHReport extends Command
                 // gonfler la présence au-delà de $workingDays, sinon l'absence
                 // (jours ouvrés - présence) devient négative.
                 if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) {
+                    continue;
+                }
+
+                // Jour déjà couvert par mission/congé/autorisation : le pointage
+                // éventuel du même jour ne doit pas être compté une 2e fois.
+                if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) {
                     continue;
                 }
 
@@ -273,8 +307,14 @@ class SendMonthlyRHReport extends Command
                 }
             }
 
-            $totalPresent    += $totalMission + $totalLeave;
-            $totalAbsent      = $workingDays - $totalPresent;
+            foreach ($permissionDates as $dateStr => $p) {
+                if (Carbon::parse($dateStr)->dayOfWeekIso <= 5 && !isset($holidayDates[$dateStr])) {
+                    $totalPermission++;
+                }
+            }
+
+            $totalPresent    += $totalMission + $totalLeave + $totalPermission;
+            $totalAbsent      = max(0, $workingDays - $totalPresent);
             $presenceRate     = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
             $ponctualiteRate  = $totalPresent > 0
                 ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
@@ -288,6 +328,7 @@ class SendMonthlyRHReport extends Command
                     'half_day'         => $totalHalfDay,
                     'mission'          => $totalMission,
                     'leave'            => $totalLeave,
+                    'permission'       => $totalPermission,
                     'presence_rate'    => $presenceRate,
                     'ponctualite_rate' => $ponctualiteRate,
                 ],
@@ -307,6 +348,7 @@ class SendMonthlyRHReport extends Command
             $totalHalfDay         = 0;
             $totalMission         = 0;
             $totalLeave           = 0;
+            $totalPermission      = 0;
             $totalOnTime          = 0;
             $totalPresenceRate    = 0;
             $totalPonctualiteRate = 0;
@@ -320,6 +362,7 @@ class SendMonthlyRHReport extends Command
                 $totalHalfDay        += $s['half_day'];
                 $totalMission        += $s['mission'];
                 $totalLeave          += $s['leave'];
+                $totalPermission     += $s['permission'];
                 $totalOnTime         += ($s['present'] - $s['late'] - $s['early_leave']);
                 $totalPresenceRate   += $s['presence_rate'];
                 $totalPonctualiteRate += $s['ponctualite_rate'];
@@ -335,6 +378,7 @@ class SendMonthlyRHReport extends Command
                 'total_half_day'       => $totalHalfDay,
                 'total_mission'        => $totalMission,
                 'total_leave'          => $totalLeave,
+                'total_permission'     => $totalPermission,
                 'total_on_time'        => $totalOnTime,
                 'avg_presence_rate'    => round($totalPresenceRate / $totalEmployees, 1),
                 'avg_ponctualite_rate' => round($totalPonctualiteRate / $totalEmployees, 1),
@@ -351,6 +395,7 @@ class SendMonthlyRHReport extends Command
             'total_half_day'       => 0,
             'total_mission'        => 0,
             'total_leave'          => 0,
+            'total_permission'     => 0,
             'total_on_time'        => 0,
             'avg_presence_rate'    => 0,
             'avg_ponctualite_rate' => 0,
@@ -365,6 +410,7 @@ class SendMonthlyRHReport extends Command
             $totals['total_half_day']    += $data['total_half_day'];
             $totals['total_mission']     += $data['total_mission'];
             $totals['total_leave']       += $data['total_leave'];
+            $totals['total_permission']  += $data['total_permission'];
             $totals['total_on_time']     += $data['total_on_time'];
         }
 
@@ -450,7 +496,7 @@ class SendMonthlyRHReport extends Command
     {
         $xlsx = new \App\Support\SimpleXlsxWriter('Rapport Mensuel RH');
         $xlsx->setLandscape();
-        $xlsx->setColumnWidths([24, 10, 9, 9, 8, 12, 10, 9, 9, 9, 12, 12]);
+        $xlsx->setColumnWidths([24, 10, 9, 9, 8, 12, 10, 9, 12, 9, 12, 12]);
 
         $xlsx->addRow(['Rapport Mensuel RH - ' . $startDate->locale('fr')->monthName . ' ' . $startDate->year], true);
         $xlsx->addRow(['Période : ' . $startDate->format('d/m/Y') . ' au ' . $endDate->format('d/m/Y') . ' (' . $reportData['period_days'] . ' jours ouvrés)']);
@@ -458,7 +504,7 @@ class SendMonthlyRHReport extends Command
 
         $xlsx->addRow([
             'Département', 'Employés', 'Présents', 'Absents', 'Retards', 'Départs anticipés',
-            'Missions', 'Congés', 'À l\'heure', 'Taux présence %', 'Taux ponctualité %',
+            'Missions', 'Congés', 'Autorisations', 'À l\'heure', 'Taux présence %', 'Taux ponctualité %',
         ], true);
 
         foreach ($reportData['report_data'] as $dept) {
@@ -471,6 +517,7 @@ class SendMonthlyRHReport extends Command
                 $dept['total_early_leave'],
                 $dept['total_mission'],
                 $dept['total_leave'],
+                $dept['total_permission'],
                 $dept['total_on_time'],
                 $dept['avg_presence_rate'],
                 $dept['avg_ponctualite_rate'],
@@ -487,6 +534,7 @@ class SendMonthlyRHReport extends Command
             $totals['total_early_leave'],
             $totals['total_mission'],
             $totals['total_leave'],
+            $totals['total_permission'],
             $totals['total_on_time'],
             $totals['avg_presence_rate'],
             $totals['avg_ponctualite_rate'],

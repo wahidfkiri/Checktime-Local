@@ -313,7 +313,7 @@
         </p>
         <p><strong>Notes :</strong>
             1. Statistiques sur jours ouvrés uniquement (lundi–vendredi).<br>
-            2. Missions et congés approuvés comptent comme présents.<br>
+            2. Missions, congés et autorisations d'absence approuvés comptent comme présents.<br>
             3. Rapport généré automatiquement le dernier jour du mois.
         </p>
     </div>

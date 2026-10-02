@@ -81,7 +81,7 @@ class WeeklyRHAttendanceReport extends Mailable
     {
         $xlsx = new SimpleXlsxWriter('Présence RH hebdo');
         $xlsx->setLandscape();
-        $xlsx->setColumnWidths([22, 10, 8, 8, 8, 12, 8, 9, 9, 11, 12, 30]);
+        $xlsx->setColumnWidths([22, 10, 8, 8, 8, 12, 8, 9, 9, 12, 11, 12, 30]);
 
         $xlsx->addRow(['Rapport de présence hebdomadaire RH'], true);
         $xlsx->addRow(['Période : ' . $this->startDate . ' au ' . $this->endDate
@@ -90,7 +90,7 @@ class WeeklyRHAttendanceReport extends Mailable
 
         $xlsx->addRow([
             'Employé', 'Code', 'Présents', 'Absents', 'Retards', 'Départs anticipés',
-            'Demi-j.', 'Missions', 'Congés', 'Taux présence %', 'Taux ponctualité %', 'Observations',
+            'Demi-j.', 'Missions', 'Congés', 'Autorisations', 'Taux présence %', 'Taux ponctualité %', 'Observations',
         ], true);
 
         foreach ($this->reportData['departments'] ?? [] as $dept) {
@@ -108,6 +108,7 @@ class WeeklyRHAttendanceReport extends Mailable
                     $s['half_day'] ?? 0,
                     $s['mission'] ?? 0,
                     $s['leave'] ?? 0,
+                    $s['permission'] ?? 0,
                     $s['presence_rate'] ?? 0,
                     $s['ponctualite_rate'] ?? 0,
                     $emp['observations'] ?? '',
@@ -126,6 +127,7 @@ class WeeklyRHAttendanceReport extends Mailable
             '',
             $totals['total_mission'] ?? 0,
             $totals['total_leave'] ?? 0,
+            '',
             $totals['avg_presence_rate'] ?? 0,
             $totals['avg_ponctualite_rate'] ?? 0,
             '',

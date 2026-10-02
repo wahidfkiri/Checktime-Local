@@ -480,6 +480,9 @@
                                 {{ $check['leave_info']['type_name'] ?? 'Congé' }}
                             </td>
 
+                        @elseif($status === 'PERMISSION')
+                            <td colspan="2" class="conge-cell">Autorisation</td>
+
                         @elseif($check && $status !== 'ABSENT')
                             <td class="check-time">
                                 @if(!empty($check['check_in']))
@@ -552,12 +555,13 @@
             • <span style="color: #ff0000;">Taux &lt; 80%</span> : À améliorer |
             • <span style="color: #ff0000;">-</span> : Absent |
             • <span style="color: #1a5276; background-color:#dce8f7; padding:1px 3px;">Mission</span> : Jour de mission |
-            • <span style="color: #1e8449; background-color:#d5f5e3; padding:1px 3px;">Congé</span> : Jour de congé approuvé
+            • <span style="color: #1e8449; background-color:#d5f5e3; padding:1px 3px;">Congé</span> : Jour de congé approuvé |
+            • <span style="color: #1e8449; background-color:#d5f5e3; padding:1px 3px;">Autorisation</span> : Autorisation d'absence approuvée
         </p>
         <p><strong>Notes :</strong> 
             1. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
             2. Les heures affichées sont les heures d'arrivée et de départ enregistrées.<br>
-            3. Mission et Congé comptent comme présents dans le calcul du taux de présence.
+            3. Mission, Congé et Autorisation d'absence comptent comme présents dans le calcul du taux de présence.
         </p>
     </div>
 
