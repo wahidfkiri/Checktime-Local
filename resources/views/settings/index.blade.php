@@ -60,6 +60,32 @@
                 </div>
 
                 <div class="row">
+                    <!-- Nom de l'entreprise / client -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">🏢 Nom de l'entreprise</h4>
+                                <p class="card-subtitle">Affiché après « Client : » dans les rapports (PDF) et les emails</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-8">
+                                        <label for="company_name" class="form-label">Nom du client</label>
+                                        <input type="text" class="form-control" id="company_name" maxlength="255"
+                                               placeholder="Ex : APB" value="{{ \App\Models\Setting::company()->name }}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" id="save-company-name" class="btn btn-primary btn-sm w-100">
+                                            <i class="bi bi-save me-1"></i> Enregistrer le nom
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
                     <!-- Section Emails RH -->
                     <div class="col-md-6">
                         <div class="card">
@@ -934,6 +960,43 @@ $(document).ready(function() {
     });
 
     // Enregistrer uniquement l'email RH (bouton dédié de la carte)
+    $('#save-company-name').on('click', function() {
+        if (isSaving) return;
+
+        var $btn = $(this);
+        hideAlerts();
+        $btn.prop('disabled', true);
+        showLoading('Enregistrement du nom...');
+
+        $.ajax({
+            url: "{{ route('settings.company-name.update') }}",
+            type: 'POST',
+            data: { _token: "{{ csrf_token() }}", company_name: $('#company_name').val() },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessAlert('Succès', response.message);
+                } else {
+                    showErrorAlert('Erreur', response.message);
+                }
+            },
+            error: function(xhr) {
+                var errorMsg = "Erreur lors de l'enregistrement du nom";
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.errors) {
+                        errorMsg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                    } else if (xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                }
+                showErrorAlert('Erreur', errorMsg);
+            },
+            complete: function() {
+                hideLoading();
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
     $('#save-rh-email').on('click', function() {
         if (isSaving) return;
 

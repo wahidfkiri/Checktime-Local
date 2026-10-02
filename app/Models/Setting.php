@@ -130,12 +130,12 @@ class Setting extends Model
         $settings = self::where('group', 'company')->pluck('value', 'key')->toArray();
 
         $user = new \stdClass();
-        $user->name = $settings['app_name'] ?? 'CheckTime';
+        $user->name = $settings['app_name'] ?? 'APB';
         $user->email = $settings['mail_from_address'] ?? '';
 
         $company = new \stdClass();
         $company->id = 1;
-        $company->name = $settings['app_name'] ?? 'CheckTime';
+        $company->name = $settings['app_name'] ?? 'APB';
         $company->raison_sociale = $settings['app_name'] ?? '';
         $company->company_name = $settings['app_name'] ?? '';
         $company->logo = $settings['app_logo'] ?? '';

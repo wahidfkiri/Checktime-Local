@@ -83,6 +83,38 @@ class SettingsController extends Controller
      * la carte « Configuration Emails RH »), sans toucher aux autres
      * paramètres de la page (tolérance, emails employés, SMS...).
      */
+    /**
+     * Nom de l'entreprise / du client : valeur « Client : … » des rapports et
+     * emails (Setting::company()->name, clé app_name du groupe company, écrite
+     * à l'origine par l'installeur).
+     */
+    public function updateCompanyName(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'company_name' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        Setting::updateOrCreate(
+            ['key' => 'app_name'],
+            ['value' => trim($request->input('company_name')), 'group' => 'company']
+        );
+
+        Log::info("Nom de l'entreprise mis à jour depuis les paramètres.");
+
+        return response()->json([
+            'success' => true,
+            'message' => "Nom de l'entreprise enregistré. Il apparaîtra dans les prochains rapports et emails.",
+        ]);
+    }
+
     public function updateRhEmail(Request $request)
     {
         try {
