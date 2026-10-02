@@ -46,6 +46,9 @@
                                             <td>
                                                 @if($template['customized'])
                                                     <span class="badge bg-success">Personnalisé</span>
+                                                    @if($template['outdated'])
+                                                        <span class="badge bg-warning text-dark" title="Ce template a été enregistré avant les valeurs dynamiques (nom, dates…). Ouvrez-le et cliquez sur « Réinitialiser » puis refaites vos modifications.">À réinitialiser</span>
+                                                    @endif
                                                     @if($template['updated_at'])
                                                         <span class="text-muted small">le {{ \Carbon\Carbon::parse($template['updated_at'])->format('d/m/Y H:i') }}</span>
                                                     @endif

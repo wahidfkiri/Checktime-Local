@@ -58,6 +58,8 @@ class EmailTemplateController extends Controller
                 'command'    => $command,
                 'label'      => $meta['label'],
                 'customized' => $customized->has($command),
+                'outdated'   => $customized->has($command)
+                    && !EmailTemplateRenderer::hasInlineDynamicValues(EmailTemplate::where('command', $command)->value('html')),
                 'updated_at' => $customized->get($command),
             ];
         }
@@ -252,7 +254,7 @@ class EmailTemplateController extends Controller
         switch ($command) {
             case 'attendance:send-weekly-reports':
                 return [
-                    'employeeName' => 'Jean Dupont',
+                    'employeeName' => EmailTemplateRenderer::SAMPLE_EMPLOYEE_NAME,
                     'clientName'   => $client->name,
                     'startDate'    => now()->startOfWeek()->format('d/m/Y'),
                     'endDate'      => now()->startOfWeek()->addDays(4)->format('d/m/Y'),

@@ -327,7 +327,7 @@ class SendWeeklyRHReports extends Command
         try {
             $mail = new WeeklyRHAttendanceReport(
                 $reportData,
-                null,
+                Setting::company(),
                 $startOfWeek->format('d/m/Y'),
                 $endOfWeek->format('d/m/Y')
             );

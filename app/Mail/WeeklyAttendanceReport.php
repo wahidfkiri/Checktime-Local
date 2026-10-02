@@ -59,7 +59,8 @@ class WeeklyAttendanceReport extends Mailable
                 'endDate'      => $endDate,
                 'stats'        => $this->emailData['employee_data']['stats'],
                 'observations' => $this->emailData['employee_data']['observations'],
-            ]
+            ],
+            [EmailTemplateRenderer::SAMPLE_EMPLOYEE_NAME => $employeeName]
         );
 
         return $this

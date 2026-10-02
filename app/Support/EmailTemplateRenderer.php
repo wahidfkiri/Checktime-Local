@@ -29,11 +29,20 @@ use App\Models\EmailTemplate;
  */
 class EmailTemplateRenderer
 {
+    /** Nom d'employé utilisé dans l'aperçu de l'éditeur (voir EmailTemplateController::sampleData). */
+    public const SAMPLE_EMPLOYEE_NAME = 'Jean Dupont';
+
     /**
      * Rend l'email pour $command : le template personnalisé s'il existe,
      * sinon la vue Blade par défaut.
+     *
+     * $legacyLiterals : [texte d'aperçu => valeur réelle] pour les templates
+     * enregistrés AVANT l'introduction des valeurs dynamiques en ligne
+     * (data-vvveb-dynamic) : le nom d'aperçu y est resté figé dans le texte
+     * (« Bonjour Jean Dupont ») et serait envoyé à tous les destinataires. On
+     * le remplace tant que le template n'a pas été réinitialisé.
      */
-    public static function render(string $command, string $defaultView, array $viewData): string
+    public static function render(string $command, string $defaultView, array $viewData, array $legacyLiterals = []): string
     {
         $template = EmailTemplate::where('command', $command)->first();
 
@@ -43,7 +52,24 @@ class EmailTemplateRenderer
 
         $liveZones = self::extractDisabledZones(view($defaultView, $viewData)->render());
 
-        return self::injectZones($template->html, $liveZones);
+        $html = self::injectZones($template->html, $liveZones);
+
+        if (!self::hasInlineDynamicValues($template->html)) {
+            foreach ($legacyLiterals as $sample => $live) {
+                $html = str_replace($sample, e($live), $html);
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Un template enregistré avant l'ajout des valeurs dynamiques en ligne
+     * n'en contient aucune : à réinitialiser dans l'éditeur.
+     */
+    public static function hasInlineDynamicValues(?string $html): bool
+    {
+        return $html !== null && str_contains($html, 'data-vvveb-dynamic');
     }
 
     /**
