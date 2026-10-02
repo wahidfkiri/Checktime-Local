@@ -3015,7 +3015,7 @@ Vvveb.Gui = {
 		}
 		
 		document.documentElement.setAttribute("data-bs-theme", theme);
-		localStorage.setItem('theme', theme);
+		// Pas de localStorage ici : la clé 'theme' est partagée avec le thème de toute l'application.
 		//document.cookie = 'theme=' + theme;
 	},
 	

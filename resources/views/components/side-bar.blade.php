@@ -272,7 +272,7 @@
         </li>
         @endcan
 
-        @canany(['menu.settings', 'menu.report-templates', 'menu.backup-data'])
+        @canany(['menu.settings', 'menu.report-templates', 'menu.email-templates', 'menu.backup-data'])
         <li class="sidebar-item has-sub @if(request()->routeIs('settings.*') || request()->routeIs('backup-data.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-gear"></i>
@@ -292,6 +292,14 @@
               <a href="{{route('settings.report-templates.index')}}" class="submenu-link">
                 <i class="bi bi-file-earmark-pdf"></i>
                 <span>Modèles d'export</span>
+              </a>
+            </li>
+            @endcanany
+            @canany(['menu.settings', 'menu.email-templates'])
+            <li class="submenu-item @if(request()->routeIs('settings.email-templates.*')) active @endif">
+              <a href="{{route('settings.email-templates.index')}}" class="submenu-link">
+                <i class="bi bi-envelope-paper"></i>
+                <span>Contenu des emails</span>
               </a>
             </li>
             @endcanany

@@ -1,13 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="light">
 
 <head>
   <script>
-	// Éditeur toujours en mode sombre : on écrase aussi un ancien choix
-	// "light" mémorisé par le bouton de thème (builder.js l'écrit dans
-	// localStorage mais ne le relit pas, d'où ce forçage explicite).
-	document.documentElement.setAttribute('data-bs-theme', 'dark');
-	try { localStorage.setItem('theme', 'dark'); } catch (e) {}
+	// Éditeur Vvveb toujours en mode clair. On ne lit ni n'écrit surtout
+	// jamais localStorage 'theme' : cette clé est partagée avec le thème
+	// clair/sombre de toute l'application (assets/static/js/components/dark.js).
+	document.documentElement.setAttribute('data-bs-theme', 'light');
   </script>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -196,7 +195,7 @@
 
               <button class="btn btn-light btn-dark-mode" data-vvveb-action="darkMode">
                 <!-- i class="la la-adjust la-lg"></i -->
-                <i class="la la-moon"></i>
+                <i class="la la-sun"></i>
               </button>
 
               <a href="#" class="btn btn-light px-1 btn-preview-url" target="_blank" title="View page">

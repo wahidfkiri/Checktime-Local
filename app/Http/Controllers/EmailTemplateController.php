@@ -46,6 +46,25 @@ class EmailTemplateController extends Controller
         ],
     ];
 
+    public function index()
+    {
+        $customized = EmailTemplate::whereNotNull('html')
+            ->where('html', '!=', '')
+            ->pluck('updated_at', 'command');
+
+        $templates = [];
+        foreach (self::TEMPLATES as $command => $meta) {
+            $templates[] = [
+                'command'    => $command,
+                'label'      => $meta['label'],
+                'customized' => $customized->has($command),
+                'updated_at' => $customized->get($command),
+            ];
+        }
+
+        return view('settings.email-templates-index', compact('templates'));
+    }
+
     public static function isEditable(string $command): bool
     {
         return array_key_exists($command, self::TEMPLATES);
@@ -110,7 +129,7 @@ class EmailTemplateController extends Controller
             'mediaBaseUrl'  => asset($this->mediaDirRelativePath($command)) . '/',
             'hasCustom'     => (bool) ($template && trim((string) $template->html) !== ''),
             'resetUrl'      => route('settings.email-templates.reset', $command),
-            'backUrl'       => route('settings.index'),
+            'backUrl'       => route('settings.email-templates.index'),
         ]);
     }
 

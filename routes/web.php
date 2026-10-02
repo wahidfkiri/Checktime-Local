@@ -259,11 +259,18 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
         Route::post('/signataires/responsables', [SignataireController::class, 'storeSignataire'])->name('settings.signataires.responsables.store');
         Route::delete('/signataires/responsables/{id}', [SignataireController::class, 'destroySignataire'])->name('settings.signataires.responsables.destroy');
 
-        // Éditeur visuel (Vvveb) du contenu des emails envoyés par les tâches
-        // planifiées. {command} est le nom de la commande Artisan (ex.
-        // "attendance:send-weekly-reports"), autorisé par défaut par la regex
-        // de paramètre de route (seul "/" est exclu).
-        Route::prefix('email-templates/{command}')->name('settings.email-templates.')->group(function () {
+    });
+
+    // Éditeur visuel (Vvveb) du contenu des emails envoyés par les tâches
+    // planifiées — groupe à part (comme les modèles d'export) pour qu'un
+    // utilisateur ayant uniquement menu.email-templates y accède sans avoir
+    // l'accès complet à Paramètres. {command} est le nom de la commande
+    // Artisan (ex. "attendance:send-weekly-reports"), autorisé par défaut par
+    // la regex de paramètre de route (seul "/" est exclu).
+    Route::middleware('role_or_permission:admin|menu.settings|menu.email-templates')->prefix('settings/email-templates')->name('settings.email-templates.')->group(function () {
+        Route::get('/', [EmailTemplateController::class, 'index'])->name('index');
+
+        Route::prefix('{command}')->group(function () {
             Route::get('/edit', [EmailTemplateController::class, 'edit'])->name('edit');
             Route::post('/save', [EmailTemplateController::class, 'save'])->name('save');
             Route::post('/reset', [EmailTemplateController::class, 'reset'])->name('reset');
