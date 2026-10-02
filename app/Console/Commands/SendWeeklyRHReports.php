@@ -372,7 +372,7 @@ class SendWeeklyRHReports extends Command
         $this->info("═══════════════════════════════════════════");
         $this->info("📋  RÉSUMÉ DE L'EXÉCUTION HEBDOMADAIRE RH");
         $this->info("═══════════════════════════════════════════");
-        $this->info("Date d'exécution : " . $referenceDate->format('d/m/Y H:i'));
+        $this->info("Date d'exécution : " . Carbon::now()->format('d/m/Y H:i'));
         $this->info("Période analysée : {$startOfWeek->format('d/m/Y')} au {$endOfWeek->format('d/m/Y')}");
         $this->info("Jours ouvrés     : {$workingDays}");
         $this->info("Employés traités : {$globalTotals['total_employees']}");
