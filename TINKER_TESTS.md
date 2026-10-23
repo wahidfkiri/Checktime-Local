@@ -34,6 +34,13 @@ Artisan::call('attendance:send-weekly-reports', ['--employee' => 12]); echo Arti
 Artisan::call('attendance:send-weekly-reports'); echo Artisan::output();
 ```
 
+Voir exactement ce que le rapport calcule, sans rien envoyer (jour par jour : statut du rapport
+et ligne réelle en base, puis totaux) :
+
+```php
+Artisan::call('attendance:send-weekly-reports', ['--employee' => 12, '--dry-run' => true, '--start-date' => '2026-09-28', '--end-date' => '2026-10-09']); echo Artisan::output();
+```
+
 Trouver l'id d'un employé :
 
 ```php

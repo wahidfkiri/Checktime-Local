@@ -64,6 +64,18 @@ class AttendanceSupport
      *
      * @return array{is_late: bool, late_minutes: int}
      */
+    /**
+     * Une ligne daily_attendance compte-t-elle comme une présence ?
+     *
+     * La synchro écrit 'ABSENT' pour un jour sans pointage, mais la table a aussi
+     * des statuts hérités ('absence', 'conge', 'permission', 'LEAVE') : comparer
+     * seulement à 'ABSENT' comptait ces jours comme présents.
+     */
+    public static function isPresentStatus($status): bool
+    {
+        return !in_array(strtoupper(trim((string) $status)), ['ABSENT', 'ABSENCE', 'LEAVE', 'CONGE', 'PERMISSION', 'MISSION'], true);
+    }
+
     public static function lateFromPlanning($employee, $attendance, string $dateKey): array
     {
         $result = [

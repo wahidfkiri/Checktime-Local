@@ -10,6 +10,7 @@ use App\Models\Leave;
 use App\Models\EmployeePermission;
 use App\Models\Setting;
 use App\Mail\WeeklyAttendanceReport;
+use App\Reports\AttendanceSupport;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,7 @@ class SendWeeklyAttendanceReports extends Command
                             {--start-date= : Début de période personnalisée (format Y-m-d)}
                             {--end-date= : Fin de période personnalisée (format Y-m-d)}
                             {--employee= : Id de l employé : envoie uniquement son rapport}
+                            {--dry-run : N envoie rien : affiche pour chaque employé le détail jour par jour et les totaux calculés}
                             {--to= : Adresse(s) de test séparées par des virgules, à la place de l email de l employé (ignore le drapeau d activation emails employés)}';
 
     protected $description = 'Envoyer les rapports de présence hebdomadaires aux employés chaque vendredi à 9h';
@@ -40,7 +42,7 @@ class SendWeeklyAttendanceReports extends Command
     public function handle()
     {
         // Vérifier la configuration SMTP
-        if (!$this->isSmtpConfigured()) {
+        if (!$this->option('dry-run') && !$this->isSmtpConfigured()) {
             $this->warn('⚠️  SMTP non configuré. Les rapports par email ne peuvent pas être envoyés.');
             $this->info('💡  Configurez SMTP dans l\'installateur (/install) ou dans le fichier .env');
             Log::warning('Rapports hebdomadaires annulés: SMTP non configuré');
@@ -101,7 +103,7 @@ class SendWeeklyAttendanceReports extends Command
             return;
         }
 
-        if (!$this->option('to') && !$settings->email_employees_is_active) {
+        if (!$this->option('to') && !$this->option('dry-run') && !$settings->email_employees_is_active) {
             $this->warn("❌  Emails désactivés pour les employés");
             Log::info("Emails employés désactivés");
             return;
@@ -158,7 +160,7 @@ class SendWeeklyAttendanceReports extends Command
         $employeesQuery = Employee::active()->whereNotNull('emp_code')->where('emp_code', '!=', '');
 
         // Sans adresse de test, seuls les employés ayant un email reçoivent le rapport.
-        if (empty($overrideTo)) {
+        if (empty($overrideTo) && !$this->option('dry-run')) {
             $employeesQuery->whereNotNull('email')->where('email', '!=', '');
         }
 
@@ -180,7 +182,7 @@ class SendWeeklyAttendanceReports extends Command
 
         foreach ($employees as $employee) {
 
-            if (empty($overrideTo) && !filter_var($employee->email, FILTER_VALIDATE_EMAIL)) {
+            if (empty($overrideTo) && !$this->option('dry-run') && !filter_var($employee->email, FILTER_VALIDATE_EMAIL)) {
                 Log::warning("Email invalide ignoré: {$employee->email} (Code: {$employee->emp_code})");
                 continue;
             }
@@ -318,7 +320,7 @@ class SendWeeklyAttendanceReports extends Command
                             'permission_info' => $permissionDates[$dateStr],
                         ];
 
-                    } elseif ($attendance && strtoupper($attendance->status) !== 'ABSENT') {
+                    } elseif ($attendance && AttendanceSupport::isPresentStatus($attendance->status)) {
                         $checkIn = null;
                         if ($attendance->check_in) {
                             $checkIn = $attendance->check_in instanceof Carbon
@@ -375,7 +377,7 @@ class SendWeeklyAttendanceReports extends Command
                     }
 
                     $status = strtoupper($att->status);
-                    if ($status !== 'ABSENT') {
+                    if (AttendanceSupport::isPresentStatus($status)) {
                         $totalPresent++;
                         if ($status === 'LATE')        $totalLate++;
                         if ($status === 'EARLY_LEAVE') $totalEarlyLeave++;
@@ -433,7 +435,7 @@ class SendWeeklyAttendanceReports extends Command
                     if ($status === 'HALF_DAY')         $observations[] = [$attDateStr, 'Demi-journée le ' . $date, 1];
                     elseif ($status === 'LATE')         $observations[] = [$attDateStr, 'Retard ' . ($att->late_minutes ?? 0) . ' min le ' . $date, 1];
                     elseif ($status === 'EARLY_LEAVE')  $observations[] = [$attDateStr, 'Départ anticipé le ' . $date, 1];
-                    elseif ($status === 'ABSENT')       $observations[] = [$attDateStr, 'Absent le ' . $date, 1];
+                    elseif (!AttendanceSupport::isPresentStatus($status)) $observations[] = [$attDateStr, 'Absent le ' . $date, 1];
                 }
                 foreach ($missionDates as $dateStr => $m) {
                     $observations[] = [$dateStr, 'Mission: ' . $m['title'] . ' (' . $m['destination'] . ') le ' . Carbon::parse($dateStr)->format('d/m'), 0];
@@ -492,6 +494,23 @@ class SendWeeklyAttendanceReports extends Command
                     'client'        => $client,
                     'client_name'   => $client->name,
                 ];
+
+                if ($this->option('dry-run')) {
+                    $this->line('');
+                    $this->info("── {$employeeData['employee_name']} (id {$employee->id}, code {$employee->emp_code}) — {$workingDays} jours ouvrés du {$startOfWeek->format('d/m')} au {$endOfWeek->format('d/m')}");
+                    foreach ($daysList as $day) {
+                        $raw = null;
+                        foreach ($employeeAttendances as $a) {
+                            if (Carbon::parse($a->attendance_date)->format('Y-m-d') === $day['date_str']) { $raw = $a; break; }
+                        }
+                        $this->line(sprintf('   %s %s  rapport=%-10s  ligne en base: %s',
+                            $day['date']->format('d/m'), $day['day_name'],
+                            $dailyChecks[$day['date_str']]['status'] ?? 'ABSENT',
+                            $raw ? "status={$raw->status} check_in=" . ($raw->check_in ?? '-') : '(aucune)'));
+                    }
+                    $this->line("   => présents={$totalPresent} (pointages + missions) absents={$totalAbsent} congés={$totalLeave} autorisations={$totalPermission} missions={$totalMission} taux={$presenceRate}%");
+                    continue;
+                }
 
                 Mail::to($overrideTo ?: $employee->email)->send(new WeeklyAttendanceReport($emailData));
 
