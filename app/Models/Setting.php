@@ -130,14 +130,16 @@ class Setting extends Model
         $settings = self::where('group', 'company')->pluck('value', 'key')->toArray();
 
         $user = new \stdClass();
-        $user->name = $settings['app_name'] ?? 'APB';
+        $user->name = config('app.name');
         $user->email = $settings['mail_from_address'] ?? '';
 
         $company = new \stdClass();
         $company->id = 1;
-        $company->name = $settings['app_name'] ?? 'APB';
-        $company->raison_sociale = $settings['app_name'] ?? '';
-        $company->company_name = $settings['app_name'] ?? '';
+        // Nom du client : APP_NAME du .env (et non plus la ligne app_name de la table
+        // settings, remplie par l'installeur avec « CheckTime »).
+        $company->name = config('app.name');
+        $company->raison_sociale = config('app.name');
+        $company->company_name = config('app.name');
         $company->logo = $settings['app_logo'] ?? '';
         $company->address = $settings['app_address'] ?? '';
         $company->adresse = $settings['app_address'] ?? '';

@@ -417,7 +417,7 @@ class SendMonthlyRHReport extends Command
     {
         try {
             $settings = Setting::first();
-            $appName  = $settings->app_name ?? 'APB';
+            $appName  = config('app.name');
 
             $client = \App\Models\Setting::company();
             $pdfData = [
@@ -556,7 +556,7 @@ class SendMonthlyRHReport extends Command
     private function sendReportEmail($rhEmail, $reportData, $startDate, $endDate, $pdfPath, array $recipients = [])
     {
         $settings = Setting::first();
-        $appName  = $settings->app_name ?? 'APB';
+        $appName  = config('app.name');
 
         $clientData = \App\Models\Setting::company();
         $emailData = [

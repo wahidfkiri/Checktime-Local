@@ -764,10 +764,8 @@ private function getAllTransactionsWithRetry($devices, $startTime, $endTime, $to
         try {
             // Récupérer les données d'aujourd'hui
             $todayData = $this->getTodayData();
-            $appName = \App\Models\Setting::where('key', 'app_name')->first();
-            
             return response()->json([
-                'client_name' => $appName ? $appName->value : 'CheckTime',
+                'client_name' => config('app.name'),
                 'last_sync' => 'Direct API',
                 'current_date' => date('d/m/Y'),
                 'today_count' => $todayData['success'] ? count($todayData['data']) : 0,
@@ -922,12 +920,10 @@ private function getAllTransactionsWithRetry($devices, $startTime, $endTime, $to
             // Préparer les filtres pour l'affichage
             $filters = $this->prepareFiltersForDisplay($request);
             
-            $appName = \App\Models\Setting::where('key', 'app_name')->first();
-            
             // Générer le PDF
             $pdf = PDF::loadView('daily-attendance.exports.pdf', [
                 'attendances' => $data,
-                'client' => ['name' => $appName ? $appName->value : 'CheckTime'],
+                'client' => ['name' => config('app.name')],
                 'filters' => $filters,
                 'statistics' => $statistics,
                 'export_date' => now()->format('d/m/Y H:i'),
