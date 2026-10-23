@@ -63,7 +63,7 @@ class NotificationSettingsController extends Controller
                 'mail_encryption'   => $request->input('mail_encryption', ''),
                 'mail_username'     => $request->input('mail_username', ''),
                 'mail_from_address' => $request->input('mail_from_address'),
-                'mail_from_name'    => $request->input('mail_from_name', config('app.name', 'CheckTime')),
+                'mail_from_name'    => $request->input('mail_from_name', config('app.name', 'ABP')),
             ];
 
             // Le mot de passe n'est mis à jour que s'il est fourni (évite de l'effacer).
@@ -123,7 +123,7 @@ class NotificationSettingsController extends Controller
 
         try {
             $fromAddress = $request->input('mail_from_address');
-            $fromName    = $request->input('mail_from_name', config('app.name', 'CheckTime'));
+            $fromName    = $request->input('mail_from_name', config('app.name', 'ABP'));
             $testEmail   = $request->input('test_email');
 
             // Si le mot de passe n'est pas fourni, réutiliser celui déjà enregistré.
@@ -149,12 +149,12 @@ class NotificationSettingsController extends Controller
             Mail::mailer('smtp');
 
             Mail::raw(
-                "Ceci est un email de test envoyé depuis les paramètres de notification de CheckTime.\n"
+                "Ceci est un email de test envoyé depuis les paramètres de notification de ABP.\n"
                 . "Si vous recevez ce message, votre configuration SMTP est correcte.",
                 function ($message) use ($testEmail, $fromAddress, $fromName) {
                     $message->from($fromAddress, $fromName)
                             ->to($testEmail)
-                            ->subject('Test SMTP - CheckTime')
+                            ->subject('Test SMTP - ABP')
                             // Vérifie aussi le transfert MIME des pièces jointes
                             // utilisé par les rapports PDF automatiques.
                             ->attachData('', 'test-smtp.txt', ['mime' => 'text/plain']);
@@ -463,7 +463,7 @@ class NotificationSettingsController extends Controller
             'mail.mailers.smtp.password'       => $mail['mail_password'] ?: null,
             'mail.mailers.smtp.encryption'     => $this->resolveEncryptionForTransport($mail['mail_encryption']),
             'mail.from.address'                => $mail['mail_from_address'] ?: null,
-            'mail.from.name'                   => $mail['mail_from_name'] ?: config('app.name', 'CheckTime'),
+            'mail.from.name'                   => $mail['mail_from_name'] ?: config('app.name', 'ABP'),
         ]);
 
         Mail::purge('smtp');
