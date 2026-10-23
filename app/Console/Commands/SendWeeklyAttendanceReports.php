@@ -399,7 +399,10 @@ class SendWeeklyAttendanceReports extends Command
                     }
                 }
 
-                $totalPresent   += $totalMission + $totalLeave + $totalPermission;
+                // Seules les missions comptent comme jours présents : les congés et les
+                // autorisations d'absence ne sont PAS ajoutés (ils restent affichés dans
+                // le détail et les observations, et leurs jours ressortent en absences).
+                $totalPresent   += $totalMission;
                 $totalAbsent     = max(0, $workingDays - $totalPresent);
                 $presenceRate    = $workingDays > 0
                     ? round(($totalPresent / $workingDays) * 100, 1) : 0;

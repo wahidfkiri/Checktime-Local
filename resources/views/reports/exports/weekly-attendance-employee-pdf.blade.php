@@ -310,7 +310,7 @@
     <p><strong>Notes :</strong>
         1. Les statistiques portent uniquement sur les jours ouvrés (lundi-vendredi).<br>
         2. Les heures affichées sont les heures d'arrivée et de départ enregistrées.<br>
-        3. Mission et Congé comptent comme présents dans le calcul du taux de présence.
+        3. Les jours de mission comptent comme présents ; les congés et autorisations d'absence ne comptent pas comme présents.
     </p>
 </div>
 
