@@ -172,3 +172,15 @@ App\Models\Employee::where('status', '!=', 'active')->update(['status' => 'activ
 // Vérifier qu'un employé inactif est bien exclu du rapport 1 (doit afficher « Aucun employé correspondant »)
 Artisan::call('attendance:send-weekly-reports', ['--employee' => 12, '--to' => 'wahidfkiri5@gmail.com']); echo Artisan::output();
 ```
+
+## 11. Champs renvoyés par l'API biométrique (dates de création / embauche)
+
+Lecture seule, avec l'URL et la clé des Paramètres :
+
+```bash
+cd /var/www/Checktime-Local
+# Résumé : quels champs date existent et pour combien d'employés ils sont renseignés
+sudo -u www-data php artisan employees:api-inspect
+# Tous les champs d'un employé précis (par code)
+sudo -u www-data php artisan employees:api-inspect 1011
+```
