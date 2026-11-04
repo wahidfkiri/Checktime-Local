@@ -76,6 +76,77 @@ class AttendanceSupport
         return !in_array(strtoupper(trim((string) $status)), ['ABSENT', 'ABSENCE', 'LEAVE', 'CONGE', 'PERMISSION', 'MISSION'], true);
     }
 
+    /**
+     * Date d'enregistrement de l'employé dans l'application (début de journée),
+     * ou null si inconnue.
+     */
+    public static function registrationDate($employee): ?Carbon
+    {
+        $created = $employee->created_at ?? null;
+
+        return $created ? Carbon::parse($created)->startOfDay() : null;
+    }
+
+    /**
+     * La ligne daily_attendance contient-elle de VRAIES données de pointage ?
+     * (une ligne « ABSENT » créée par la synchro n'en contient pas)
+     */
+    public static function hasPunchData($attendance): bool
+    {
+        return $attendance && (!empty($attendance->check_in) || !empty($attendance->check_out));
+    }
+
+    /**
+     * Ce jour est-il antérieur à l'enregistrement de l'employé SANS aucune
+     * donnée de pointage ? Dans ce cas le rapport doit laisser la case vide
+     * (l'employé n'existait pas encore : ce n'est pas une absence). S'il y a
+     * des pointages ce jour-là, on les affiche normalement.
+     */
+    public static function isBeforeRegistration($employee, string $dateKey, $attendance = null): bool
+    {
+        $registration = self::registrationDate($employee);
+
+        if (!$registration || Carbon::parse($dateKey)->startOfDay()->gte($registration)) {
+            return false;
+        }
+
+        return !self::hasPunchData($attendance);
+    }
+
+    /**
+     * Jours (Y-m-d => true) de [$startDate, $endDate] à laisser vides pour cet
+     * employé : jours ouvrés avant son enregistrement, sans pointage.
+     *
+     * @param  iterable $attendances  lignes daily_attendance de l'employé
+     */
+    public static function blankDays($employee, string $startDate, string $endDate, iterable $attendances = [], array $holidayDates = [], bool $includeWeekends = false): array
+    {
+        $registration = self::registrationDate($employee);
+        if (!$registration) {
+            return [];
+        }
+
+        $byDate = [];
+        foreach ($attendances as $a) {
+            $byDate[Carbon::parse($a->attendance_date)->format('Y-m-d')] = $a;
+        }
+
+        $blank = [];
+        $cur   = Carbon::parse($startDate)->startOfDay();
+        $end   = Carbon::parse($endDate)->startOfDay();
+
+        while ($cur->lte($end) && $cur->lt($registration)) {
+            $key = $cur->format('Y-m-d');
+            if (($includeWeekends || $cur->dayOfWeekIso <= 5) && !isset($holidayDates[$key])
+                && self::isBeforeRegistration($employee, $key, $byDate[$key] ?? null)) {
+                $blank[$key] = true;
+            }
+            $cur->addDay();
+        }
+
+        return $blank;
+    }
+
     public static function lateFromPlanning($employee, $attendance, string $dateKey): array
     {
         $result = [

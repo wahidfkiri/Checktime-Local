@@ -244,6 +244,14 @@ class SendWeeklyAttendanceReports extends Command
                     }
                 }
 
+                // ── Jours antérieurs à l'enregistrement de l'employé, sans pointage :
+                // cases vides (il n'existait pas encore), ni absence ni jour ouvré. ──
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+                foreach (array_keys($blankDays) as $blankDay) {
+                    unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
+                }
+                $employeeWorkingDays = max(0, $workingDays - count($blankDays));
+
                 // ── Boucle journalière (Lun-Ven uniquement, jours fériés chômés exclus) ──
                 $dailyChecks = [];
                 $cur         = Carbon::parse($startDate);
@@ -266,6 +274,12 @@ class SendWeeklyAttendanceReports extends Command
                             $attendance = $att;
                             break;
                         }
+                    }
+
+                    if (isset($blankDays[$dateStr])) {
+                        $dailyChecks[$dateStr] = ['status' => 'BLANK', 'check_in' => null, 'check_out' => null];
+                        $cur->addDay();
+                        continue;
                     }
 
                     $isMission    = isset($missionDates[$dateStr]);
@@ -367,7 +381,7 @@ class SendWeeklyAttendanceReports extends Command
 
                 foreach ($employeeAttendances as $att) {
                     $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
-                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
+                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) continue;
 
                     // Jour déjà couvert par une mission/congé/autorisation :
                     // ne pas compter en plus l'éventuel pointage du même jour
@@ -405,9 +419,9 @@ class SendWeeklyAttendanceReports extends Command
                 // autorisations d'absence ne sont PAS ajoutés (ils restent affichés dans
                 // le détail et les observations, et leurs jours ressortent en absences).
                 $totalPresent   += $totalMission;
-                $totalAbsent     = max(0, $workingDays - $totalPresent);
-                $presenceRate    = $workingDays > 0
-                    ? round(($totalPresent / $workingDays) * 100, 1) : 0;
+                $totalAbsent     = max(0, $employeeWorkingDays - $totalPresent);
+                $presenceRate    = $employeeWorkingDays > 0
+                    ? round(($totalPresent / $employeeWorkingDays) * 100, 1) : 0;
                 $ponctualiteRate = $totalPresent > 0
                     ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
 
@@ -421,7 +435,7 @@ class SendWeeklyAttendanceReports extends Command
                 $observations = [];
                 foreach ($employeeAttendances as $att) {
                     $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
-                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
+                    if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) continue;
 
                     // Jour déjà justifié par une mission/congé/autorisation :
                     // la justification est ajoutée plus bas, ne pas la
@@ -489,7 +503,7 @@ class SendWeeklyAttendanceReports extends Command
                     'end_date'      => $endOfWeek->format('d/m/Y'),
                     'week_range'    => $startOfWeek->format('d/m/Y') . ' au ' . $endOfWeek->format('d/m/Y'),
                     'days_list'     => $daysList,
-                    'working_days'  => $workingDays,
+                    'working_days'  => $employeeWorkingDays,
                     'export_date'   => Carbon::now(),
                     'client'        => $client,
                     'client_name'   => $client->name,
@@ -497,7 +511,7 @@ class SendWeeklyAttendanceReports extends Command
 
                 if ($this->option('dry-run')) {
                     $this->line('');
-                    $this->info("── {$employeeData['employee_name']} (id {$employee->id}, code {$employee->emp_code}) — {$workingDays} jours ouvrés du {$startOfWeek->format('d/m')} au {$endOfWeek->format('d/m')}");
+                    $this->info("── {$employeeData['employee_name']} (id {$employee->id}, code {$employee->emp_code}) — {$employeeWorkingDays} jours ouvrés du {$startOfWeek->format('d/m')} au {$endOfWeek->format('d/m')}");
                     foreach ($daysList as $day) {
                         $raw = null;
                         foreach ($employeeAttendances as $a) {

@@ -25,6 +25,7 @@ use App\Http\Controllers\ScheduleRotationController;
 use App\Http\Controllers\ScheduleAssignmentController;
 use App\Http\Controllers\EmployeeScheduleController;
 use App\Http\Controllers\EmployeePermissionController;
+use App\Http\Controllers\RegularizationController;
 use App\Http\Controllers\CustomReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SignataireController;
@@ -182,6 +183,15 @@ Route::middleware(['auth', 'web', 'installed'])->group(function () {
             Route::post('/{employeePermission}/reject', [EmployeePermissionController::class, 'reject'])->name('reject');
             Route::get('/employee/{employee}', [EmployeePermissionController::class, 'byEmployee'])->name('by-employee');
             Route::get('/export', [EmployeePermissionController::class, 'export'])->name('export');
+        });
+
+        // Régularisation de pointages (« Autre » : coupure d'électricité, oubli de pointage…)
+        Route::middleware('role_or_permission:admin|menu.regularizations')->prefix('regularizations')->name('regularizations.')->group(function () {
+            Route::get('/', [RegularizationController::class, 'index'])->name('index');
+            Route::post('/check', [RegularizationController::class, 'checkConflicts'])->name('check');
+            Route::post('/', [RegularizationController::class, 'store'])->name('store');
+            Route::post('/causes', [RegularizationController::class, 'storeCause'])->name('causes.store');
+            Route::delete('/causes/{id}', [RegularizationController::class, 'destroyCause'])->name('causes.destroy');
         });
 
         // Leaves (existing)

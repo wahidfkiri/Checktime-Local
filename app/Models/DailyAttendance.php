@@ -73,6 +73,25 @@ class DailyAttendance extends Model
         return $this->belongsTo(Employee::class);
     }
 
+    /**
+     * Écarte les lignes « sans pointage » (ABSENT, congé…) datées AVANT
+     * l'enregistrement de l'employé : il n'existait pas encore, ce n'est pas
+     * une absence. Une ligne avec de vrais pointages est toujours conservée.
+     */
+    public function scopeWithoutPreRegistrationBlanks($query)
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->where(function ($q) use ($table) {
+            $q->whereNotNull($table . '.check_in')
+                ->orWhereNotNull($table . '.check_out')
+                ->orWhereNotIn($table . '.employee_id', Employee::query()
+                    ->whereNotNull('employees.created_at')
+                    ->whereRaw('DATE(employees.created_at) > ' . $table . '.attendance_date')
+                    ->select('employees.id'));
+        });
+    }
+
     public function transactions()
     {
         return $this->hasMany(AttendanceTransaction::class);

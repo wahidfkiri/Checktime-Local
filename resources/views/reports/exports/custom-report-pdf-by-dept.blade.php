@@ -560,8 +560,12 @@
                             $status = $check ? strtoupper($check['status']) : null;
                         @endphp
 
+                        {{-- ── AVANT ENREGISTREMENT : cellule vide (ni absence ni présence) ── --}}
+                        @if($status === 'BLANK')
+                            <td colspan="2" class="check-time"></td>
+
                         {{-- ── MISSION : une seule cellule fusionnée (colspan=2) ── --}}
-                        @if($status === 'MISSION')
+                        @elseif($status === 'MISSION')
                             <td colspan="2" class="mission-cell">
                                 Mission
                             </td>
@@ -621,7 +625,7 @@
                             $dayPresent = 0;
                             foreach ($department['employees'] as $emp) {
                                 $c = $emp['daily_checks'][$day['date_str']] ?? null;
-                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE', 'PERMISSION'], true)) {
+                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE', 'PERMISSION', 'BLANK'], true)) {
                                     $dayPresent++;
                                 }
                             }

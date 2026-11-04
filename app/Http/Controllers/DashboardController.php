@@ -31,13 +31,13 @@ class DashboardController extends Controller
         $suspendedEmployees = 0;
         
         // Statistiques de présence du jour
-        $totalPresentToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
+        $totalPresentToday = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $today)
             ->whereNotNull('check_in')
             ->count();
         
         $totalAbsentToday = $activeEmployees - $totalPresentToday;
         
-        $totalRetardToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
+        $totalRetardToday = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $today)
             ->where('late_minutes', '>', 0)
             ->count();
         
@@ -100,7 +100,7 @@ class DashboardController extends Controller
             ->get();
         
         // Dernières présences enregistrées
-        $recentAttendances = DailyAttendance::forActiveEmployees()->with('employee')
+        $recentAttendances = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->with('employee')
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
@@ -372,15 +372,15 @@ class DashboardController extends Controller
         for ($i = 0; $i < 7; $i++) {
             $date = $startOfWeek->copy()->addDays($i);
             
-            $present = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
+            $present = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $date)
                 ->whereNotNull('check_in')
                 ->count();
             
-            $retard = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
+            $retard = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $date)
                 ->where('late_minutes', '>', 0)
                 ->count();
 
-            $absent = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $date)
+            $absent = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $date)
                 ->whereNull('check_in')
                 ->count();
             
@@ -403,7 +403,7 @@ class DashboardController extends Controller
         $this->syncDevicesIfNeeded();
         
         $activeEmployees = Employee::where('status', 'active')->count();
-        $totalPresentToday = DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
+        $totalPresentToday = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $today)
             ->whereNotNull('check_in')
             ->count();
         
@@ -424,7 +424,7 @@ class DashboardController extends Controller
             'activeEmployees' => $activeEmployees,
             'totalPresentToday' => $totalPresentToday,
             'totalAbsentToday' => $activeEmployees - $totalPresentToday,
-            'totalRetardToday' => DailyAttendance::forActiveEmployees()->whereDate('attendance_date', $today)
+            'totalRetardToday' => DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereDate('attendance_date', $today)
                 ->where('late_minutes', '>', 0)
                 ->count(),
             'totalDepartments' => Department::count(),

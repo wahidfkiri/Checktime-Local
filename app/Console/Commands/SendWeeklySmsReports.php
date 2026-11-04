@@ -265,7 +265,15 @@ class SendWeeklySmsReports extends Command
                 }
             }
 
-            $absenceCount = max(0, $totalWorkingDays - $presenceCount);
+            // Jours antérieurs à l'enregistrement de l'employé, sans pointage : pas des absences.
+            $blankDays = \App\Reports\AttendanceSupport::blankDays(
+                $employee,
+                $startOfWeek->format('Y-m-d'),
+                $endOfWeek->format('Y-m-d'),
+                $employeeAttendances
+            );
+
+            $absenceCount = max(0, $totalWorkingDays - count($blankDays) - $presenceCount);
 
             $statsByEmployee[$empCode] = [
                 'employee'       => $employee,

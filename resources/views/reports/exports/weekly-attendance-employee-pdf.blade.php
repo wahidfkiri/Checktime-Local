@@ -251,7 +251,10 @@
                     $status = $check ? strtoupper($check['status']) : null;
                 @endphp
 
-                @if($status === 'MISSION')
+                @if($status === 'BLANK')
+                    <td colspan="2" class="check-time"></td>
+
+                @elseif($status === 'MISSION')
                     <td colspan="2" class="mission-cell">Mission</td>
 
                 @elseif($status === 'CONGE')

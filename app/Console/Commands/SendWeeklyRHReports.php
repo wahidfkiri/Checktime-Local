@@ -11,6 +11,7 @@ use App\Models\EmployeePermission;
 use App\Models\Setting;
 use App\Mail\WeeklyRHAttendanceReport;
 use App\Reports\SuiviPonctualiteReport;
+use App\Reports\AttendanceSupport;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -253,12 +254,20 @@ class SendWeeklyRHReports extends Command
                     }
                 }
 
+                // Jours antérieurs à l'enregistrement de l'employé, sans pointage : cases
+                // vides, ni absence ni jour ouvré pour cet employé.
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+                foreach (array_keys($blankDays) as $blankDay) {
+                    unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
+                }
+                $employeeWorkingDays = max(0, $workingDays - count($blankDays));
+
                 $dailyChecks = $this->buildDailyChecks(
-                    $startDate, $endDate, $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates
+                    $startDate, $endDate, $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates, $blankDays
                 );
 
                 $stats = $this->calculateEmployeeStats(
-                    $workingDays, $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates
+                    $employeeWorkingDays, $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates, $blankDays
                 );
 
                 $deptData['total_present']     += $stats['present'];
@@ -270,7 +279,7 @@ class SendWeeklyRHReports extends Command
                 $deptData['total_leave']       += $stats['leave'];
 
                 $observations = $this->buildObservations(
-                    $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates
+                    $employeeAttendances, $missionDates, $leaveDates, $holidayDates, $permissionDates, $blankDays
                 );
 
                 $deptData['employees'][] = [
@@ -451,7 +460,7 @@ class SendWeeklyRHReports extends Command
         return $daysList;
     }
 
-    private function buildDailyChecks($startDate, $endDate, $employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = []): array
+    private function buildDailyChecks($startDate, $endDate, $employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = [], array $blankDays = []): array
     {
         $dailyChecks = [];
         $cur = Carbon::parse($startDate);
@@ -467,6 +476,12 @@ class SendWeeklyRHReports extends Command
                     ? $att->attendance_date->format('Y-m-d')
                     : date('Y-m-d', strtotime($att->attendance_date));
                 if ($attDate === $dateStr) { $attendance = $att; break; }
+            }
+
+            if (isset($blankDays[$dateStr])) {
+                $dailyChecks[$dateStr] = ['status' => 'BLANK', 'check_in' => null, 'check_out' => null];
+                $cur->addDay();
+                continue;
             }
 
             $isMission    = isset($missionDates[$dateStr]);
@@ -514,14 +529,14 @@ class SendWeeklyRHReports extends Command
         return $dailyChecks;
     }
 
-    private function calculateEmployeeStats($workingDays, $employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = []): array
+    private function calculateEmployeeStats($workingDays, $employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = [], array $blankDays = []): array
     {
         $totalPresent = $totalLate = $totalEarlyLeave = $totalHalfDay = $totalMission = $totalLeave = $totalPermission = $totalOnTime = 0;
 
         foreach ($employeeAttendances as $att) {
             $status = strtoupper($att->status);
             $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
-            if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
+            if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) continue;
             // Jour déjà couvert par mission/congé/autorisation : pas de double comptage.
             if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) continue;
             if ($status !== 'ABSENT') {
@@ -556,7 +571,7 @@ class SendWeeklyRHReports extends Command
         ];
     }
 
-    private function buildObservations($employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = []): array
+    private function buildObservations($employeeAttendances, $missionDates, $leaveDates, array $holidayDates = [], array $permissionDates = [], array $blankDays = []): array
     {
         // [date, texte, priorité] : les justifications (0) passent avant les
         // retards/absences (1) pour ne pas être tronquées par la limite
@@ -564,7 +579,7 @@ class SendWeeklyRHReports extends Command
         $observations = [];
         foreach ($employeeAttendances as $att) {
             $attDateStr = Carbon::parse($att->attendance_date)->format('Y-m-d');
-            if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) continue;
+            if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) continue;
             if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) continue;
             $status = strtoupper($att->status);
             $date = Carbon::parse($att->attendance_date)->format('d/m');

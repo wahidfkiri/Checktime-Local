@@ -206,6 +206,12 @@ class ReportController extends Controller
             foreach ($employees as $empCode => $employee) {
                 $key = $empCode . '_' . $dateStr;
                 $attendance = $attendances->get($key);
+
+                // Jour antérieur à l'enregistrement de l'employé, sans pointage :
+                // pas une absence → pas de ligne. Avec pointage, affiché normalement.
+                if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, $attendance ? $attendance->first() : null)) {
+                    continue;
+                }
                 
                 // Récupérer le planning pour cette date
                 $schedule = $this->getEmployeeScheduleForDateNew($employee, $dateStr);

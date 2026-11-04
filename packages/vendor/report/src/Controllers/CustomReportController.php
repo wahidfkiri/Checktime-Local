@@ -217,6 +217,7 @@ class CustomReportController extends Controller
         ];
         
         $observations = [];
+        $blankCount = 0;
         
         $currentDate = $start->copy();
         while ($currentDate <= $end) {
@@ -231,6 +232,15 @@ class CustomReportController extends Controller
                 $attendance = DailyAttendance::where('employee_id', $employee->id)
                     ->where('attendance_date', $dateStr)
                     ->first();
+
+                // Jour antérieur à l'enregistrement de l'employé, sans pointage :
+                // ni absence ni jour ouvré pour lui. Avec pointage, on le traite
+                // normalement.
+                if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, $attendance)) {
+                    $blankCount++;
+                    $currentDate->addDay();
+                    continue;
+                }
                 
                 // Vérifier les permissions
                 $hasPermission = $this->hasPermission($employee->id, $dateStr, $permissions);
@@ -280,6 +290,9 @@ class CustomReportController extends Controller
             $currentDate->addDay();
         }
         
+        // Jours ouvrés propres à l'employé (hors jours avant son enregistrement)
+        $totalWorkingDays = max(0, $totalWorkingDays - $blankCount);
+
         // Calculer les taux
         $presenceRate = $totalWorkingDays > 0 ? round(($presenceData['present'] / $totalWorkingDays) * 100, 1) : 0;
         $ponctualiteRate = $presenceData['present'] > 0 ? round(($ponctualiteData['on_time'] / $presenceData['present']) * 100, 1) : 0;

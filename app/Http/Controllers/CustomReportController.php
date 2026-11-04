@@ -277,6 +277,15 @@ class CustomReportController extends Controller
                 }
             }
 
+            // Jours antérieurs à l'enregistrement de l'employé, sans pointage : ni
+            // absence ni jour ouvré pour lui (colonne vide). S'il existe un
+            // pointage réel ces jours-là, ils ne sont pas concernés.
+            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends);
+            foreach (array_keys($blankDays) as $blankDay) {
+                unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
+            }
+            $employeeWorkingDays = max(0, $workingDays - count($blankDays));
+
             // --- Compteurs ---
             $totalPresent    = 0;
             $totalAbsent     = 0;
@@ -296,7 +305,8 @@ class CustomReportController extends Controller
                 // Un jour férié chômé reste exclu dans tous les cas (il n'est
                 // jamais compté dans $workingDays, voir countWorkingDays()).
                 if ((!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5)
-                    || isset($holidayDates[$dateKey])) {
+                    || isset($holidayDates[$dateKey])
+                    || isset($blankDays[$dateKey])) {
                     continue;
                 }
 
@@ -334,10 +344,10 @@ class CustomReportController extends Controller
             // Un congé ou une permission sans pointage reste une absence au
             // poste. La justification est néanmoins conservée en observation.
 
-            $totalAbsent = $workingDays - $totalPresent;
+            $totalAbsent = $employeeWorkingDays - $totalPresent;
             $totalOnTime = $totalPresent - $totalLate - $totalEarlyLeave;
 
-            $presenceRate    = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
+            $presenceRate    = $employeeWorkingDays > 0 ? round(($totalPresent / $employeeWorkingDays) * 100, 1) : 0;
             $ponctualiteRate = $totalPresent > 0 ? round(($totalOnTime / $totalPresent) * 100, 1) : 0;
 
             // --- Observations ---
@@ -356,7 +366,7 @@ class CustomReportController extends Controller
                 // justification est ajoutée plus bas, ne pas la contredire avec
                 // un « Absent le … ».
                 if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])
-                    || isset($permissionDates[$dateKey])) {
+                    || isset($permissionDates[$dateKey]) || isset($blankDays[$dateKey])) {
                     continue;
                 }
 
@@ -412,6 +422,7 @@ class CustomReportController extends Controller
                 if (($includeWeekends || ($dayOfWeek >= 1 && $dayOfWeek <= 5))
                     && !isset($holidayDates[$dateStr])
                     && !in_array($dateStr, $recordedDates)
+                    && !isset($blankDays[$dateStr])
                     && !isset($missionDates[$dateStr])
                     && !isset($leaveDates[$dateStr])
                     && !isset($permissionDates[$dateStr])
@@ -431,7 +442,7 @@ class CustomReportController extends Controller
                     'present'              => $totalPresent,
                     'absent'               => $totalAbsent,
                     'rate'                 => $presenceRate,
-                    'present_days_display' => $totalPresent . '/' . $workingDays
+                    'present_days_display' => $totalPresent . '/' . $employeeWorkingDays
                 ],
                 'ponctualite_data' => [
                     'on_time'     => $totalOnTime,
@@ -578,12 +589,26 @@ class CustomReportController extends Controller
                     }
                 }
 
+                // Jours antérieurs à l'enregistrement de l'employé, sans pointage :
+                // cellules vides (ni absence, ni jour ouvré pour lui).
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends);
+                foreach (array_keys($blankDays) as $blankDay) {
+                    unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
+                }
+                $employeeWorkingDays = max(0, $workingDays - count($blankDays));
+
                 $dailyChecks = [];
                 $currentDate = Carbon::parse($startDate);
                 $endDateObj  = Carbon::parse($endDate);
 
                 while ($currentDate <= $endDateObj) {
                     $dateStr = $currentDate->format('Y-m-d');
+
+                    if (isset($blankDays[$dateStr])) {
+                        $dailyChecks[$dateStr] = ['status' => 'BLANK', 'check_in' => null, 'check_out' => null];
+                        $currentDate->addDay();
+                        continue;
+                    }
 
                     $attendance = null;
                     foreach ($employeeAttendances as $att) {
@@ -700,7 +725,8 @@ class CustomReportController extends Controller
                     // modèle choisi inclut explicitement les week-ends. Un jour
                     // férié chômé reste exclu dans tous les cas.
                     if ((!$includeWeekends && Carbon::parse($dateKey)->dayOfWeekIso > 5)
-                        || isset($holidayDates[$dateKey])) {
+                        || isset($holidayDates[$dateKey])
+                        || isset($blankDays[$dateKey])) {
                         continue;
                     }
                     if ($status !== 'ABSENT' && !isset($missionDates[$dateKey])) {
@@ -730,8 +756,8 @@ class CustomReportController extends Controller
                 // Un congé n'est présent que s'il possède un pointage réel ;
                 // seul le jour de mission est automatiquement présent.
                 $totalPresent += $totalMission;
-                $totalAbsent   = $workingDays - $totalPresent;
-                $presenceRate  = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
+                $totalAbsent   = $employeeWorkingDays - $totalPresent;
+                $presenceRate  = $employeeWorkingDays > 0 ? round(($totalPresent / $employeeWorkingDays) * 100, 1) : 0;
                 $ponctualiteRate = $totalPresent > 0 ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
 
                 // Entrées datées puis triées chronologiquement (cf. formatObservations).
@@ -743,7 +769,7 @@ class CustomReportController extends Controller
 
                     // Journée justifiée : la mission ou le congé est ajouté plus bas,
                     // ne pas le contredire avec un « Absent le … ».
-                    if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey])) {
+                    if (isset($missionDates[$dateKey]) || isset($leaveDates[$dateKey]) || isset($blankDays[$dateKey])) {
                         continue;
                     }
 

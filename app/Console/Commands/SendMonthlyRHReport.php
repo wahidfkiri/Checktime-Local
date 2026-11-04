@@ -11,6 +11,7 @@ use App\Models\EmployeePermission;
 use App\Models\Setting;
 use App\Mail\MonthlyRHReport;
 use App\Reports\SuiviPonctualiteReport;
+use App\Reports\AttendanceSupport;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -243,6 +244,14 @@ class SendMonthlyRHReport extends Command
                 }
             }
 
+            // Jours antérieurs à l'enregistrement de l'employé, sans pointage : ni
+            // absence ni jour ouvré pour lui (il n'existait pas encore).
+            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+            foreach (array_keys($blankDays) as $blankDay) {
+                unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
+            }
+            $employeeWorkingDays = max(0, $workingDays - count($blankDays));
+
             // Stats employé
             $totalPresent    = 0;
             $totalLate       = 0;
@@ -257,7 +266,7 @@ class SendMonthlyRHReport extends Command
                 // Un pointage un week-end ou un jour férié chômé ne doit pas
                 // gonfler la présence au-delà de $workingDays, sinon l'absence
                 // (jours ouvrés - présence) devient négative.
-                if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr])) {
+                if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) {
                     continue;
                 }
 
@@ -296,8 +305,8 @@ class SendMonthlyRHReport extends Command
             }
 
             $totalPresent    += $totalMission + $totalLeave + $totalPermission;
-            $totalAbsent      = max(0, $workingDays - $totalPresent);
-            $presenceRate     = $workingDays > 0 ? round(($totalPresent / $workingDays) * 100, 1) : 0;
+            $totalAbsent      = max(0, $employeeWorkingDays - $totalPresent);
+            $presenceRate     = $employeeWorkingDays > 0 ? round(($totalPresent / $employeeWorkingDays) * 100, 1) : 0;
             $ponctualiteRate  = $totalPresent > 0
                 ? round((($totalPresent - $totalLate - $totalEarlyLeave) / $totalPresent) * 100, 1) : 0;
 

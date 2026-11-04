@@ -150,14 +150,14 @@ class DailyAttendanceController extends Controller
         };
         $retardStats = [
             'today' => $applyTolerance(
-                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')->where('attendance_date', $today)
+                DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')->where('attendance_date', $today)
             )->count(),
             'week' => $applyTolerance(
-                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+                DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                     ->whereBetween('attendance_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()])
             )->count(),
             'month' => $applyTolerance(
-                DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+                DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                     ->whereBetween('attendance_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
             )->count(),
         ];
@@ -314,7 +314,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee');
@@ -763,7 +763,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données " . implode(',', $statuses) . " pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', $statuses)
                 ->with('employee');
@@ -901,16 +901,16 @@ class DailyAttendanceController extends Controller
     {
         $today = Carbon::today()->format('Y-m-d');
         
-        $total = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+        $total = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->count();
         
-        $present = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+        $present = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
             ->count();
         
-        $absent = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+        $absent = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
             ->where('attendance_date', $today)
             ->where('status', 'ABSENT')
             ->count();
@@ -939,7 +939,7 @@ class DailyAttendanceController extends Controller
             Log::info("Récupération données pour aujourd'hui depuis DB: " . $today);
             
             // Récupérer toutes les présences d'aujourd'hui
-            $attendances = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $attendances = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->where('attendance_date', $today)
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -1028,7 +1028,7 @@ class DailyAttendanceController extends Controller
                      ", department: " . ($department ?: 'all'));
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee');
             
@@ -1600,7 +1600,7 @@ class DailyAttendanceController extends Controller
             }
             
             // Dernière synchronisation depuis les données
-            $lastSync = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $lastSync = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereNotNull('last_sync_at')
                 ->orderBy('last_sync_at', 'desc')
                 ->first();
@@ -1666,7 +1666,7 @@ class DailyAttendanceController extends Controller
                 Log::info("Resynchronisation manuelle pour {$empCode} le {$date}");
                 
                 // Récupérer la présence mise à jour
-                $attendance = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+                $attendance = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                     ->where('emp_code', $empCode)
                     ->where('attendance_date', $date)
                     ->first();
@@ -1869,7 +1869,7 @@ class DailyAttendanceController extends Controller
                 ->keyBy('emp_code');
             
             // Construire la requête pour les présences journalières
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->with('employee')
                 ->orderBy('attendance_date', 'desc')
@@ -2013,7 +2013,7 @@ class DailyAttendanceController extends Controller
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
                 ->with('employee')
@@ -2157,7 +2157,7 @@ class DailyAttendanceController extends Controller
             Log::info("Export PDF Retards pour: " . $startDate . " à " . $endDate);
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('is_late', true)
                 ->with('employee')
@@ -2306,7 +2306,7 @@ class DailyAttendanceController extends Controller
                 ->keyBy('emp_code');
             
             // Construire la requête
-            $query = DailyAttendance::forActiveEmployees()->whereRaw('1 = 1')
+            $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereRaw('1 = 1')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('status', 'ABSENT')
                 ->with('employee')
@@ -2460,7 +2460,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereBetween('attendance_date', [$startDate, $endDate])
             ->whereIn('status', ['PRESENT', 'LATE', 'HALF_DAY', 'OVERTIME', 'SHORT_WORK'])
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2516,7 +2516,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereBetween('attendance_date', [$startDate, $endDate])
             ->where('status', 'ABSENT')
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2560,7 +2560,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereBetween('attendance_date', [$startDate, $endDate])
             ->where('is_late', true)
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
@@ -2620,7 +2620,7 @@ class DailyAttendanceController extends Controller
 
         [$startDate, $endDate] = $this->resolveExportDates($request);
 
-        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $query = DailyAttendance::forActiveEmployees()->withoutPreRegistrationBlanks()->whereBetween('attendance_date', [$startDate, $endDate])
             ->with('employee')
             ->orderBy('attendance_date', 'desc')
             ->orderBy('emp_code');

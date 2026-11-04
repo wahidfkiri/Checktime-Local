@@ -113,6 +113,13 @@ class SuiviPonctualiteReport
                 $dateKey    = $day['date'];
                 $attendance = $employeeAttendances->get($dateKey);
 
+                // Jour antérieur à l'enregistrement de l'employé et sans pointage :
+                // case vide (il n'existait pas encore), pas une absence.
+                if (AttendanceSupport::isBeforeRegistration($employee, $dateKey, $attendance)) {
+                    $cells[$dateKey] = ['text' => '', 'detail' => '', 'type' => 'blank'];
+                    continue;
+                }
+
                 // Justifications d'abord : congé > mission > autorisation.
                 if (isset($leaveDates[$dateKey])) {
                     $cells[$dateKey] = ['text' => 'en congé', 'detail' => '', 'type' => 'leave'];

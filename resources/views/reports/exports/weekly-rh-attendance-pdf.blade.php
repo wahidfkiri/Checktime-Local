@@ -475,6 +475,9 @@
                                 Mission
                             </td>
 
+                        @elseif($status === 'BLANK')
+                            <td colspan="2" class="check-time"></td>
+
                         @elseif($status === 'CONGE')
                             <td colspan="2" class="conge-cell">
                                 {{ $check['leave_info']['type_name'] ?? 'Congé' }}

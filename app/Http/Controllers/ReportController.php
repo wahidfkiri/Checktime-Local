@@ -385,6 +385,16 @@ class ReportController extends Controller
         $arrivalTime = $transactions['arrival_time'] ?? null;
         $departureTime = $transactions['departure_time'] ?? null;
         
+        // Jour antérieur à l'enregistrement de l'employé et sans aucun pointage :
+        // ce n'est pas une absence (il n'existait pas encore) → pas de ligne.
+        // S'il y a des pointages ce jour-là, ils sont affichés normalement.
+        if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, (object) [
+            'check_in'  => $arrivalTime,
+            'check_out' => $departureTime,
+        ])) {
+            return null;
+        }
+
         // 6. Déterminer le statut
         $status = $this->determineStatus(
             $schedule,

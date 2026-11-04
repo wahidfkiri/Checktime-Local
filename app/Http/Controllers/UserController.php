@@ -32,6 +32,7 @@ class UserController extends Controller
             ],
             'Gestion des autorisations' => [
                 'menu.employee-permissions' => 'Permissions',
+                'menu.regularizations' => 'Autre (régularisation de pointages)',
                 'menu.missions' => 'Missions',
                 'menu.leaves' => 'Congés',
                 'menu.holidays' => 'Jours Fériés',

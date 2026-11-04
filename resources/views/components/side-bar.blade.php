@@ -108,7 +108,7 @@
 @endcanany
 
         <!-- Gestion des autorisations -->
-        @canany(['menu.employee-permissions', 'menu.missions', 'menu.leaves', 'menu.holidays'])
+        @canany(['menu.employee-permissions', 'menu.regularizations', 'menu.missions', 'menu.leaves', 'menu.holidays'])
         <li class="sidebar-item has-sub @if(request()->routeIs('authorizations.*') || request()->routeIs('absences.*') || request()->routeIs('delays.*') || request()->routeIs('leaves.*') || request()->routeIs('holidays.*')) active @endif">
           <a href="#" class="sidebar-link">
             <i class="bi bi-clipboard-check-fill"></i>
@@ -127,6 +127,14 @@
               <a href="{{route('authorizations.employee-permissions.index')}}" class="submenu-link">
                 <i class="bi bi-check-circle-fill"></i>
                 <span>Permissions</span>
+              </a>
+            </li>
+            @endcan
+            @can('menu.regularizations')
+            <li class="submenu-item {{ request()->routeIs('authorizations.regularizations.*') ? 'active' : '' }}">
+              <a href="{{ route('authorizations.regularizations.index') }}" class="submenu-link">
+                <i class="bi bi-lightning-charge me-2"></i>
+                <span>Autre</span>
               </a>
             </li>
             @endcan

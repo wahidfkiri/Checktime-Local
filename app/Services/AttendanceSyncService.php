@@ -402,6 +402,16 @@ class AttendanceSyncService
 
     private function doUpdateEmployeeDailySummary(Employee $employee, Carbon $date)
     {
+        // Une régularisation manuelle (coupure d'électricité, oubli de pointage…)
+        // ne doit jamais être écrasée par le recalcul à partir des transactions.
+        $regularized = DailyAttendance::where('employee_id', $employee->id)
+            ->whereDate('attendance_date', $date->format('Y-m-d'))
+            ->where('source', 'regularization')
+            ->first();
+        if ($regularized) {
+            return $regularized;
+        }
+
         $startOfDay = $date->copy()->startOfDay();
         $endOfDay = $date->copy()->endOfDay();
         
@@ -672,6 +682,16 @@ class AttendanceSyncService
             return null;
         }
         
+        // Jour antérieur à l'enregistrement de l'employé : il n'existait pas
+        // encore, ce n'est pas une absence → aucune ligne (et on retire celle
+        // qui aurait été créée auparavant, vide de tout pointage).
+        if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $date->format('Y-m-d'))) {
+            DailyAttendance::where('employee_id', $employee->id)
+                ->whereDate('attendance_date', $date->format('Y-m-d'))
+                ->whereNull('check_in')->whereNull('check_out')->delete();
+            return null;
+        }
+
         $hasLeave = $this->checkEmployeeLeave($employee, $date);
         
         $status = $hasLeave ? 'LEAVE' : 'ABSENT';
@@ -796,7 +816,7 @@ class AttendanceSyncService
         $startDate = $startDate ? Carbon::parse($startDate) : Carbon::now()->startOfMonth();
         $endDate = $endDate ? Carbon::parse($endDate) : Carbon::now()->endOfMonth();
         
-        $attendances = DailyAttendance::where('employee_id', $employee->id)
+        $attendances = DailyAttendance::withoutPreRegistrationBlanks()->where('employee_id', $employee->id)
             ->whereBetween('attendance_date', [$startDate, $endDate])
             ->orderBy('attendance_date', 'desc')
             ->get();
