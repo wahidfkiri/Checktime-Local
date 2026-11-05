@@ -449,10 +449,13 @@ class InstallerController extends Controller
      */
     protected function testApiConnection(string $url, string $token): array
     {
+        $baseUrl = rtrim(trim($url), '/');
+
         try {
             $client = new \GuzzleHttp\Client([
-                'base_uri' => rtrim($url, '/') . '/',
+                'base_uri' => $baseUrl . '/',
                 'timeout' => 10,
+                'connect_timeout' => 5,
                 'verify' => false,
             ]);
 
@@ -471,15 +474,29 @@ class InstallerController extends Controller
 
             return ['success' => false, 'message' => 'Réponse API invalide.'];
         } catch (\GuzzleHttp\Exception\ConnectException $e) {
-            return ['success' => false, 'message' => 'Impossible de se connecter au serveur.'];
+            $detail = strtolower($e->getMessage());
+            if (str_contains($detail, 'ssl') || str_contains($detail, 'tls') || str_contains($detail, 'schannel')) {
+                return [
+                    'success' => false,
+                    'message' => "Échec de la négociation HTTPS avec {$baseUrl}. Vérifiez le protocole (http/https), le port et le certificat TLS du serveur.",
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => "Serveur injoignable à {$baseUrl} (port fermé, filtré ou serveur arrêté). Vérifiez l'adresse et l'accès réseau.",
+            ];
         } catch (\GuzzleHttp\Exception\ClientException $e) {
             $statusCode = $e->getResponse()->getStatusCode();
             if ($statusCode === 401 || $statusCode === 403) {
-                return ['success' => false, 'message' => 'Clé d\'accès invalide.'];
+                return ['success' => false, 'message' => "Le serveur {$baseUrl} répond, mais refuse le token (HTTP {$statusCode}). Vérifiez le token et ses autorisations."];
             }
-            return ['success' => false, 'message' => 'Erreur client: ' . $e->getMessage()];
+            return ['success' => false, 'message' => "Le serveur {$baseUrl} a répondu avec HTTP {$statusCode}."];
+        } catch (\GuzzleHttp\Exception\ServerException $e) {
+            $statusCode = $e->getResponse()->getStatusCode();
+            return ['success' => false, 'message' => "Le serveur {$baseUrl} a rencontré une erreur (HTTP {$statusCode})."];
         } catch (\Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => "Erreur pendant le test de {$baseUrl}: " . $e->getMessage()];
         }
     }
 
