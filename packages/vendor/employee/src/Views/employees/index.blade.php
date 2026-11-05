@@ -465,6 +465,34 @@
     </div>
 </div>
 
+<!-- Modal d'activation / désactivation d'un employé (choix manuel de la date) -->
+<div class="modal fade" id="employeeStatusModal" tabindex="-1" aria-labelledby="employeeStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="employeeStatusModalLabel">Désactiver l'employé</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="employee-status-help" class="mb-3"></p>
+                <div class="mb-2">
+                    <label class="form-label" for="employee-status-date" id="employee-status-date-label">Date de désactivation <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control" id="employee-status-date">
+                    <div class="text-danger small mt-1 d-none" id="employee-status-error"></div>
+                </div>
+                <div class="alert alert-info py-2 mb-0 small" id="employee-status-hint"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" id="employee-status-confirm">
+                    <span id="employee-status-confirm-text">Désactiver</span>
+                    <span id="employee-status-confirm-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de suppression d'employé -->
 <div class="modal fade" id="deleteEmployeeModal" tabindex="-1" aria-labelledby="deleteEmployeeModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -1600,62 +1628,118 @@ function selectByText(selectId, text) {
     });
     
     // Activer / désactiver un employé (interrupteur dans la colonne Statut).
-    // On demande la date : désactivation = dernier jour pris en compte dans les
-    // rapports ; activation = premier jour pris en compte.
-    function askStatusDate(newStatus, defaultDate) {
-        var isActivation = newStatus === 'active';
-        var today = new Date().toLocaleDateString('en-CA');
+    // Une modal demande la date, au choix : passée, du jour ou FUTURE.
+    //  - désactivation = dernier jour pris en compte dans les rapports ;
+    //  - activation    = premier jour pris en compte.
+    // Date passée / du jour : effet immédiat. Date future : l'opération est
+    // programmée et appliquée par la tâche planifiée horaire (/settings).
+    var statusModalState = null;
 
-        return Swal.fire({
-            icon: 'question',
-            title: isActivation ? "Activer l'employé" : "Désactiver l'employé",
-            html: isActivation
-                ? "Choisissez la <strong>date d'activation</strong> (premier jour pris en compte dans les rapports)."
-                : "Choisissez la <strong>date de désactivation</strong> (dernier jour pris en compte : les rapports et données de l'employé s'arrêtent à cette date).",
-            input: 'date',
-            inputValue: defaultDate || today,
-            inputAttributes: { max: today },
-            showCancelButton: true,
-            confirmButtonText: isActivation ? 'Activer' : 'Désactiver',
-            cancelButtonText: 'Annuler',
-            confirmButtonColor: isActivation ? '#198754' : '#dc3545',
-            inputValidator: function(value) {
-                if (!value) return 'Veuillez choisir une date.';
-                if (value > today) return 'La date ne peut pas être dans le futur.';
-            }
-        });
+    function todayLocal() {
+        return new Date().toLocaleDateString('en-CA');
     }
 
-    function sendEmployeeStatus(id, newStatus, date, onFail) {
-        var url = "{{ route('employees.set-status', ['id' => '__ID__']) }}".replace('__ID__', id);
+    function refreshStatusHint() {
+        if (!statusModalState) return;
+        var value = $('#employee-status-date').val();
+        var isActivation = statusModalState.status === 'active';
+        var $hint = $('#employee-status-hint');
+
+        $hint.removeClass('alert-info alert-warning');
+
+        if (value && value > todayLocal()) {
+            $hint.addClass('alert-warning').html(
+                '<i class="bi bi-clock-history me-1"></i> Date future : l\'opération sera <strong>programmée</strong> et appliquée '
+                + 'automatiquement par la tâche planifiée (vérification chaque heure). L\'employé reste '
+                + (isActivation ? 'inactif' : 'actif') + ' en attendant.'
+            );
+        } else {
+            $hint.addClass('alert-info').html(
+                '<i class="bi bi-lightning-charge me-1"></i> Date passée ou du jour : '
+                + (isActivation ? 'l\'activation' : 'la désactivation') + ' est <strong>appliquée immédiatement</strong>.'
+            );
+        }
+    }
+
+    function openStatusModal(opts) {
+        // opts : { id, status, defaultDate, onCancel }
+        statusModalState = { id: opts.id, status: opts.status, confirmed: false, onCancel: opts.onCancel || null };
+        var isActivation = opts.status === 'active';
+
+        $('#employeeStatusModalLabel').text(isActivation ? "Activer l'employé" : "Désactiver l'employé");
+        $('#employee-status-date-label').html((isActivation ? "Date d'activation" : 'Date de désactivation') + ' <span class="text-danger">*</span>');
+        $('#employee-status-help').html(isActivation
+            ? "Choisissez la <strong>date d'activation</strong> (premier jour pris en compte dans les rapports)."
+            : "Choisissez la <strong>date de désactivation</strong> (dernier jour pris en compte : les rapports et données de l'employé s'arrêtent à cette date). Vous pouvez choisir une date passée ou future.");
+        $('#employee-status-confirm').toggleClass('btn-success', isActivation).toggleClass('btn-danger', !isActivation);
+        $('#employee-status-confirm-text').text(isActivation ? 'Activer' : 'Désactiver');
+        $('#employee-status-date').val(opts.defaultDate || todayLocal());
+        $('#employee-status-error').addClass('d-none').text('');
+        refreshStatusHint();
+
+        $('#employeeStatusModal').modal('show');
+    }
+
+    $('#employee-status-date').on('input change', refreshStatusHint);
+
+    $('#employeeStatusModal').on('hidden.bs.modal', function() {
+        // Fermeture sans confirmation : remettre l'interrupteur dans son état d'origine.
+        if (statusModalState && !statusModalState.confirmed && statusModalState.onCancel) {
+            statusModalState.onCancel();
+        }
+        statusModalState = null;
+        $('#employee-status-confirm').prop('disabled', false);
+        $('#employee-status-confirm-spinner').addClass('d-none');
+    });
+
+    $('#employee-status-confirm').on('click', function() {
+        if (!statusModalState) return;
+
+        var date = $('#employee-status-date').val();
+        if (!date) {
+            $('#employee-status-error').removeClass('d-none').text('Veuillez choisir une date.');
+            return;
+        }
+
+        var state = statusModalState;
+        var $btn = $(this);
+        var url = "{{ route('employees.set-status', ['id' => '__ID__']) }}".replace('__ID__', state.id);
+
+        $btn.prop('disabled', true);
+        $('#employee-status-confirm-spinner').removeClass('d-none');
 
         $.ajax({
             url: url,
             type: 'POST',
-            data: { _token: "{{ csrf_token() }}", status: newStatus, effective_date: date },
+            data: { _token: "{{ csrf_token() }}", status: state.status, effective_date: date },
             success: function(response) {
-                showSweetAlert('success', newStatus === 'active' ? 'Employé activé' : 'Employé désactivé', response.message, 3500);
+                state.confirmed = true;
+                $('#employeeStatusModal').modal('hide');
+
+                var title = response.scheduled
+                    ? 'Opération programmée'
+                    : (state.status === 'active' ? 'Employé activé' : 'Employé désactivé');
+                showSweetAlert('success', title, response.message, 4500);
                 table.ajax.reload(null, false);
             },
             error: function(xhr) {
-                if (onFail) onFail();
-                var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossible de modifier le statut.';
-                showSweetAlert('error', 'Erreur', msg);
+                var msg = (xhr.responseJSON && (xhr.responseJSON.message || (xhr.responseJSON.errors && xhr.responseJSON.errors.effective_date && xhr.responseJSON.errors.effective_date[0])))
+                    || 'Impossible de modifier le statut.';
+                $('#employee-status-error').removeClass('d-none').text(msg);
+                $btn.prop('disabled', false);
+                $('#employee-status-confirm-spinner').addClass('d-none');
             }
         });
-    }
+    });
 
     $(document).on('change', '.js-employee-status-toggle', function() {
         var $toggle = $(this);
         var newStatus = $toggle.is(':checked') ? 'active' : 'inactive';
-        var revert = function() { $toggle.prop('checked', newStatus !== 'active'); };
 
-        askStatusDate(newStatus).then(function(result) {
-            if (!result.isConfirmed) {
-                revert();
-                return;
-            }
-            sendEmployeeStatus($toggle.data('id'), newStatus, result.value, revert);
+        openStatusModal({
+            id: $toggle.data('id'),
+            status: newStatus,
+            onCancel: function() { $toggle.prop('checked', newStatus !== 'active'); }
         });
     });
 
@@ -1663,12 +1747,41 @@ function selectByText(selectId, text) {
     $(document).on('click', '.js-employee-status-date', function(e) {
         e.preventDefault();
         var $link = $(this);
-        var status = $link.data('status');
 
-        askStatusDate(status, $link.data('date')).then(function(result) {
-            if (result.isConfirmed) {
-                sendEmployeeStatus($link.data('id'), status, result.value);
-            }
+        openStatusModal({
+            id: $link.data('id'),
+            status: $link.data('status'),
+            defaultDate: $link.data('date')
+        });
+    });
+
+    // Annuler une opération programmée
+    $(document).on('click', '.js-cancel-scheduled-status', function(e) {
+        e.preventDefault();
+        var id = $(this).data('id');
+        var url = "{{ route('employees.cancel-scheduled-status', ['id' => '__ID__']) }}".replace('__ID__', id);
+
+        Swal.fire({
+            icon: 'question',
+            title: "Annuler l'opération programmée ?",
+            showCancelButton: true,
+            confirmButtonText: 'Oui, annuler',
+            cancelButtonText: 'Non'
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: url,
+                type: 'DELETE',
+                data: { _token: "{{ csrf_token() }}" },
+                success: function(response) {
+                    showSweetAlert('success', 'Annulée', response.message, 2500);
+                    table.ajax.reload(null, false);
+                },
+                error: function() {
+                    showSweetAlert('error', 'Erreur', "Impossible d'annuler l'opération.");
+                }
+            });
         });
     });
 

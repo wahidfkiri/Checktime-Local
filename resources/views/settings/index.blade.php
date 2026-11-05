@@ -522,7 +522,7 @@
                                                                        placeholder="email1@x.com, email2@y.com"
                                                                        value="{{ is_array($job->recipients) ? implode(', ', $job->recipients) : '' }}">
                                                                 <small class="text-muted">Séparez par des virgules</small>
-                                                            @elseif($job->command === 'attendance:sync')
+                                                            @elseif(in_array($job->command, ['attendance:sync', 'employees:apply-scheduled-status'], true))
                                                                 <span class="text-muted">—</span>
                                                             @else
                                                                 <span class="text-muted">Envoyé à chaque employé</span>

@@ -83,6 +83,12 @@ class Employee extends Model
         });
     }
 
+    /** Opération d'activation / désactivation programmée à une date future (en attente). */
+    public function pendingStatusChange()
+    {
+        return $this->hasOne(EmployeeScheduledStatusChange::class)->whereNull('applied_at')->latestOfMany();
+    }
+
     public function inactivePeriods(): HasMany
     {
         return $this->hasMany(EmployeeInactivePeriod::class)->orderBy('start_date');

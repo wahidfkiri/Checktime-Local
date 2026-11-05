@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\CheckTimeService;
 use App\Models\Employee;
+use App\Models\EmployeeScheduledStatusChange;
 use App\Models\Zone;
 use App\Models\Department;
 use Yajra\DataTables\Facades\DataTables;
@@ -569,7 +570,7 @@ public function destroy($id)
     public function getLocalEmployees(Request $request)
 {
     if ($request->ajax()) {
-        $query = Employee::query();
+        $query = Employee::query()->with('pendingStatusChange');
         
         // Appliquer les filtres
         $this->applyFilters($query, $request);
@@ -625,6 +626,12 @@ public function destroy($id)
                     . '</div>'
                     . '<span class="badge ' . ($isActive ? 'bg-success' : 'bg-danger') . '">'
                     . ($isActive ? 'Actif' : 'Inactif') . '</span>'
+                    . ($employee->pendingStatusChange
+                        ? '<span class="badge bg-warning text-dark" title="Opération programmée">'
+                            . ($employee->pendingStatusChange->status === 'inactive' ? 'Désactivation' : 'Activation')
+                            . ' programmée le ' . $employee->pendingStatusChange->effective_date->format('d/m/Y')
+                            . '</span> <a href="#" class="small text-danger js-cancel-scheduled-status" data-id="' . $employee->id . '">Annuler</a>'
+                        : '')
                     . ($dateLabel !== ''
                         ? '<a href="#" class="small text-muted js-employee-status-date" data-id="' . $employee->id . '"'
                             . ' data-status="' . $status . '" data-date="' . $statusDate->format('Y-m-d') . '"'
@@ -690,26 +697,77 @@ public function destroy($id)
             'status'         => 'required|in:active,inactive',
             // Date de désactivation (dernier jour pris en compte dans les
             // rapports) ou d'activation (premier jour pris en compte).
-            'effective_date' => 'nullable|date|before_or_equal:today',
+            'effective_date' => 'nullable|date',
         ], [
-            'effective_date.before_or_equal' => 'La date ne peut pas être dans le futur.',
-            'effective_date.date'            => 'Date invalide.',
+            'effective_date.date' => 'Date invalide.',
         ]);
 
-        $employee = Employee::findOrFail($id);
-        $date     = $validated['effective_date'] ?? now()->toDateString();
+        $employee  = Employee::findOrFail($id);
+        $date      = \Carbon\Carbon::parse($validated['effective_date'] ?? now())->startOfDay();
+        $formatted = $date->format('d/m/Y');
 
-        $employee->applyStatus($validated['status'], $date, auth()->id());
+        // Date FUTURE : l'opération est programmée (l'employé reste inchangé
+        // pour l'instant) et sera appliquée par la tâche planifiée horaire
+        // `employees:apply-scheduled-status` (réglable dans /settings).
+        if ($date->gt(\Carbon\Carbon::today())) {
+            // Corriger la date d'un statut déjà en place avec une date future n'a pas de sens.
+            if ($employee->status === $validated['status']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validated['status'] === 'active'
+                        ? "L'employé est déjà actif : choisissez une date passée ou du jour pour corriger sa date d'activation."
+                        : "L'employé est déjà désactivé : choisissez une date passée ou du jour pour corriger sa date de désactivation.",
+                ], 422);
+            }
 
-        $formatted = \Carbon\Carbon::parse($date)->format('d/m/Y');
+            // Une seule opération en attente par employé : la nouvelle remplace l'ancienne.
+            EmployeeScheduledStatusChange::where('employee_id', $employee->id)->pending()->delete();
+
+            EmployeeScheduledStatusChange::create([
+                'employee_id'    => $employee->id,
+                'status'         => $validated['status'],
+                'effective_date' => $date->toDateString(),
+                'created_by'     => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success'   => true,
+                'scheduled' => true,
+                'status'    => $employee->status,
+                'date'      => $date->toDateString(),
+                'message'   => $validated['status'] === 'active'
+                    ? "Activation programmée au {$formatted} : elle sera appliquée automatiquement par la tâche planifiée."
+                    : "Désactivation programmée au {$formatted} (dernier jour pris en compte) : elle sera appliquée automatiquement par la tâche planifiée, une fois cette journée terminée.",
+            ]);
+        }
+
+        // Une opération immédiate remplace toute opération programmée en attente.
+        EmployeeScheduledStatusChange::where('employee_id', $employee->id)->pending()->delete();
+
+        $employee->applyStatus($validated['status'], $date->toDateString(), auth()->id());
 
         return response()->json([
             'success' => true,
             'status'  => $employee->status,
-            'date'    => $date,
+            'date'    => $date->toDateString(),
             'message' => $employee->status === 'active'
                 ? "Employé activé à partir du {$formatted} : il réapparaît dans les rapports à partir de cette date."
                 : "Employé désactivé le {$formatted} : ses rapports et données s'arrêtent à cette date ; il est masqué des statistiques et de la synchronisation.",
+        ]);
+    }
+
+    /**
+     * Annule l'opération d'activation / désactivation programmée d'un employé.
+     */
+    public function cancelScheduledStatus($id)
+    {
+        $employee = Employee::findOrFail($id);
+
+        $deleted = EmployeeScheduledStatusChange::where('employee_id', $employee->id)->pending()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => $deleted ? 'Opération programmée annulée.' : 'Aucune opération programmée.',
         ]);
     }
 

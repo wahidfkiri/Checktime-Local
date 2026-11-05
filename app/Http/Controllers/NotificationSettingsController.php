@@ -21,6 +21,7 @@ class NotificationSettingsController extends Controller
         'reports:send-monthly-rh',
         'backup:send',
         'attendance:sync',
+        'employees:apply-scheduled-status',
     ];
 
     /**
