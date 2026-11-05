@@ -60,7 +60,7 @@ class SuiviPonctualiteReport
         }
 
         // --- Employés ---
-        $employeesQuery = Employee::active()->whereNotNull('emp_code')->where('emp_code', '!=', '');
+        $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')->where('emp_code', '!=', '');
         if ($empCode && $empCode !== 'all') {
             $employeesQuery->where('emp_code', $empCode);
         }
@@ -70,7 +70,7 @@ class SuiviPonctualiteReport
         );
 
         // --- Sources annexes, chargées en une fois pour toute la période ---
-        $attendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $attendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])
             ->get()
             ->groupBy('employee_id');
 
@@ -115,7 +115,7 @@ class SuiviPonctualiteReport
 
                 // Jour antérieur à l'enregistrement de l'employé et sans pointage :
                 // case vide (il n'existait pas encore), pas une absence.
-                if (AttendanceSupport::isBeforeRegistration($employee, $dateKey, $attendance)) {
+                if (AttendanceSupport::isOutOfService($employee, $dateKey, $attendance)) {
                     $cells[$dateKey] = ['text' => '', 'detail' => '', 'type' => 'blank'];
                     continue;
                 }

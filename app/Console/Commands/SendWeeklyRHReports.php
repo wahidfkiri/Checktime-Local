@@ -113,7 +113,7 @@ class SendWeeklyRHReports extends Command
         $this->info("\n--- Rapport RH pour: {$rhEmail} ---");
 
         // Récupération des données pour la période
-        $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])->get();
+        $allAttendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])->get();
         $this->info("📊 Pointages trouvés: " . $allAttendances->count());
 
         $allMissions = Mission::overlappingPeriod($startDate, $endDate)->get();
@@ -147,7 +147,7 @@ class SendWeeklyRHReports extends Command
         }
 
         // Employés
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::activeDuring($startDate)->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('dept_name')
             ->orderBy('first_name')

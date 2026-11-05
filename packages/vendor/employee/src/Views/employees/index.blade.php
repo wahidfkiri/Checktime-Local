@@ -1599,29 +1599,75 @@ function selectByText(selectId, text) {
         $('#delete-employee-spinner').addClass('d-none');
     });
     
-    // Activer / désactiver un employé (interrupteur dans la colonne Statut)
-    $(document).on('change', '.js-employee-status-toggle', function() {
-        var $toggle = $(this);
-        var newStatus = $toggle.is(':checked') ? 'active' : 'inactive';
-        var url = "{{ route('employees.set-status', ['id' => '__ID__']) }}".replace('__ID__', $toggle.data('id'));
+    // Activer / désactiver un employé (interrupteur dans la colonne Statut).
+    // On demande la date : désactivation = dernier jour pris en compte dans les
+    // rapports ; activation = premier jour pris en compte.
+    function askStatusDate(newStatus, defaultDate) {
+        var isActivation = newStatus === 'active';
+        var today = new Date().toLocaleDateString('en-CA');
 
-        $toggle.prop('disabled', true);
+        return Swal.fire({
+            icon: 'question',
+            title: isActivation ? "Activer l'employé" : "Désactiver l'employé",
+            html: isActivation
+                ? "Choisissez la <strong>date d'activation</strong> (premier jour pris en compte dans les rapports)."
+                : "Choisissez la <strong>date de désactivation</strong> (dernier jour pris en compte : les rapports et données de l'employé s'arrêtent à cette date).",
+            input: 'date',
+            inputValue: defaultDate || today,
+            inputAttributes: { max: today },
+            showCancelButton: true,
+            confirmButtonText: isActivation ? 'Activer' : 'Désactiver',
+            cancelButtonText: 'Annuler',
+            confirmButtonColor: isActivation ? '#198754' : '#dc3545',
+            inputValidator: function(value) {
+                if (!value) return 'Veuillez choisir une date.';
+                if (value > today) return 'La date ne peut pas être dans le futur.';
+            }
+        });
+    }
+
+    function sendEmployeeStatus(id, newStatus, date, onFail) {
+        var url = "{{ route('employees.set-status', ['id' => '__ID__']) }}".replace('__ID__', id);
 
         $.ajax({
             url: url,
             type: 'POST',
-            data: { _token: "{{ csrf_token() }}", status: newStatus },
+            data: { _token: "{{ csrf_token() }}", status: newStatus, effective_date: date },
             success: function(response) {
-                showSweetAlert('success', newStatus === 'active' ? 'Employé activé' : 'Employé désactivé', response.message, 2500);
+                showSweetAlert('success', newStatus === 'active' ? 'Employé activé' : 'Employé désactivé', response.message, 3500);
                 table.ajax.reload(null, false);
             },
             error: function(xhr) {
-                $toggle.prop('checked', newStatus !== 'active');
+                if (onFail) onFail();
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Impossible de modifier le statut.';
                 showSweetAlert('error', 'Erreur', msg);
-            },
-            complete: function() {
-                $toggle.prop('disabled', false);
+            }
+        });
+    }
+
+    $(document).on('change', '.js-employee-status-toggle', function() {
+        var $toggle = $(this);
+        var newStatus = $toggle.is(':checked') ? 'active' : 'inactive';
+        var revert = function() { $toggle.prop('checked', newStatus !== 'active'); };
+
+        askStatusDate(newStatus).then(function(result) {
+            if (!result.isConfirmed) {
+                revert();
+                return;
+            }
+            sendEmployeeStatus($toggle.data('id'), newStatus, result.value, revert);
+        });
+    });
+
+    // Corriger la date de la dernière désactivation / activation (clic sur la date)
+    $(document).on('click', '.js-employee-status-date', function(e) {
+        e.preventDefault();
+        var $link = $(this);
+        var status = $link.data('status');
+
+        askStatusDate(status, $link.data('date')).then(function(result) {
+            if (result.isConfirmed) {
+                sendEmployeeStatus($link.data('id'), status, result.value);
             }
         });
     });

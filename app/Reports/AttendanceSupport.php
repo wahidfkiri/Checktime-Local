@@ -114,18 +114,74 @@ class AttendanceSupport
     }
 
     /**
+     * Périodes pendant lesquelles l'employé était désactivé, sous la forme
+     * [[Carbon début, ?Carbon fin], …] (fin null = toujours désactivé). La
+     * date de désactivation saisie est le DERNIER jour pris en compte : la
+     * période commence le lendemain ; à la réactivation, elle se termine la
+     * veille de la date d'activation.
+     */
+    public static function inactivePeriods($employee): array
+    {
+        $periods = [];
+
+        $rows = $employee->relationLoaded('inactivePeriods')
+            ? $employee->inactivePeriods
+            : (method_exists($employee, 'inactivePeriods') && $employee->exists ? $employee->inactivePeriods : collect());
+
+        foreach ($rows as $row) {
+            $periods[] = [
+                Carbon::parse($row->start_date)->startOfDay(),
+                $row->end_date ? Carbon::parse($row->end_date)->startOfDay() : null,
+            ];
+        }
+
+        // Employé désactivé sans période enregistrée (donnée antérieure à la
+        // fonctionnalité) : inactif à partir du lendemain de sa date de désactivation.
+        if (($employee->status ?? 'active') === 'inactive' && !empty($employee->deactivated_at)
+            && !collect($periods)->contains(fn ($p) => $p[1] === null)) {
+            $periods[] = [Carbon::parse($employee->deactivated_at)->startOfDay()->addDay(), null];
+        }
+
+        return $periods;
+    }
+
+    /**
+     * L'employé était-il désactivé ce jour-là ? Un employé désactivé n'apparaît
+     * dans les rapports que jusqu'à sa date de désactivation.
+     */
+    public static function isInactiveOn($employee, string $dateKey): bool
+    {
+        $day = Carbon::parse($dateKey)->startOfDay();
+
+        foreach (self::inactivePeriods($employee) as [$start, $end]) {
+            if ($day->gte($start) && ($end === null || $day->lte($end))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Jour à laisser vide dans les rapports pour cet employé : désactivé ce
+     * jour-là (même s'il existe une ligne), ou antérieur à son enregistrement
+     * sans aucun pointage.
+     */
+    public static function isOutOfService($employee, string $dateKey, $attendance = null): bool
+    {
+        return self::isInactiveOn($employee, $dateKey)
+            || self::isBeforeRegistration($employee, $dateKey, $attendance);
+    }
+
+    /**
      * Jours (Y-m-d => true) de [$startDate, $endDate] à laisser vides pour cet
-     * employé : jours ouvrés avant son enregistrement, sans pointage.
+     * employé : jours ouvrés hors période d'activité (avant son enregistrement
+     * sans pointage, ou pendant une désactivation).
      *
      * @param  iterable $attendances  lignes daily_attendance de l'employé
      */
     public static function blankDays($employee, string $startDate, string $endDate, iterable $attendances = [], array $holidayDates = [], bool $includeWeekends = false): array
     {
-        $registration = self::registrationDate($employee);
-        if (!$registration) {
-            return [];
-        }
-
         $byDate = [];
         foreach ($attendances as $a) {
             $byDate[Carbon::parse($a->attendance_date)->format('Y-m-d')] = $a;
@@ -135,10 +191,10 @@ class AttendanceSupport
         $cur   = Carbon::parse($startDate)->startOfDay();
         $end   = Carbon::parse($endDate)->startOfDay();
 
-        while ($cur->lte($end) && $cur->lt($registration)) {
+        while ($cur->lte($end)) {
             $key = $cur->format('Y-m-d');
             if (($includeWeekends || $cur->dayOfWeekIso <= 5) && !isset($holidayDates[$key])
-                && self::isBeforeRegistration($employee, $key, $byDate[$key] ?? null)) {
+                && self::isOutOfService($employee, $key, $byDate[$key] ?? null)) {
                 $blank[$key] = true;
             }
             $cur->addDay();

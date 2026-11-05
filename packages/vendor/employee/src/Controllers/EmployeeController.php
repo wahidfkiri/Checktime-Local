@@ -609,6 +609,12 @@ public function destroy($id)
                 $status = strtolower($employee->status ?? 'active');
                 $isActive = $status === 'active';
 
+                // Date de la dernière désactivation / activation, modifiable au clic.
+                $statusDate = $isActive ? $employee->activated_at : $employee->deactivated_at;
+                $dateLabel  = $statusDate
+                    ? ($isActive ? 'Activé le ' : 'Désactivé le ') . $statusDate->format('d/m/Y')
+                    : '';
+
                 // Interrupteur actif/inactif (décision locale, voir setStatus()) :
                 // un employé inactif est masqué de tous les rapports, stats et synchros.
                 return '<div class="d-flex align-items-center gap-2">'
@@ -619,6 +625,11 @@ public function destroy($id)
                     . '</div>'
                     . '<span class="badge ' . ($isActive ? 'bg-success' : 'bg-danger') . '">'
                     . ($isActive ? 'Actif' : 'Inactif') . '</span>'
+                    . ($dateLabel !== ''
+                        ? '<a href="#" class="small text-muted js-employee-status-date" data-id="' . $employee->id . '"'
+                            . ' data-status="' . $status . '" data-date="' . $statusDate->format('Y-m-d') . '"'
+                            . ' title="Modifier la date">' . $dateLabel . '</a>'
+                        : '')
                     . '</div>';
             })
             ->addColumn('last_sync', function($employee) {
@@ -676,19 +687,29 @@ public function destroy($id)
     public function setStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|in:active,inactive',
+            'status'         => 'required|in:active,inactive',
+            // Date de désactivation (dernier jour pris en compte dans les
+            // rapports) ou d'activation (premier jour pris en compte).
+            'effective_date' => 'nullable|date|before_or_equal:today',
+        ], [
+            'effective_date.before_or_equal' => 'La date ne peut pas être dans le futur.',
+            'effective_date.date'            => 'Date invalide.',
         ]);
 
         $employee = Employee::findOrFail($id);
-        $employee->status = $validated['status'];
-        $employee->save();
+        $date     = $validated['effective_date'] ?? now()->toDateString();
+
+        $employee->applyStatus($validated['status'], $date, auth()->id());
+
+        $formatted = \Carbon\Carbon::parse($date)->format('d/m/Y');
 
         return response()->json([
             'success' => true,
             'status'  => $employee->status,
+            'date'    => $date,
             'message' => $employee->status === 'active'
-                ? 'Employé activé : il réapparaît dans les rapports et la synchronisation.'
-                : 'Employé désactivé : il est masqué des rapports, statistiques et synchronisations.',
+                ? "Employé activé à partir du {$formatted} : il réapparaît dans les rapports à partir de cette date."
+                : "Employé désactivé le {$formatted} : ses rapports et données s'arrêtent à cette date ; il est masqué des statistiques et de la synchronisation.",
         ]);
     }
 

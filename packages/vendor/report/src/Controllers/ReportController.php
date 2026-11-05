@@ -29,7 +29,7 @@ class ReportController extends Controller
         $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::reportable()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -168,7 +168,7 @@ class ReportController extends Controller
              ->get();
         
         // Récupérer les employés concernés
-        $employeesQuery = Employee::active()->whereNotNull('emp_code')
+        $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -182,7 +182,7 @@ class ReportController extends Controller
         }
         
         // Récupérer TOUTES les données de daily_attendances (sans limit)
-        $query = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate]);
+        $query = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate]);
         
         if ($empCode && $empCode !== 'all') {
             $query->where('emp_code', $empCode);
@@ -209,7 +209,7 @@ class ReportController extends Controller
 
                 // Jour antérieur à l'enregistrement de l'employé, sans pointage :
                 // pas une absence → pas de ligne. Avec pointage, affiché normalement.
-                if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, $attendance ? $attendance->first() : null)) {
+                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance ? $attendance->first() : null)) {
                     continue;
                 }
                 

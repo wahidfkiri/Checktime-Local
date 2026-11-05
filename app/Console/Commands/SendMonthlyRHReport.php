@@ -145,7 +145,7 @@ class SendMonthlyRHReport extends Command
         $workingDays  = $this->countWorkingDays($startDate, $endDate);
 
         // ── Présences ──────────────────────────────────────────────
-        $attendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $attendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])
             ->get();
 
         // ── Missions ───────────────────────────────────────────────
@@ -160,7 +160,7 @@ class SendMonthlyRHReport extends Command
             ->get();
 
         // ── Employés ───────────────────────────────────────────────
-        $employees = Employee::active()->orderBy('dept_name')
+        $employees = Employee::activeDuring($startDate)->orderBy('dept_name')
             ->orderBy('first_name')
             ->get();
 

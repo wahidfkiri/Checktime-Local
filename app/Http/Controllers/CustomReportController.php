@@ -34,7 +34,7 @@ class CustomReportController extends Controller
      */
     public function presencePonctualite(Request $request)
     {
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::reportable()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -48,7 +48,7 @@ class CustomReportController extends Controller
         // Récupérer les départements pour le filtre à partir du champ dept_name des employés.
         // dept_name est chiffré (cast "encrypted"), on doit donc déchiffrer côté PHP
         // pour obtenir la liste distincte des départements réellement présents.
-        $departments = Employee::active()->get()
+        $departments = Employee::reportable()->get()
             ->pluck('dept_name')
             ->map(fn ($name) => trim((string) $name))
             ->filter(fn ($name) => $name !== '')
@@ -174,7 +174,7 @@ class CustomReportController extends Controller
 
     private function getPresencePonctualiteData($startDate, $endDate, $empCode, $departmentIds = ['all'], $includeWeekends = false)
     {
-        $employeesQuery = Employee::active()->whereNotNull('emp_code')
+        $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
 
         if ($empCode && $empCode !== 'all') {
@@ -197,7 +197,7 @@ class CustomReportController extends Controller
         $holidayDates = $this->getNonWorkingHolidayDates($startDate, $endDate);
 
         // Récupérer toutes les présences pour la période
-        $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $allAttendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])
             ->get();
 
         // Récupérer les congés approuvés pour la période
@@ -483,7 +483,7 @@ class CustomReportController extends Controller
             $periodStart = Carbon::parse($startDate)->startOfDay();
             $periodEnd   = Carbon::parse($endDate)->startOfDay();
 
-            $attendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+            $attendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])
                 ->get();
 
             $missions = Mission::overlappingPeriod($startDate, $endDate)->get();
@@ -494,7 +494,7 @@ class CustomReportController extends Controller
                 ->overlappingPeriod($startDate, $endDate)
                 ->get();
 
-            $employeesQuery = Employee::active();
+            $employeesQuery = Employee::activeDuring($startDate);
 
             if ($empCode && $empCode !== 'all') {
                 $employeesQuery->where('emp_code', $empCode);
@@ -1104,7 +1104,7 @@ class CustomReportController extends Controller
      */
     public function suiviPonctualite(Request $request)
     {
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::reportable()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -1114,7 +1114,7 @@ class CustomReportController extends Controller
             ]);
 
         // dept_name est chiffré en base : liste distincte construite côté PHP.
-        $departments = Employee::active()->get()
+        $departments = Employee::reportable()->get()
             ->pluck('dept_name')
             ->map(fn ($name) => trim((string) $name))
             ->filter(fn ($name) => $name !== '')

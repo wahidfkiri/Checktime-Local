@@ -30,7 +30,7 @@ class CustomReportController extends Controller
         $client = \App\Models\Setting::company();
         
         // Récupérer les employés pour les filtres
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::reportable()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -98,7 +98,7 @@ class CustomReportController extends Controller
     private function getPresencePonctualiteData($client, $startDate, $endDate, $empCode = 'all', $departmentId = 'all')
     {
         // Récupérer les employés selon les filtres
-        $employeesQuery = Employee::active()->whereNotNull('emp_code')
+        $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
         
         if ($empCode && $empCode !== 'all') {
@@ -236,7 +236,7 @@ class CustomReportController extends Controller
                 // Jour antérieur à l'enregistrement de l'employé, sans pointage :
                 // ni absence ni jour ouvré pour lui. Avec pointage, on le traite
                 // normalement.
-                if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, $attendance)) {
+                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance)) {
                     $blankCount++;
                     $currentDate->addDay();
                     continue;
@@ -514,7 +514,7 @@ class CustomReportController extends Controller
     {
         $index = [];
 
-        $rows = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])
+        $rows = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])
             ->whereNotNull('employee_id')
             ->get();
 

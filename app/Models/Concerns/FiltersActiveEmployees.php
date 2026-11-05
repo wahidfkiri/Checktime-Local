@@ -18,4 +18,15 @@ trait FiltersActiveEmployees
 
         return $query->whereIn($table . '.employee_id', Employee::active()->select('employees.id'));
     }
+
+    /**
+     * Pour les RAPPORTS portant sur une période : employés actifs + employés
+     * désactivés jusqu'à leur date de désactivation (voir Employee::activeDuring()).
+     */
+    public function scopeForReportEmployees($query, $periodStart)
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->whereIn($table . '.employee_id', Employee::activeDuring($periodStart)->select('employees.id'));
+    }
 }

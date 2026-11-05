@@ -685,7 +685,7 @@ class AttendanceSyncService
         // Jour antérieur à l'enregistrement de l'employé : il n'existait pas
         // encore, ce n'est pas une absence → aucune ligne (et on retire celle
         // qui aurait été créée auparavant, vide de tout pointage).
-        if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $date->format('Y-m-d'))) {
+        if (\App\Reports\AttendanceSupport::isOutOfService($employee, $date->format('Y-m-d'))) {
             DailyAttendance::where('employee_id', $employee->id)
                 ->whereDate('attendance_date', $date->format('Y-m-d'))
                 ->whereNull('check_in')->whereNull('check_out')->delete();

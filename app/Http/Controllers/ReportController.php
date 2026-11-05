@@ -56,7 +56,7 @@ class ReportController extends Controller
 
     public function absencesDelays(Request $request)
     {
-        $employees = Employee::active()->whereNotNull('emp_code')
+        $employees = Employee::reportable()->whereNotNull('emp_code')
             ->where('emp_code', '!=', '')
             ->orderBy('emp_code')
             ->get()
@@ -117,7 +117,7 @@ class ReportController extends Controller
             }
             
             // Récupérer les employés selon le filtre
-            $employeesQuery = Employee::active()->whereNotNull('emp_code')
+            $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')
                 ->where('emp_code', '!=', '');
             
             if ($empCode && $empCode !== 'all') {
@@ -388,7 +388,7 @@ class ReportController extends Controller
         // Jour antérieur à l'enregistrement de l'employé et sans aucun pointage :
         // ce n'est pas une absence (il n'existait pas encore) → pas de ligne.
         // S'il y a des pointages ce jour-là, ils sont affichés normalement.
-        if (\App\Reports\AttendanceSupport::isBeforeRegistration($employee, $dateStr, (object) [
+        if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, (object) [
             'check_in'  => $arrivalTime,
             'check_out' => $departureTime,
         ])) {
@@ -880,7 +880,7 @@ class ReportController extends Controller
             throw new \RuntimeException('Aucun device trouvé.');
         }
 
-        $employeesQuery = Employee::active()->whereNotNull('emp_code')
+        $employeesQuery = Employee::activeDuring($startDate)->whereNotNull('emp_code')
             ->where('emp_code', '!=', '');
 
         if ($empCode && $empCode !== 'all') {

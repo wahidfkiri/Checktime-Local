@@ -114,7 +114,7 @@ class SendWeeklyAttendanceReports extends Command
         $client = Setting::company();
 
         // ── Données pour la semaine ─────────────────────────────────
-        $allAttendances = DailyAttendance::forActiveEmployees()->whereBetween('attendance_date', [$startDate, $endDate])->get();
+        $allAttendances = DailyAttendance::forReportEmployees($startDate)->whereBetween('attendance_date', [$startDate, $endDate])->get();
 
         $allMissions = Mission::overlappingPeriod($startDate, $endDate)->get();
 
