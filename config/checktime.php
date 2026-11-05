@@ -14,7 +14,7 @@ return [
     | enregistrée par l'installeur ou l'écran des paramètres.
     |
     */
-    'base_url' => 'http://145.239.74.69:8080',
+    'base_url' => 'http://54.37.15.111',
 
     'timeout' => env('CHECKTIME_TIMEOUT', 30),
     'retry_attempts' => env('CHECKTIME_RETRY_ATTEMPTS', 3),

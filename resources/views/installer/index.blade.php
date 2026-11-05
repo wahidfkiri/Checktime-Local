@@ -225,9 +225,9 @@
                             <label class="form-label">URL de l'API <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-link"></i></span>
-                                <input type="url" class="form-control" name="api_url" id="api_url" placeholder="http://145.239.74.69:8080" required>
+                                <input type="url" class="form-control" name="api_url" id="api_url" placeholder="http://api.example.com" required>
                             </div>
-                            <div class="form-text">URL de base de l'API CheckTime (sans le slash final). Pour le serveur configuré dans ce projet, utilisez http://145.239.74.69:8080.</div>
+                            <div class="form-text">URL de base de l'API CheckTime (sans le slash final). Vérifiez le protocole (http/https) et le port configurés sur le serveur.</div>
                             <div class="invalid-feedback" id="error_api_url"></div>
                         </div>
                         <div class="mb-3">
