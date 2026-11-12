@@ -280,7 +280,7 @@ class CustomReportController extends Controller
             // Jours antérieurs à l'enregistrement de l'employé, sans pointage : ni
             // absence ni jour ouvré pour lui (colonne vide). S'il existe un
             // pointage réel ces jours-là, ils ne sont pas concernés.
-            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends);
+            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends, $missionDates + $leaveDates + $permissionDates);
             foreach (array_keys($blankDays) as $blankDay) {
                 unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
             }
@@ -317,7 +317,7 @@ class CustomReportController extends Controller
                     continue;
                 }
 
-                if ($status !== 'ABSENT') {
+                if (AttendanceSupport::isPresentStatus($status)) {
                     $totalPresent++;
 
                     $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateKey);
@@ -370,7 +370,7 @@ class CustomReportController extends Controller
                     continue;
                 }
 
-                if ($status === 'ABSENT') {
+                if (!AttendanceSupport::isPresentStatus($status)) {
                     $observations[] = [$dateKey, 'Absent le ' . $date];
                 } else {
                     $lateData = $this->calculateLateFromPlanning($employee, $attendance, $dateKey);
@@ -591,7 +591,7 @@ class CustomReportController extends Controller
 
                 // Jours antérieurs à l'enregistrement de l'employé, sans pointage :
                 // cellules vides (ni absence, ni jour ouvré pour lui).
-                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends);
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, $includeWeekends, $missionDates + $leaveDates + $permissionDates);
                 foreach (array_keys($blankDays) as $blankDay) {
                     unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
                 }
@@ -642,7 +642,7 @@ class CustomReportController extends Controller
                             'is_leave'       => false,
                             'leave_info'     => null,
                         ];
-                    } elseif ($attendance && strtoupper($attendance->status) !== 'ABSENT') {
+                    } elseif ($attendance && AttendanceSupport::isPresentStatus($attendance->status)) {
                         // Un pointage réel prévaut sur le congé : l'agent est
                         // physiquement présent, tandis que « Congé » reste
                         // visible dans les observations.
@@ -729,7 +729,7 @@ class CustomReportController extends Controller
                         || isset($blankDays[$dateKey])) {
                         continue;
                     }
-                    if ($status !== 'ABSENT' && !isset($missionDates[$dateKey])) {
+                    if (AttendanceSupport::isPresentStatus($status) && !isset($missionDates[$dateKey])) {
                         $totalPresent++;
                         $lateData = $this->calculateLateFromPlanning($employee, $att, $dateKey);
                         if ($lateData['is_late']) {
@@ -773,7 +773,7 @@ class CustomReportController extends Controller
                         continue;
                     }
 
-                    if ($status === 'ABSENT') {
+                    if (!AttendanceSupport::isPresentStatus($status)) {
                         $observations[] = [$dateKey, 'Absent le ' . $date];
                     } else {
                         $lateData = $this->calculateLateFromPlanning($employee, $att, $dateKey);

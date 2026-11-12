@@ -35,6 +35,98 @@ class CheckTimeService
     }
 
     /**
+     * Récupère TOUS les employés de l'API biométrique, toutes pages confondues.
+     *
+     * L'API renvoie les employés par pages (10 par défaut : le paramètre `limit`
+     * est ignoré) avec un champ `next` et un `count` total. On suit donc la
+     * pagination annoncée par l'API elle-même (`next`, que ce soit en `page=` ou
+     * en `offset=`) au lieu de supposer un format, on dédoublonne (une API qui
+     * ignorerait `page` renverrait sans fin la même page) et on compare le
+     * nombre récupéré au `count` annoncé.
+     *
+     * @return array{employees: array, count: ?int, complete: bool, pages: int}
+     * @throws \Exception si la première page échoue
+     */
+    public static function fetchAllEmployees(string $baseUrl, string $token, int $pageSize = 100): array
+    {
+        $endpoint = rtrim($baseUrl, '/') . '/personnel/api/employees/';
+        $params   = ['page' => 1, 'page_size' => $pageSize, 'limit' => $pageSize];
+
+        $employees = [];
+        $seen      = [];
+        $count     = null;
+        $pages     = 0;
+        $failed    = false;
+
+        for ($i = 0; $i < 2000; $i++) {
+            $response = Http::withHeaders([
+                    'Authorization' => 'Token ' . $token,
+                    'Accept'        => 'application/json',
+                ])
+                ->timeout(60)
+                ->retry(3, 1000, throw: false)
+                ->get($endpoint, $params);
+
+            if ($response->failed()) {
+                if ($pages === 0) {
+                    throw new \Exception('GET /personnel/api/employees/ a échoué (HTTP ' . $response->status() . ') : ' . $response->body());
+                }
+                \Log::warning('Pagination employés interrompue (HTTP ' . $response->status() . ') après ' . $pages . ' page(s)');
+                $failed = true;
+                break;
+            }
+
+            $pages++;
+            $json  = $response->json();
+            $batch = $json['data'] ?? (is_array($json) && array_is_list($json) ? $json : []);
+
+            if ($count === null && isset($json['count']) && is_numeric($json['count'])) {
+                $count = (int) $json['count'];
+            }
+
+            $new = 0;
+            foreach ($batch as $employee) {
+                $key = $employee['id'] ?? $employee['emp_code'] ?? md5(json_encode($employee));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key]  = true;
+                $employees[] = $employee;
+                $new++;
+            }
+
+            // Page vide ou déjà vue : fin (évite toute boucle infinie).
+            if ($new === 0) {
+                break;
+            }
+
+            if (!empty($json['next'])) {
+                // On reprend les paramètres de la page suivante annoncés par l'API
+                // (page=N ou offset=N&limit=M), sur l'URL configurée.
+                parse_str((string) parse_url($json['next'], PHP_URL_QUERY), $nextParams);
+                if (empty($nextParams)) {
+                    break;
+                }
+                $params = $nextParams + ['page_size' => $pageSize];
+            } elseif ($count !== null && count($employees) < $count) {
+                // Pas de `next` mais il en manque : essayer la page suivante.
+                $params['page'] = ($params['page'] ?? $pages) + 1;
+            } else {
+                break;
+            }
+
+            usleep(50000);
+        }
+
+        return [
+            'employees' => $employees,
+            'count'     => $count,
+            'complete'  => !$failed && ($count === null || count($employees) >= $count),
+            'pages'     => $pages,
+        ];
+    }
+
+    /**
      * Test de la validité du token avec une requête GET
      */
     public function testTokenValid(string $token): bool

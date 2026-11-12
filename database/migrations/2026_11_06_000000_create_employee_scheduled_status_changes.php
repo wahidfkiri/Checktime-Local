@@ -25,7 +25,8 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['applied_at', 'effective_date']);
+            // Nom explicite : le nom auto (65 caractères) dépasse la limite MySQL de 64.
+            $table->index(['applied_at', 'effective_date'], 'emp_sched_status_applied_effective_idx');
         });
 
         $now = now();

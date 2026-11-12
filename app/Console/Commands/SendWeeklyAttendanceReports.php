@@ -246,7 +246,7 @@ class SendWeeklyAttendanceReports extends Command
 
                 // ── Jours antérieurs à l'enregistrement de l'employé, sans pointage :
                 // cases vides (il n'existait pas encore), ni absence ni jour ouvré. ──
-                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, false, $missionDates + $leaveDates + $permissionDates);
                 foreach (array_keys($blankDays) as $blankDay) {
                     unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
                 }

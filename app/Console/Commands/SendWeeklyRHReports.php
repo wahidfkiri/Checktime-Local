@@ -256,7 +256,7 @@ class SendWeeklyRHReports extends Command
 
                 // Jours antérieurs à l'enregistrement de l'employé, sans pointage : cases
                 // vides, ni absence ni jour ouvré pour cet employé.
-                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+                $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, false, $missionDates + $leaveDates + $permissionDates);
                 foreach (array_keys($blankDays) as $blankDay) {
                     unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
                 }
@@ -507,7 +507,7 @@ class SendWeeklyRHReports extends Command
                     'mission_info' => null, 'leave_info' => null,
                     'permission_info' => $permissionDates[$dateStr],
                 ];
-            } elseif ($attendance && strtoupper($attendance->status) !== 'ABSENT') {
+            } elseif ($attendance && AttendanceSupport::isPresentStatus($attendance->status)) {
                 $checkIn = $attendance->check_in
                     ? ($attendance->check_in instanceof Carbon ? $attendance->check_in->format('H:i') : substr($attendance->check_in, 11, 5))
                     : null;
@@ -539,7 +539,7 @@ class SendWeeklyRHReports extends Command
             if (Carbon::parse($attDateStr)->dayOfWeekIso > 5 || isset($holidayDates[$attDateStr]) || isset($blankDays[$attDateStr])) continue;
             // Jour déjà couvert par mission/congé/autorisation : pas de double comptage.
             if (isset($missionDates[$attDateStr]) || isset($leaveDates[$attDateStr]) || isset($permissionDates[$attDateStr])) continue;
-            if ($status !== 'ABSENT') {
+            if (AttendanceSupport::isPresentStatus($status)) {
                 $totalPresent++;
                 if ($status === 'LATE') $totalLate++;
                 if ($status === 'EARLY_LEAVE') $totalEarlyLeave++;
@@ -586,7 +586,7 @@ class SendWeeklyRHReports extends Command
             if ($status === 'HALF_DAY') $observations[] = [$attDateStr, 'Demi-journée le ' . $date, 1];
             elseif ($status === 'LATE') $observations[] = [$attDateStr, 'Retard ' . ($att->late_minutes ?? 0) . ' min le ' . $date, 1];
             elseif ($status === 'EARLY_LEAVE') $observations[] = [$attDateStr, 'Départ anticipé le ' . $date, 1];
-            elseif ($status === 'ABSENT') $observations[] = [$attDateStr, 'Absent le ' . $date, 1];
+            elseif (!AttendanceSupport::isPresentStatus($status)) $observations[] = [$attDateStr, 'Absent le ' . $date, 1];
         }
         foreach ($missionDates as $dateStr => $m) {
             $observations[] = [$dateStr, 'Mission: ' . $m['title'] . ' (' . $m['destination'] . ') le ' . Carbon::parse($dateStr)->format('d/m'), 0];

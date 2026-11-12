@@ -246,7 +246,7 @@ class SendMonthlyRHReport extends Command
 
             // Jours antérieurs à l'enregistrement de l'employé, sans pointage : ni
             // absence ni jour ouvré pour lui (il n'existait pas encore).
-            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates);
+            $blankDays = AttendanceSupport::blankDays($employee, $startDate, $endDate, $employeeAttendances, $holidayDates, false, $missionDates + $leaveDates + $permissionDates);
             foreach (array_keys($blankDays) as $blankDay) {
                 unset($missionDates[$blankDay], $leaveDates[$blankDay], $permissionDates[$blankDay]);
             }
@@ -277,7 +277,7 @@ class SendMonthlyRHReport extends Command
                 }
 
                 $status = strtoupper($att->status);
-                if ($status !== 'ABSENT') {
+                if (AttendanceSupport::isPresentStatus($status)) {
                     $totalPresent++;
                     if ($status === 'LATE')        $totalLate++;
                     if ($status === 'EARLY_LEAVE') $totalEarlyLeave++;

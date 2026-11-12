@@ -19,6 +19,12 @@ class EmployeeController extends Controller
 {
     private CheckTimeService $api;
 
+    /** La dernière récupération a-t-elle ramené tous les employés annoncés par l'API ? */
+    private bool $lastFetchComplete = false;
+
+    /** Employés qui n'ont pas pu être enregistrés lors de la dernière synchronisation. */
+    private array $syncFailures = [];
+
     public function __construct(CheckTimeService $api)
     {
         $this->api = $api;
@@ -305,9 +311,11 @@ public function destroy($id)
             
             return response()->json([
                 'success' => true,
-                'message' => "Synchronisation terminée: {$totalEmployees} employés en base",
+                'message' => $this->syncSummary("Synchronisation terminée: {$totalEmployees} employés en base"),
                 'total_synced' => $synced,
-                'total_in_db' => $totalEmployees
+                'total_in_db' => $totalEmployees,
+                'failed' => $this->syncFailures,
+                'complete' => $this->lastFetchComplete,
             ]);
             
         } catch (\Exception $e) {
@@ -326,6 +334,7 @@ public function destroy($id)
     {
         $clientId = 1;
         
+        $this->syncFailures = [];
         Log::info("Synchronisation employés");
         
         try {
@@ -355,8 +364,18 @@ public function destroy($id)
                 
                 $deptName = $employeeData['department']['dept_name'] ?? null;
                 
+                // Un employé sans prénom ne doit pas disparaître de la synchronisation :
+                // repli sur le nom, le surnom, puis le code.
+                if ($employeeCode && !$firstName) {
+                    $firstName = $lastName ?: ($employeeData['nickname'] ?? null) ?: ('Employé ' . $employeeCode);
+                    if ($firstName === $lastName) {
+                        $lastName = '';
+                    }
+                }
+
                 if (!$employeeCode || !$firstName) {
-                    Log::warning("Employé ignoré: emp_code ou first_name manquant", ['emp_code' => $employeeCode]);
+                    Log::warning("Employé ignoré: emp_code manquant", ['id' => $employeeId]);
+                    $this->syncFailures[] = ['emp_code' => $employeeCode ?: ('id ' . $employeeId), 'error' => 'emp_code manquant'];
                     continue;
                 }
                 
@@ -402,7 +421,16 @@ public function destroy($id)
             Log::info("Client {$clientId}: " . count($employeeCodes) . " employés préparés");
             
             // Supprimer les employés obsolètes
-            $deletedCount = $this->cleanupMissingEmployees($employeeCodes, $clientId);
+            // Garde-fou : si la liste de l'API est incomplète (pagination interrompue)
+            // ou si des employés n'ont pas pu être enregistrés, ne RIEN supprimer —
+            // on effacerait à tort des employés (et leurs pointages) qui existent
+            // bien côté API.
+            if ($this->lastFetchComplete && empty($this->syncFailures)) {
+                $deletedCount = $this->cleanupMissingEmployees($employeeCodes, $clientId);
+            } else {
+                $deletedCount = 0;
+                Log::warning("Nettoyage des employés obsolètes ignoré : liste API incomplète ou employés non enregistrés.");
+            }
             
             Log::info("Client {$clientId}: Synchronisation terminée, {$deletedCount} employés supprimés");
             
@@ -419,64 +447,47 @@ public function destroy($id)
      */
     private function fetchAllEmployeesWithPagination(string $token): array
     {
-        $allEmployees = [];
-        $page = 1;
-        
+        $this->lastFetchComplete = false;
+
         try {
-            while (true) {
-                Log::debug("Récupération page {$page}");
-                
-                // Préparer les paramètres
-                $params = [
-                    'page' => $page,
-                    'limit' => 300
-                ];
-                
-                // Utiliser votre méthode get() existante
-                $response = $this->api->get('/personnel/api/employees/', $params, $token);
-                
-                if (!isset($response['data']) || !is_array($response['data'])) {
-                    Log::warning("Format de réponse invalide pour la page {$page}");
-                    break;
-                }
-                
-                $employees = $response['data'];
-                
-                if (empty($employees)) {
-                    Log::info("Page {$page} vide - fin de pagination");
-                    break;
-                }
-                
-                // Ajouter les employés de cette page
-                $allEmployees = array_merge($allEmployees, $employees);
-                Log::debug("Page {$page}: " . count($employees) . " employés");
-                
-                // Vérifier s'il y a une page suivante
-                $hasNext = isset($response['next']) && !empty($response['next']);
-                
-                if (!$hasNext) {
-                    Log::info("Pas de page suivante - fin de pagination");
-                    break;
-                }
-                
-                $page++;
-                
-                // Petite pause pour éviter de surcharger l'API
-                if ($page <= 100) { // Limite de sécurité
-                    usleep(100000); // 0.1 seconde
-                } else {
-                    Log::warning("Limite de pagination atteinte (10 pages)");
-                    break;
-                }
+            $result = \App\Services\CheckTimeService::fetchAllEmployees($this->api->getBaseUrl(), $token);
+
+            $this->lastFetchComplete = $result['complete'];
+
+            Log::info("Total récupéré: " . count($result['employees']) . " employés sur " . ($result['count'] ?? '?')
+                . " annoncés par l'API ({$result['pages']} page(s))");
+
+            if (!$result['complete']) {
+                Log::warning("L'API a annoncé {$result['count']} employés mais " . count($result['employees']) . " seulement ont été récupérés.");
             }
-            
-            Log::info("Total récupéré: " . count($allEmployees) . " employés");
-            
+
+            return $result['employees'];
         } catch (\Exception $e) {
             Log::error('Erreur fetchAllEmployeesWithPagination: ' . $e->getMessage());
         }
-        
-        return $allEmployees;
+
+        return [];
+    }
+
+    /**
+     * Complète le message de synchronisation avec les anomalies éventuelles :
+     * employés non enregistrés, liste API incomplète.
+     */
+    private function syncSummary(string $message): string
+    {
+        $failed = count($this->syncFailures);
+
+        if ($failed > 0) {
+            $codes = implode(', ', array_slice(array_column($this->syncFailures, 'emp_code'), 0, 10));
+            $message .= " — ATTENTION : {$failed} employé(s) non enregistré(s) ({$codes}" . ($failed > 10 ? ', …' : '')
+                . '), voir storage/logs/laravel.log.';
+        }
+
+        if (!$this->lastFetchComplete) {
+            $message .= " — ATTENTION : la liste renvoyée par l'API est incomplète.";
+        }
+
+        return $message;
     }
 
     /**
@@ -530,6 +541,7 @@ public function destroy($id)
                     );
                 } catch (\Exception $e) {
                     Log::error("Erreur pour emp_code {$data['emp_code']}: " . $e->getMessage());
+                    $this->syncFailures[] = ['emp_code' => $data['emp_code'], 'error' => mb_substr($e->getMessage(), 0, 160)];
                 }
             }
             
@@ -853,10 +865,11 @@ public function destroy($id)
             
             return response()->json([
                 'success' => true,
-                'message' => "Reset et synchronisation terminés: {$afterCount} employés",
+                'message' => $this->syncSummary("Reset et synchronisation terminés: {$afterCount} employés"),
                 'before' => $beforeCount,
                 'after' => $afterCount,
-                'synced' => $synced
+                'synced' => $synced,
+                'failed' => $this->syncFailures,
             ]);
             
         } catch (\Exception $e) {
@@ -886,36 +899,11 @@ public function destroy($id)
         try {
             Log::info('====== SYNCHRONISATION EMPLOYÉS (DEPUIS INSTALLATION) ======');
 
-            $allEmployees = [];
-            $page = 1;
+            $this->syncFailures = [];
 
-            while (true) {
-                $response = Http::withHeaders([
-                    "Authorization" => "Token " . $apiToken,
-                    "Accept" => "application/json"
-                ])
-                ->timeout(60)
-                ->get(rtrim($apiUrl, '/') . '/personnel/api/employees/', [
-                    'page' => $page,
-                    'limit' => 300
-                ]);
-
-                if ($response->failed()) {
-                    Log::warning("Page {$page} échouée: " . $response->status());
-                    break;
-                }
-
-                $data = $response->json();
-                $employees = $data['data'] ?? [];
-
-                if (empty($employees)) break;
-
-                $allEmployees = array_merge($allEmployees, $employees);
-
-                if (empty($data['next'])) break;
-                $page++;
-                usleep(100000);
-            }
+            $fetched = \App\Services\CheckTimeService::fetchAllEmployees($apiUrl, $apiToken);
+            $allEmployees = $fetched['employees'];
+            $this->lastFetchComplete = $fetched['complete'];
 
             if (empty($allEmployees)) {
                 Log::info('Aucun employé trouvé via API');
@@ -970,7 +958,11 @@ public function destroy($id)
                 $this->bulkUpsertEmployees($batchData);
             }
 
-            $this->cleanupMissingEmployees($employeeCodes, 1);
+            if ($this->lastFetchComplete && empty($this->syncFailures)) {
+                $this->cleanupMissingEmployees($employeeCodes, 1);
+            } else {
+                Log::warning("Nettoyage des employés obsolètes ignoré : liste API incomplète ou employés non enregistrés.");
+            }
 
             Cache::put('employees_last_sync_1', time(), now()->addHours(2));
 
@@ -980,7 +972,7 @@ public function destroy($id)
 
             return response()->json([
                 'success' => true,
-                'message' => "Synchronisation terminée: {$totalEmployees} employés en base",
+                'message' => $this->syncSummary("Synchronisation terminée: {$totalEmployees} employés en base"),
                 'total_synced' => count($employeeCodes),
                 'total_in_db' => $totalEmployees
             ]);

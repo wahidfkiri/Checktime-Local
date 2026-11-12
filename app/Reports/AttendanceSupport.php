@@ -163,24 +163,40 @@ class AttendanceSupport
     }
 
     /**
-     * Jour à laisser vide dans les rapports pour cet employé : désactivé ce
-     * jour-là (même s'il existe une ligne), ou antérieur à son enregistrement
-     * sans aucun pointage.
+     * Ce jour est-il à venir (après aujourd'hui) SANS aucune donnée de
+     * pointage ? Une période dont la date de fin est dans le futur ne doit
+     * pas afficher ces jours comme des absences : la case reste vide.
      */
-    public static function isOutOfService($employee, string $dateKey, $attendance = null): bool
+    public static function isFutureDay(string $dateKey, $attendance = null): bool
+    {
+        return Carbon::parse($dateKey)->startOfDay()->gt(Carbon::today())
+            && !self::hasPunchData($attendance);
+    }
+
+    /**
+     * Jour à laisser vide dans les rapports pour cet employé : désactivé ce
+     * jour-là (même s'il existe une ligne), antérieur à son enregistrement
+     * sans aucun pointage, ou à venir. Un jour à venir déjà justifié (congé,
+     * mission, autorisation : $justified) n'est pas vidé, la justification
+     * reste affichée.
+     */
+    public static function isOutOfService($employee, string $dateKey, $attendance = null, bool $justified = false): bool
     {
         return self::isInactiveOn($employee, $dateKey)
-            || self::isBeforeRegistration($employee, $dateKey, $attendance);
+            || self::isBeforeRegistration($employee, $dateKey, $attendance)
+            || (!$justified && self::isFutureDay($dateKey, $attendance));
     }
 
     /**
      * Jours (Y-m-d => true) de [$startDate, $endDate] à laisser vides pour cet
      * employé : jours ouvrés hors période d'activité (avant son enregistrement
-     * sans pointage, ou pendant une désactivation).
+     * sans pointage, pendant une désactivation, ou à venir sans justification).
      *
-     * @param  iterable $attendances  lignes daily_attendance de l'employé
+     * @param  iterable $attendances     lignes daily_attendance de l'employé
+     * @param  array    $justifiedDates  jours (Y-m-d => …) couverts par un congé,
+     *                                   une mission ou une autorisation
      */
-    public static function blankDays($employee, string $startDate, string $endDate, iterable $attendances = [], array $holidayDates = [], bool $includeWeekends = false): array
+    public static function blankDays($employee, string $startDate, string $endDate, iterable $attendances = [], array $holidayDates = [], bool $includeWeekends = false, array $justifiedDates = []): array
     {
         $byDate = [];
         foreach ($attendances as $a) {
@@ -194,7 +210,7 @@ class AttendanceSupport
         while ($cur->lte($end)) {
             $key = $cur->format('Y-m-d');
             if (($includeWeekends || $cur->dayOfWeekIso <= 5) && !isset($holidayDates[$key])
-                && self::isOutOfService($employee, $key, $byDate[$key] ?? null)) {
+                && self::isOutOfService($employee, $key, $byDate[$key] ?? null, isset($justifiedDates[$key]))) {
                 $blank[$key] = true;
             }
             $cur->addDay();

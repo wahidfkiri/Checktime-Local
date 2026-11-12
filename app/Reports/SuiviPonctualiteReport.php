@@ -115,7 +115,10 @@ class SuiviPonctualiteReport
 
                 // Jour antérieur à l'enregistrement de l'employé et sans pointage :
                 // case vide (il n'existait pas encore), pas une absence.
-                if (AttendanceSupport::isOutOfService($employee, $dateKey, $attendance)) {
+                $justified  = isset($leaveDates[$dateKey]) || isset($missionDates[$dateKey]) || isset($permissionDates[$dateKey]);
+
+                // (ou jour à venir sans congé/mission/autorisation : case vide aussi)
+                if (AttendanceSupport::isOutOfService($employee, $dateKey, $attendance, $justified)) {
                     $cells[$dateKey] = ['text' => '', 'detail' => '', 'type' => 'blank'];
                     continue;
                 }
@@ -134,7 +137,7 @@ class SuiviPonctualiteReport
                     continue;
                 }
 
-                if (!$attendance || strtoupper($attendance->status) === 'ABSENT') {
+                if (!$attendance || !AttendanceSupport::isPresentStatus($attendance->status)) {
                     $cells[$dateKey] = ['text' => 'absent', 'detail' => '', 'type' => 'absent'];
                     continue;
                 }

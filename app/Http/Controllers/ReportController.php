@@ -391,7 +391,7 @@ class ReportController extends Controller
         if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, (object) [
             'check_in'  => $arrivalTime,
             'check_out' => $departureTime,
-        ])) {
+        ], $isOnLeave || $hasPermission)) {
             return null;
         }
 
