@@ -176,15 +176,20 @@ class AttendanceSupport
     /**
      * Jour à laisser vide dans les rapports pour cet employé : désactivé ce
      * jour-là (même s'il existe une ligne), antérieur à son enregistrement
-     * sans aucun pointage, ou à venir. Un jour à venir déjà justifié (congé,
-     * mission, autorisation : $justified) n'est pas vidé, la justification
-     * reste affichée.
+     * sans aucun pointage, ou à venir.
+     *
+     * Un jour justifié (congé, mission ou autorisation approuvé : $justified)
+     * n'est JAMAIS vidé avant l'enregistrement ni à venir : la justification
+     * prouve que l'employé existait et doit rester affichée (comme un
+     * pointage réel). Seule la désactivation prime sur tout.
      */
     public static function isOutOfService($employee, string $dateKey, $attendance = null, bool $justified = false): bool
     {
         return self::isInactiveOn($employee, $dateKey)
-            || self::isBeforeRegistration($employee, $dateKey, $attendance)
-            || (!$justified && self::isFutureDay($dateKey, $attendance));
+            || (!$justified && (
+                self::isBeforeRegistration($employee, $dateKey, $attendance)
+                || self::isFutureDay($dateKey, $attendance)
+            ));
     }
 
     /**

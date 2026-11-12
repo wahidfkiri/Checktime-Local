@@ -233,15 +233,6 @@ class CustomReportController extends Controller
                     ->where('attendance_date', $dateStr)
                     ->first();
 
-                // Jour antérieur à l'enregistrement de l'employé, sans pointage :
-                // ni absence ni jour ouvré pour lui. Avec pointage, on le traite
-                // normalement.
-                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance)) {
-                    $blankCount++;
-                    $currentDate->addDay();
-                    continue;
-                }
-                
                 // Vérifier les permissions
                 $hasPermission = $this->hasPermission($employee->id, $dateStr, $permissions);
                 
@@ -250,6 +241,15 @@ class CustomReportController extends Controller
 
                 // Vérifier les missions
                 $isOnMission = $this->isEmployeeOnMission($employee->id, $dateStr, $missions);
+
+                // Jour antérieur à l'enregistrement de l'employé, sans pointage ni
+                // justification : ni absence ni jour ouvré pour lui. Un pointage ou
+                // un congé / mission / autorisation est traité normalement.
+                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance, $isOnLeave || $isOnMission || $hasPermission)) {
+                    $blankCount++;
+                    $currentDate->addDay();
+                    continue;
+                }
                 
                 // Récupérer le planning pour calculer les retards
                 $schedule = $this->getEmployeeScheduleForDate($employee, $dateStr);

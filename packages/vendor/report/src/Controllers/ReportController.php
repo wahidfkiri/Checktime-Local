@@ -207,12 +207,6 @@ class ReportController extends Controller
                 $key = $empCode . '_' . $dateStr;
                 $attendance = $attendances->get($key);
 
-                // Jour antérieur à l'enregistrement de l'employé, sans pointage :
-                // pas une absence → pas de ligne. Avec pointage, affiché normalement.
-                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance ? $attendance->first() : null)) {
-                    continue;
-                }
-                
                 // Récupérer le planning pour cette date
                 $schedule = $this->getEmployeeScheduleForDateNew($employee, $dateStr);
                 
@@ -220,6 +214,13 @@ class ReportController extends Controller
                 $isOnLeave = $this->isEmployeeOnLeave($employee->id, $dateStr, $leaves);
                 $hasPermission = $this->hasPermission($employee->id, $dateStr, $permissions);
                 $isOnMission = $this->isEmployeeOnMission($employee->id, $dateStr, $missions);
+
+                // Jour antérieur à l'enregistrement de l'employé, sans pointage ni
+                // justification : pas une absence → pas de ligne. Un pointage ou un
+                // congé / mission / autorisation est affiché normalement.
+                if (\App\Reports\AttendanceSupport::isOutOfService($employee, $dateStr, $attendance ? $attendance->first() : null, $isOnLeave || $isOnMission || $hasPermission)) {
+                    continue;
+                }
                 
                 // Calculer les données de présence
                 $result = $this->calculateAttendanceData(
