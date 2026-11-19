@@ -623,15 +623,20 @@
                     @foreach($days_list as $day)
                         @php
                             $dayPresent = 0;
+                            $dayBlank   = 0;
                             foreach ($department['employees'] as $emp) {
                                 $c = $emp['daily_checks'][$day['date_str']] ?? null;
-                                if ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE', 'PERMISSION', 'BLANK'], true)) {
+                                if ($c && strtoupper($c['status']) === 'BLANK') {
+                                    $dayBlank++;
+                                } elseif ($c && !in_array(strtoupper($c['status']), ['ABSENT', 'CONGE', 'PERMISSION'], true)) {
                                     $dayPresent++;
                                 }
                             }
                         @endphp
                         <td colspan="2" class="small-note" style="text-align: center;">
-                            @if($dayPresent > 0)
+                            {{-- Jour vide pour tous (ex. jour à venir) : rien à afficher. --}}
+                            @if($dayBlank === count($department['employees']))
+                            @elseif($dayPresent > 0)
                                 {{ $dayPresent }}/{{ $department['total_employees'] }}
                             @else
                                 -
