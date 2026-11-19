@@ -2916,9 +2916,44 @@ class DailyAttendanceController extends Controller
             $request->validate([
                 'date' => 'nullable|date_format:Y-m-d',
                 'days_back' => 'nullable|integer|min:1|max:30',
-                'force' => 'nullable|boolean'
+                'force' => 'nullable|boolean',
+                'start_date' => 'nullable|date_format:Y-m-d|required_with:end_date',
+                'end_date' => 'nullable|date_format:Y-m-d|required_with:start_date|after_or_equal:start_date',
             ]);
-            
+
+            // Période choisie dans les filtres (Date début / Date fin). La page
+            // découpe les longues périodes en tranches de 31 jours au plus, une
+            // requête par tranche, pour rester sous le délai du serveur web.
+            if ($request->filled('start_date')) {
+                $periodStart = Carbon::parse($request->input('start_date'))->startOfDay();
+                $periodEnd = Carbon::parse($request->input('end_date'))->startOfDay();
+                if ($periodEnd->gt(Carbon::today())) {
+                    $periodEnd = Carbon::today(); // pas de pointage dans le futur
+                }
+                if ($periodStart->gt($periodEnd)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'La période choisie est entièrement dans le futur : aucun pointage à synchroniser.'
+                    ], 422);
+                }
+                if ($periodStart->diffInDays($periodEnd) > 30) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Une requête de synchronisation est limitée à 31 jours.'
+                    ], 422);
+                }
+
+                $this->attendanceService->syncPeriod($periodStart, $periodEnd);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Synchronisation effectuée du {$periodStart->format('d/m/Y')} au {$periodEnd->format('d/m/Y')}",
+                    'stats' => $this->getTodayStats($client),
+                    'today_data' => $this->getTodayDataFromDatabase($client),
+                    'sync_time' => now()->format('H:i:s')
+                ]);
+            }
+
             $specificDate = $request->input('date');
             $daysBack = $request->input('days_back', 7);
             $force = $request->input('force', false);

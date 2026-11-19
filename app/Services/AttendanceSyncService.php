@@ -721,6 +721,57 @@ class AttendanceSyncService
     }
     
     /**
+     * Synchroniser les pointages de tous les employés actifs sur une période
+     * précise (date début → date fin incluses), puis recalculer les résumés
+     * quotidiens de chaque jour de la période. Utilisé par le bouton
+     * "Synchroniser" de /admin/daily-attendance avec les dates des filtres.
+     */
+    public function syncPeriod(Carbon $start, Carbon $end)
+    {
+        set_time_limit(0);
+
+        $token = CheckTimeService::getConfigToken();
+
+        if (!$token) {
+            Log::warning("Pas de token configuré pour la synchronisation");
+            return false;
+        }
+
+        $startDate = $start->copy()->startOfDay();
+        $endDate = $end->copy()->endOfDay();
+
+        $employees = Employee::whereNotNull('emp_code')->where('status', 'active')->get();
+        $successCount = 0;
+
+        foreach ($employees as $employee) {
+            try {
+                if ($this->syncEmployeeForDate($employee, $token, $startDate, $endDate)) {
+                    $successCount++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Erreur {$employee->emp_code} du {$startDate->format('Y-m-d')} au {$endDate->format('Y-m-d')}: " . $e->getMessage());
+                continue;
+            }
+
+            usleep(50000);
+        }
+
+        Log::info("Période {$startDate->format('Y-m-d')} → {$endDate->format('Y-m-d')}: {$successCount}/" . $employees->count() . " employés avec pointages");
+
+        $currentDate = $startDate->copy()->startOfDay();
+        while ($currentDate->lte($endDate)) {
+            try {
+                $this->updateDailySummaryForDate($currentDate->copy());
+            } catch (\Exception $e) {
+                Log::error("Erreur résumé pour {$currentDate->format('Y-m-d')}: " . $e->getMessage());
+            }
+            $currentDate->addDay();
+        }
+
+        return true;
+    }
+
+    /**
      * Synchroniser pour une date spécifique
      */
     public function syncForDate(Carbon $date)

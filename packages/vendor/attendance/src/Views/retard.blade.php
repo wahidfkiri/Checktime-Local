@@ -296,9 +296,98 @@ $(document).ready(function() {
 
     // Bouton de synchronisation — appelle réellement l'API biométrique
     // (contrairement à "Appliquer", qui ne fait que relire la base locale).
+    // ========== SYNCHRONISATION PAR PÉRIODE ==========
+    // La synchronisation suit la période choisie (Date début / Date fin).
+    // Elle est découpée en tranches de 31 jours au plus, envoyées l'une après
+    // l'autre, pour qu'aucune requête ne dépasse le délai du serveur web.
+    var SYNC_CHUNK_DAYS = 31;
+
+    function syncYmd(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function syncFr(ymd) {
+        var p = ymd.split('-');
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    // [] = aucune date choisie (30 derniers jours), null = période invalide.
+    function buildSyncChunks(startStr, endStr) {
+        if (!startStr || !endStr) {
+            return [];
+        }
+        var start = new Date(startStr + 'T00:00:00');
+        var end = new Date(endStr + 'T00:00:00');
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (end > today) {
+            end = today; // pas de pointage à récupérer dans le futur
+        }
+        if (isNaN(start) || isNaN(end) || start > end) {
+            return null;
+        }
+        var chunks = [];
+        var cursor = new Date(start);
+        while (cursor <= end) {
+            var chunkEnd = new Date(cursor);
+            chunkEnd.setDate(chunkEnd.getDate() + SYNC_CHUNK_DAYS - 1);
+            if (chunkEnd > end) {
+                chunkEnd = new Date(end);
+            }
+            chunks.push({ start: syncYmd(cursor), end: syncYmd(chunkEnd) });
+            cursor = new Date(chunkEnd);
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        return chunks;
+    }
+
+    function syncPeriodInChunks(chunks, progressInterval, handlers) {
+        var url = "{{ route('admin.daily-attendance.sync.data') }}";
+        var token = "{{ csrf_token() }}";
+
+        if (!chunks.length) {
+            $.ajax({ url: url, type: 'POST', data: { _token: token, days_back: 30 }, success: handlers.success, error: handlers.error });
+            return;
+        }
+
+        var index = 0;
+        (function next() {
+            var chunk = chunks[index];
+            if (chunks.length > 1) {
+                clearInterval(progressInterval); // progression réelle, tranche par tranche
+                updateSyncProgressBar(Math.round(index * 100 / chunks.length),
+                    'Période ' + (index + 1) + '/' + chunks.length + ' : du ' + syncFr(chunk.start) + ' au ' + syncFr(chunk.end));
+            }
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: { _token: token, start_date: chunk.start, end_date: chunk.end },
+                success: function(response) {
+                    if (!response.success || index === chunks.length - 1) {
+                        if (response.success) {
+                            response.message = 'Synchronisation effectuée du ' + syncFr(chunks[0].start)
+                                + ' au ' + syncFr(chunks[chunks.length - 1].end);
+                        }
+                        handlers.success(response);
+                        return;
+                    }
+                    index++;
+                    next();
+                },
+                error: handlers.error
+            });
+        })();
+    }
+
     $('#syncDataBtn').on('click', function() {
         if (isGeneratingPDF || isGeneratingReport || isSyncing) {
             showSweetAlert('info', 'Info', 'Une opération est déjà en cours. Veuillez patienter.');
+            return;
+        }
+
+        var syncChunks = buildSyncChunks($('#filter_start_date').val(), $('#filter_end_date').val());
+        if (syncChunks === null) {
+            showSweetAlert('error', 'Erreur', 'La date de début ne peut pas être après la date de fin.');
             return;
         }
 
@@ -317,13 +406,7 @@ $(document).ready(function() {
 
                 var progressInterval = simulateSyncProgress();
 
-                $.ajax({
-                    url: "{{ route('admin.daily-attendance.sync.data') }}",
-                    type: 'POST',
-                    data: {
-                        _token: "{{ csrf_token() }}",
-                        days_back: 30 // Maximum autorisé côté serveur
-                    },
+                syncPeriodInChunks(syncChunks, progressInterval, {
                     success: function(response) {
                         clearInterval(progressInterval);
 
