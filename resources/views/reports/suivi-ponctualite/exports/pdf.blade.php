@@ -48,6 +48,11 @@
         .legende { margin-top: 8px; font-size: 7px; color: #444; }
         .legende span { display: inline-block; border: 1px solid #bbb; padding: 0 5px; margin-right: 4px; }
 
+        .observation {
+            float: left; width: 34%; margin-top: 22px;
+            font-size: 9px; color: #000; border: 1px solid #555; padding: 6px 8px;
+        }
+
         .pied { position: fixed; bottom: -8px; left: 0; right: 0; text-align: center; font-size: 6.5px; color: #777; }
         .pied .page-number:before { content: "Page " counter(page); }
     </style>
@@ -128,7 +133,17 @@
         — pour une journée travaillée, la cellule donne l'arrivée et le départ, l'anomalie figurant en dessous.
     </div>
 
-    {{-- Cartouche commun aux rapports : postes et responsables de /settings. --}}
+    {{-- Observation à gauche, cartouche des signataires (/settings) à droite. --}}
+    @php
+        $totalMinutesRetard = (int) ($report['totals']['minutes'] ?? 0);
+        $observationRetard = $totalMinutesRetard > 0
+            ? $totalMinutesRetard . ' minute' . ($totalMinutesRetard > 1 ? 's' : '') . ' de retard au total.'
+            : 'aucun retard enregistré sur la période.';
+    @endphp
+    <div class="observation">
+        <strong>Observation :</strong> {{ $observationRetard }}
+    </div>
+
     @include('reports.exports.partials.signataires', ['signatairePostes' => $signatairePostes ?? collect()])
 
     <div class="pied">
