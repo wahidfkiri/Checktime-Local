@@ -134,6 +134,8 @@
         
         .page-break { page-break-after: always; }
         
+        .footer .page-number:before { content: counter(page); }
+
         .footer {
             position: fixed;
             bottom: -35px;
@@ -425,9 +427,7 @@
     
     <!-- Pied de page -->
     <div class="footer">
-        Page <span class="page-number"></span> sur <span class="page-count"></span> |
-        Généré le {{ $export_date->format('d/m/Y à H:i') }} |
-        © {{ date('Y') }} {{ $companyName }}
+        Page <span class="page-number"></span>
     </div>
 </body>
 </html>

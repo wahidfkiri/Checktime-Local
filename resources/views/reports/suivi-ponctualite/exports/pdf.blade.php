@@ -48,12 +48,8 @@
         .legende { margin-top: 8px; font-size: 7px; color: #444; }
         .legende span { display: inline-block; border: 1px solid #bbb; padding: 0 5px; margin-right: 4px; }
 
-        .signatures { margin-top: 22px; width: 100%; }
-        .signatures td { border: none; text-align: center; font-size: 8px; padding-top: 6px; }
-        .signature-poste { font-weight: bold; }
-        .signature-ligne { margin-top: 26px; border-top: 1px solid #555; width: 70%; margin-left: auto; margin-right: auto; }
-
         .pied { position: fixed; bottom: -8px; left: 0; right: 0; text-align: center; font-size: 6.5px; color: #777; }
+        .pied .page-number:before { content: "Page " counter(page); }
     </style>
 </head>
 <body>
@@ -132,21 +128,11 @@
         — pour une journée travaillée, la cellule donne l'arrivée et le départ, l'anomalie figurant en dessous.
     </div>
 
-    @if($signatairePostes->count() > 0)
-        <table class="signatures">
-            <tr>
-                @foreach($signatairePostes as $poste)
-                    <td>
-                        <div class="signature-poste">{{ $poste->name ?? $poste->libelle ?? '' }}</div>
-                        <div class="signature-ligne"></div>
-                    </td>
-                @endforeach
-            </tr>
-        </table>
-    @endif
+    {{-- Cartouche commun aux rapports : postes et responsables de /settings. --}}
+    @include('reports.exports.partials.signataires', ['signatairePostes' => $signatairePostes ?? collect()])
 
     <div class="pied">
-        {{ $companyName }} — Tableau de Suivi de la Ponctualité — exporté le {{ $export_date->format('d/m/Y à H:i') }}
+        <span class="page-number"></span>
     </div>
 </body>
 </html>

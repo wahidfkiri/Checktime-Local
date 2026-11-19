@@ -328,8 +328,7 @@
     
     <!-- Pied de page -->
     <div class="footer">
-        <span class="page-number"></span> | 
-        Rapport généré le {{ $export_date->format('d/m/Y à H:i') }} par le système CHECKTIME - Tél: 0141555592.
+        <span class="page-number"></span>
     </div>
 </body>
 </html>
